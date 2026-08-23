@@ -1,0 +1,9 @@
+.venv/
+upstream/NextLat/.git/
+.env
+*.pt
+*.ckpt
+data/
+output/
+__pycache__/
+.agent_state/*.log
