@@ -7,3 +7,4 @@ data/
 output/
 __pycache__/
 .agent_state/*.log
+.secrets/
