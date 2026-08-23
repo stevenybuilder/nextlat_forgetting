@@ -83,3 +83,32 @@ and, for the later bottleneck-width ablation:
 > We also do not study how the width of the hidden layers in the latent dynamics MLP
 > affects learning, even though it effectively acts as a bottleneck that constrains
 > belief-state capacity and may influence performance across tasks.
+
+**Smoke test green on L4 (third attempt).** 20 NextLat steps at the paper architecture
+(12L/6H/384, `mtp_horizon=3`, `lambda_mse=lambda_kl=1.0`, `proj_factor=0.5`) on a 2,000-graph
+toy corpus. Train loss 4.38 -> 4.31, validation loss tracked it, and the run wrote
+`ckpt_iter_*.pt`, a `latest_ckpt` pointer, `materialized_config.yaml`, and `version_0/metrics.csv`.
+End-to-end transport is therefore proven: local script -> Colab runtime -> pinned repo ->
+training -> durable artifacts -> GCS.
+
+The third attempt is the point. Attempt 1 reported success while running blind. Attempt 2
+reported success while `train.py` was in fact dying on `Missing key test_generalization`,
+because a hand-written config had dropped a key the trainer requires. Only attempt 3 — with
+child output relayed, exit codes unmasked, and the config *derived from the official YAML by
+overriding permitted keys only* — actually trained. The spec's rule "copy the official Path-Star
+configuration, do not reconstruct an approximate one from this document" earned its place.
+
+Also observed: upstream retains only the latest and best checkpoints (`ckpt_iter_10` was deleted
+once `ckpt_iter_20` existed). The spec requires two *verified* recovery checkpoints with the
+oldest deleted only after the newest is loaded and hashed, so the durable layer has to own
+retention rather than delegating it upstream.
+
+**H1's extraction point needed correcting before a single confirmatory run.** The spec says to
+take the state at the final prompt delimiter `=` (index 62). But the token generated from index
+62 is `path[0]`, the *source* — which is already printed in the prompt's `/source,goal` field, so
+predicting it is a copy, and it is identical across every member of a quartet by construction. The
+first genuine *branch* decision is `path[1]`, generated from index 63. Extracting only at `=`
+risked measuring a state whose immediate prediction target cannot differ between near-safe and
+near-critical. Resolution, frozen before any model is trained: extract both positions, keep index
+62 as the preregistered primary for PSI, and compute every correct-branch logit margin from index
+63.

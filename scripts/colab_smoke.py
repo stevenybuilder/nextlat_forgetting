@@ -110,60 +110,50 @@ sh("python -c \"import lightning, omegaconf; print('lightning', lightning.__vers
    check=False)
 
 print("=== 5. tiny stargraph data (pipeline test only, NOT scientific) ===", flush=True)
-sh("cd %s && python data/stargraph/prepare.py --num_samples 2000 --num_test_samples 200 "
-   "--num_paths 5 --path_len 5 --max_nodes 100 --generate_test_data "
-   "--data_dir data/stargraph" % WORK, check=False)
-sh("ls -la %s/data/stargraph/ | head" % WORK, check=False)
+# prepare.py prints a 50-character progress bar per sample with a carriage return; relayed
+# line-by-line that is one log line per graph and it floods the exec stream. Import the
+# generator and call it directly with showLoadingBar=False instead of shelling out.
+train_txt = os.path.join(WORK, "data/stargraph/graph_5_5_sample_2000.txt")
+if not os.path.exists(train_txt):
+    sys.path.insert(0, WORK)
+    from data.stargraph.prepare import generate_and_save_star_or_sink_graph_data as gen
+    t0 = time.time()
+    gen(numOfSamples=2000, numOfTestSamples=200, numOfPathsFromSource=5, lenOfEachPath=5,
+        maxNodes=100, data_dir=os.path.join(WORK, "data/stargraph"),
+        generate_test_data=True, showLoadingBar=False)
+    print("GEN_2200_SECONDS=%.1f" % (time.time() - t0), flush=True)
+else:
+    print("data already present, skipping generation", flush=True)
+sh("ls -la %s/data/stargraph/" % WORK, check=False)
 sh("head -c 300 %s/data/stargraph/graph_5_5_sample_2000.txt" % WORK, check=False)
 
 print("\n=== 6. 20-step NextLat run ===", flush=True)
-cfg = os.path.join(WORK, "config/stargraph/5_5/nextlat_smoke.yaml")
-with open(cfg, "w") as f:
-    f.write("""use_nextlat: true
-trainer:
-  epochs: -1
-  train_batches: 20
-  val_batches: 2
-  test_batches: 2
-  log_interval: 1
-  val_interval: 10
-  test_interval: 1000
-  out_dir: /content/out_smoke
-  init_from: scratch
-  compile: false
-  experiment_name: smoke
-  wandb_project: null
-data:
-  dataset: stargraph
-  effective_batch_size: 64
-  gradient_accum_steps: 1
-  num_workers: 0
-  stargraph_train_data_path: "data/stargraph/graph_5_5_sample_2000.txt"
-  stargraph_test_data_path: "data/stargraph/graph_5_5_test_200.txt"
-  stargraph_max_nodes: 100
-model:
-  n_layer: 12
-  n_head: 6
-  n_embd: 384
-  dropout: 0.0
-  bias: false
-  block_size: 1024
-  gpt_mode: next_token
-  lambda_kl: 1.0
-  lambda_mse: 1.0
-  mtp_horizon: 3
-  proj_factor: 0.5
-optimizer:
-  optimizer_type: adam
-  learning_rate: 5e-4
-  weight_decay: 0.1
-  beta1: 0.9
-  beta2: 0.95
-  grad_clip: 100
-lr_scheduler:
-  warmup_iters: 0
-  warmdown_iters: 0
-""")
+# Derive the smoke config from the OFFICIAL yaml rather than writing one by hand. A
+# reconstructed config silently drops keys the trainer requires -- the first attempt at
+# this died on `Missing key test_generalization` -- which is exactly why the spec says to
+# copy the official configuration and override only what is permitted.
+import yaml  # noqa: E402
+
+OFFICIAL = os.path.join(WORK, "config/stargraph/5_5/nextlat_stargraph_5_5.yaml")
+cfg_path = os.path.join(WORK, "config/stargraph/5_5/nextlat_smoke.yaml")
+with open(OFFICIAL) as f:
+    conf = yaml.safe_load(f)
+conf["trainer"].update({
+    "train_batches": 20, "val_batches": 2, "test_batches": 2, "val_interval": 10,
+    "test_interval": 1000, "out_dir": "/content/out_smoke", "compile": False,
+    "experiment_name": "smoke", "wandb_project": "stargraph",
+})
+conf["data"].update({
+    "effective_batch_size": 64,
+    "stargraph_train_data_path": "data/stargraph/graph_5_5_sample_2000.txt",
+    "stargraph_test_data_path": "data/stargraph/graph_5_5_test_200.txt",
+})
+conf.pop("sweep", None)  # a sweep would launch five seeds; the smoke test wants one
+with open(cfg_path, "w") as f:
+    yaml.safe_dump(conf, f, sort_keys=False)
+print("smoke config derived from official; overridden keys only", flush=True)
+sh("cat " + cfg_path, check=False)
+
 os.environ["WANDB_MODE"] = "disabled"
 os.environ["WANDB_SILENT"] = "true"
 t0 = time.time()
