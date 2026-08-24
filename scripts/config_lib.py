@@ -12,9 +12,50 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from typing import Any, Dict, Iterable, List, Tuple
 
 import yaml
+
+
+class OmegaConfCompatLoader(yaml.SafeLoader):
+    """SafeLoader with the float resolver OmegaConf installs.
+
+    PyYAML follows YAML 1.1, whose implicit float pattern requires a decimal point before an
+    exponent, so plain `yaml.safe_load` reads the shipped `learning_rate: 5e-4` as the STRING
+    '5e-4'. OmegaConf replaces that resolver (omegaconf/_utils.py, `get_yaml_loader`) with a
+    pattern whose second alternative accepts `[-+]?[0-9][0-9_]*[eE][-+]?[0-9]+`, so upstream
+    reads 5e-4 as the float 0.0005.
+
+    The generator deliberately uses plain SafeLoader/SafeDumper, which round-trips `5e-4`
+    verbatim and keeps the emitted file a literal copy of the official text. This loader is
+    used only where a check must see the value the trainer will actually see.
+    """
+
+
+OmegaConfCompatLoader.add_implicit_resolver(
+    "tag:yaml.org,2002:float",
+    re.compile(
+        r"""^(?:
+     [-+]?(?:[0-9][0-9_]*)\.[0-9_]*(?:[eE][-+]?[0-9]+)?
+    |[-+]?(?:[0-9][0-9_]*)(?:[eE][-+]?[0-9]+)
+    |\.[0-9_]+(?:[eE][-+][0-9]+)?
+    |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*
+    |[-+]?\.(?:inf|Inf|INF)
+    |\.(?:nan|NaN|NAN))$""",
+        re.X,
+    ),
+    list("-+0123456789."),
+)
+
+
+def load_yaml_as_trainer_sees_it(path: str) -> Dict[str, Any]:
+    """Parse a config the way OmegaConf will parse it inside train.py."""
+    with open(path, "r") as fh:
+        obj = yaml.load(fh, Loader=OmegaConfCompatLoader)
+    if not isinstance(obj, dict):
+        raise ValueError(f"{path} did not parse to a mapping")
+    return obj
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPSTREAM = os.path.join(REPO_ROOT, "upstream", "NextLat")

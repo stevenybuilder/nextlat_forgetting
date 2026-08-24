@@ -187,9 +187,9 @@ def solve_edges(
     if indeg[source] != 0:
         raise GraphError("source has an incoming edge")
     for node in nodes:
-        if node is source:
+        if node == source:
             continue
-        if node != source and indeg[node] != 1:
+        if indeg[node] != 1:
             raise GraphError(f"node {node} has in-degree {indeg[node]}, expected 1")
     if len(adj[source]) != num_arms:
         raise GraphError(f"source out-degree {len(adj[source])}, expected {num_arms}")
@@ -254,8 +254,15 @@ def canonical_graph_key(edges: Iterable[Edge], source: int, goal: int) -> str:
 
     Two serializations of one graph (base and repeat) collide here on purpose — that is
     what makes this a stronger leakage test than hashing the prompt string.
+
+    The canonical order is a **lexicographic sort of the formatted edge strings**, not a
+    numeric sort of the pairs.  Both are total orders, but they disagree ("10,5" < "2,3"
+    as text, the reverse as numbers), and :meth:`TrainingIndex.build` reaches the same key
+    without parsing 4 million integers.  The two implementations must agree; the leakage
+    positive control in ``tests/test_lure_generator.py`` is what enforces that, and it is
+    what caught this exact mismatch the first time round.
     """
-    body = "|".join(f"{u},{v}" for u, v in sorted(edges))
+    body = "|".join(sorted(f"{u},{v}" for u, v in edges))
     return hashlib.sha256(f"{body}/{source},{goal}".encode()).hexdigest()
 
 
@@ -409,7 +416,17 @@ def check_quartet(record: Mapping, max_nodes: int = MAX_NODES) -> List[str]:
             problems.append(f"{c}: answer length changed")
         if len(token_ids(p.prompt, max_nodes)) != base_prompt_len:
             problems.append(f"{c}: prompt token length changed")
-        if node_frequency(p.prompt, max_nodes) != base_freq:
+        freq = node_frequency(p.prompt, max_nodes)
+        if c == "far_critical":
+            # Spec §5 asks far-critical only for "the same node multiset"; it is a
+            # repartition, so a node that terminated an arm in base may sit mid-arm in
+            # far.  The node *set* and the multiset of per-node frequencies are still
+            # exactly preserved, and that is what is asserted here.
+            if set(freq) != set(base_freq):
+                problems.append("far_critical: node set changed")
+            if sorted(freq.values()) != sorted(base_freq.values()):
+                problems.append("far_critical: node frequency multiset changed")
+        elif freq != base_freq:
             problems.append(f"{c}: node multiset/frequency changed")
         if degree_sequence(p.edges) != base_deg:
             problems.append(f"{c}: degree sequence changed")

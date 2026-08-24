@@ -1,0 +1,32 @@
+{
+  "generator": "src/lurestar/generate.py",
+  "master_seed": 20260823,
+  "config": {
+    "max_nodes": 100,
+    "far_max_edge_overlap": 2,
+    "far_max_tries": 500,
+    "self_check": true
+  },
+  "counts": {
+    "e_lure_quartets": 2000,
+    "a_pair": 1000,
+    "b_near": 5000,
+    "b_far": 15000
+  },
+  "train_file": "/Users/stevenyang/Documents/nextlat_forgetting/data/stargraph/graph_5_5_sample_200000.txt",
+  "invariants": [
+    "LS-1",
+    "LS-2"
+  ],
+  "far_edge_overlap_histogram": {
+    "0": 288,
+    "1": 820,
+    "2": 892
+  },
+  "sha256": {
+    "e_lure.jsonl": "f67765e6ea2afd4156c9d03ad0271afe224f1a54ddf1afc82118fcc3e4541495",
+    "a_pair.jsonl": "e70fb087b6b1dd6fa7129303bbc4bcc30843c327fcab168937976295cbf2dd10",
+    "b_near.jsonl": "7e4a414fc51c693e850fb5a0e01a651e3e78cb01304ddf1704cf11aad5314528",
+    "b_far.jsonl": "364978600eb73a6e9044e812dd974fe6a2df509b7f256079dc3c7d2ec8ab99e3"
+  }
+}

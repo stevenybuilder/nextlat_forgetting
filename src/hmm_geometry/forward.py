@@ -67,6 +67,7 @@ __all__ = [
 ]
 
 _PROB_TOL = 1e-12
+HASH_DECIMALS = 12
 
 
 @dataclass(frozen=True)
@@ -105,7 +106,7 @@ class HMM:
                 raise ValueError(f"{name} rows must sum to 1, got {sums}")
         # Freeze normalised, read-only copies so no caller can mutate a "frozen" HMM in place.
         for name, m in (("transition", t), ("emission", e), ("initial", p)):
-            m = np.clip(m, 0.0, None)
+            m = np.clip(m, 0.0, None).astype(np.float64)
             m = m / m.sum(axis=-1, keepdims=True)
             m.flags.writeable = False
             object.__setattr__(self, name, m)
@@ -170,12 +171,26 @@ class HMM:
         )
 
     def sha256(self) -> str:
-        """Hash of the canonical JSON of the matrices.
+        """Hash of the canonical JSON of the matrices, rounded to `HASH_DECIMALS` decimals.
 
         This is the identity used everywhere downstream: a manifest, a pair bank or a dataset
-        that was built under a different HMM must not silently be usable with this one.
+        built under different matrices must not silently be usable with these ones.
+
+        The rounding is the point, not a shortcut. The constructor renormalises its inputs, and
+        `x / sum(x)` is not idempotent in float64 -- reloading an HMM from the manifest it wrote
+        can perturb the last bit of an entry. Without rounding the digest would then change for
+        an HMM that is, by any meaning of the word, the same one, and every downstream identity
+        check would fire spuriously. Twelve decimals on a probability distinguishes any two
+        matrices anyone would deliberately write down, and is far coarser than the perturbation.
         """
-        blob = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
+        rounded = {
+            "n_states": self.n_states,
+            "n_obs": self.n_obs,
+            "transition": np.round(self.transition, HASH_DECIMALS).tolist(),
+            "emission": np.round(self.emission, HASH_DECIMALS).tolist(),
+            "initial": np.round(self.initial, HASH_DECIMALS).tolist(),
+        }
+        blob = json.dumps(rounded, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 

@@ -144,3 +144,79 @@ tail of child output, so its own steady-state estimate silently returned `null` 
 were recovered by parsing the full local log); and peak VRAM was read from `torch.cuda` in the driver
 process rather than the `fabric run` child, so it reported 0.00 GB. **Peak VRAM is therefore still
 unmeasured** and must be captured on the first confirmatory run.
+
+## Durable checkpoint / resume contract — implemented and forced-interruption tested
+
+`src/lurestar/durable_checkpoint.py`, `scripts/run_matrix.py`, `tests/test_resume.py`,
+`tests/test_run_matrix.py`. 35 tests, all passing on the CPU-only host in 12 s.
+
+**The mandatory recovery test passes bitwise.** 300 steps uninterrupted; then the same 300-step
+job, `SIGKILL`ed at step 150 (a real child process, `returncode == -9`, no `finally`, no flush),
+resumed from the newest verified checkpoint at step 125, finished at 300. Measured
+`max |delta param| = 0.000e+00`, and step, both Adam moment buffers, `lr_scheduler_state`,
+data epoch/cursor/permutation and every `metrics/step_*.json` are equal. The stated tolerance is
+therefore exact zero, not a bound.
+
+That only means something because the falsifier is also tested: with the python and numpy RNG
+states *dropped* from the checkpoint — which is upstream's real behaviour, since its checkpoint
+carries only model/optimizer/scheduler/step (UPSTREAM_REPORT §3.1) and `train.py:170` reseeds on
+every launch — the same experiment diverges by `7.012e-02`. So the spec's contingency ("if the
+trajectories materially diverge, add Python, NumPy, CPU and CUDA RNG states") is confirmed as the
+expected path, and the RNG state is in the checkpoint from the start.
+
+One real bug found while building it, worth recording because it is the kind that survives a
+casual resume test: restoring the numpy Generator and *then* constructing the data sampler drew a
+permutation from the freshly restored Generator, forking the trajectory while every counter still
+matched. Step, `opt.t`, `last_epoch`, epoch and cursor all agreed; only the weights differed.
+Data position is now asserted separately from RNG restoration for exactly that reason.
+
+Four mutations were run against the finished layer to check the tests can fail: disabling the
+rollback in `resolve()` (4 failures), publishing the pointer before verification (1), keeping
+three checkpoints instead of two (1), and skipping RNG restore (2). Each broke the intended test
+and nothing else.
+
+Retention, atomicity and the pointer are now owned by our layer, closing UPSTREAM_REPORT §3.5
+items 1-4: `.partial` + fsync + rename for both checkpoints and pointers, hash *and* read-back
+before a record enters the index, two-deep retention with the oldest deleted only after the newest
+verifies, and `finalize()` clearing the stale `recovery_ckpt` that would otherwise hard-fail the
+next resume at `core_train.py:148-150`.
+
+## Representation extraction and the H1/H2 evaluation math — implemented and mutation-tested
+
+`src/lurestar/representations.py`, `src/lurestar/evaluate.py`, `tests/test_representations.py`,
+`docs/EXTRACTION.md`. 37 tests, all passing on the CPU-only host
+(`.venv/bin/python -m pytest tests/test_representations.py` → `37 passed in 5.46s`).
+
+The file is split at a hard line: **Layer A** is pure numpy (distances, centering, whitening,
+shrinkage, margins, index resolution) and **Layer B** is the only torch-touching code, with
+`import torch` inside the functions so the module imports cleanly here. `evaluate.py` is entirely
+Layer A. Layer B encodes the forward-pass asymmetry and nothing else: GPT returns `(logits, h)`
+(`model_gpt.py:290-291`), NextLat early-returns `(token_embeds, text_embd)` at
+`model_nextlat.py:199-200` and never applies `lm_head`, so the caller applies it
+(`model_nextlat.py:121`). The state is `transformer.norm(x)` — RMS-normalized, because
+`bias: false` sends `LayerNorm.forward` to `F.rms_norm` (`model_base.py:823-830`).
+
+The extraction correction is now frozen in code as `PSI_EXTRACTION_INDEX = 62` /
+`BRANCH_MARGIN_INDEX = 63`, with `resolve_extraction_indices()` re-deriving both from a real
+token batch and refusing a ragged or shifted one.
+
+**The suite was mutation-tested rather than merely run.** Fourteen deliberately wrong
+implementations were built and the suite had to kill each: swapped extraction indices, centered
+cosine ignoring the pool mean, a leaked cross-fit, a too-narrow bootstrap, a reversed PSI sign, a
+dropped whitening transform, a full-vocab branch margin, a removed leakage guard, a removed
+shrinkage floor, a removed seeds-are-not-items guard, a removed ragged-batch check.
+
+One mutant survived the first pass: **taking the centering mean from the scored pair instead of
+the declared E_lure pool**. That is exactly the silent way to manufacture a PSI effect, and the
+first version of the suite could not see it — the analytic geometry was built from mirrored item
+pairs whose per-pair mean coincides with the pool mean. Fixed by
+`test_psi_distances_center_on_the_DECLARED_pool_and_not_on_the_scored_pair`, which pins the
+identity against the declared pool *and* asserts the pair-derived pool gives a materially
+different answer. Both halves are needed; the first alone would pass whenever the two pools
+happen to coincide. All fourteen mutants now die.
+
+Inferential units are separated by argument type, not by convention: item-level functions take
+arrays, and `model_contrast_seed_level` takes a `Mapping {seed_id: statistic}` and raises
+`TypeError` on an array — so a 20,000-item array cannot be passed where three seeds belong. With
+three seeds the exact two-sided sign-flip p has a floor of 0.25, which is reported alongside the
+interval and every per-seed value.

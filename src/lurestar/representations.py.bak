@@ -352,7 +352,7 @@ class Whitener:
             alpha = float(shrinkage)
         if not 0.0 <= alpha <= 1.0:
             raise ValueError(f"shrinkage must be in [0, 1]; got {alpha}")
-        pass
+        alpha = max(alpha, float(min_shrinkage))
         mu = np.trace(S) / p
         Sig = (1.0 - alpha) * S + alpha * mu * np.eye(p)
         evals, evecs = np.linalg.eigh(Sig)
