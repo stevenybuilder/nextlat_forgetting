@@ -323,7 +323,13 @@ def neighborhood_retrieval(
     cos_dist = 1.0 - x @ x.T
     np.fill_diagonal(cos_dist, np.inf)
 
-    js = js_divergence(beliefs[:, None, :], beliefs[None, :, :])
+    # Chunked: the full (n, n, S) broadcast would allocate several hundred MB at n ~ 2,000, and
+    # js_divergence builds three such intermediates. Rows are computed in blocks instead.
+    js = np.empty((n, n), dtype=np.float64)
+    block = max(1, int(2e7 // (n * beliefs.shape[1])))
+    for lo in range(0, n, block):
+        hi = min(lo + block, n)
+        js[lo:hi] = js_divergence(beliefs[lo:hi, None, :], beliefs[None, :, :])
     np.fill_diagonal(js, np.inf)
 
     knn_state = np.argsort(cos_dist, axis=1, kind="stable")[:, :k]

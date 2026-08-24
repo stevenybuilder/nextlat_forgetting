@@ -12,7 +12,7 @@
       "observations_file": "data/hmm/hmm4x4_train_len32_100000.npy",
       "observations_sha256": "1912e878d96fd264cb48f87f015b48c3772f58426d6d5289cdbdc5128fbe34b9",
       "observations_dtype": "int8",
-      "seconds": 0.83
+      "seconds": 0.43
     },
     "val": {
       "n_sequences": 10000,
@@ -26,7 +26,7 @@
       "mean_belief_entropy_bits": 1.1319569750437208,
       "bayes_next_obs_accuracy": 0.41570625,
       "mean_conditional_nll_nats": 1.2995416251877567,
-      "seconds": 0.57
+      "seconds": 0.24
     },
     "lengen": {
       "n_sequences": 10000,
@@ -40,10 +40,10 @@
       "mean_belief_entropy_bits": 1.1267893667633158,
       "bayes_next_obs_accuracy": 0.4183765625,
       "mean_conditional_nll_nats": 1.2975437597695012,
-      "seconds": 0.85
+      "seconds": 0.51
     }
   },
-  "pair_bank_split_rule": "the validation split is cut in half by sequence index: [0, 5000) is the pair-bank calibration pool that thresholds are frozen from, [5000, 10000) is the test pool those frozen thresholds are applied to. The lengen split is a third, length-64 pool.",
+  "pair_bank_split_rule": "both evaluation splits are cut in half by sequence index. val[0:5000] and lengen[0:5000] are the pair-bank calibration pools that thresholds are frozen from; val[5000:10000] and lengen[5000:10000] are the test pools those frozen thresholds are applied to, unchanged. The length-64 band is calibrated from its own half because the high-edit-distance cut is a per-length quantile and no length in 33..64 appears in the length-32 band.",
   "train_posteriors": "not stored; recomputable exactly with forward_batch(load_frozen_hmm()[0], obs)",
-  "generated_at_unix": 1787531343
+  "generated_at_unix": 1787532763
 }

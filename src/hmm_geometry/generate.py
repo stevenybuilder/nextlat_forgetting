@@ -517,9 +517,12 @@ def generate_corpus(
         "seed_scheme": "numpy.random.SeedSequence(DATA_SEED).spawn(3) -> train, val, lengen",
         "splits": entry,
         "pair_bank_split_rule": (
-            "the validation split is cut in half by sequence index: [0, 5000) is the pair-bank "
-            "calibration pool that thresholds are frozen from, [5000, 10000) is the test pool "
-            "those frozen thresholds are applied to. The lengen split is a third, length-64 pool."
+            "both evaluation splits are cut in half by sequence index. val[0:5000] and "
+            "lengen[0:5000] are the pair-bank calibration pools that thresholds are frozen from; "
+            "val[5000:10000] and lengen[5000:10000] are the test pools those frozen thresholds "
+            "are applied to, unchanged. The length-64 band is calibrated from its own half "
+            "because the high-edit-distance cut is a per-length quantile and no length in "
+            "33..64 appears in the length-32 band."
         ),
         "train_posteriors": (
             "not stored; recomputable exactly with forward_batch(load_frozen_hmm()[0], obs)"

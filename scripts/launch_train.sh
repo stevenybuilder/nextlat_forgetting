@@ -86,20 +86,27 @@ esac
 
 # --- preconditions upstream fails silently on ------------------------------------------
 
+[[ -f "$NEXTLAT_REPO/train.py" ]] || die "no train.py under NEXTLAT_REPO=$NEXTLAT_REPO"
+[[ -f "$NEXTLAT_REPO/defaults.yaml" ]] || die "train.py loads defaults.yaml relative to CWD \
+(train.py:348); $NEXTLAT_REPO/defaults.yaml is missing"
+
+# Every check below runs in DRY_RUN too; nothing below MUTATES anything in DRY_RUN. Seeding
+# a resume pointer from a dry run is not a preview, it is a decision: a later real launch
+# with the right parent would find the pointer already present, print "ignoring
+# LURESTAR_PARENT_CKPT", and adapt from whatever the dry run happened to name.
+SEED_POINTER=""
+
 if [[ "$CONFIG_NAME" == adapt_* ]]; then
   # core_train.py:139-168: init_from=resume prefers {out_dir}/recovery_ckpt, falls back to
   # {out_dir}/latest_ckpt, and if NEITHER exists it prints two "Could not find" lines and
   # builds a SCRATCH model. For an adaptation branch that would silently train a fresh
   # random network on 5,000 items, so refuse to launch without a pointer.
-  mkdir -p "$OUT_DIR"
   if [[ ! -f "$OUT_DIR/recovery_ckpt" && ! -f "$OUT_DIR/latest_ckpt" ]]; then
     [[ -n "${LURESTAR_PARENT_CKPT:-}" ]] || die "first launch of $EXP needs LURESTAR_PARENT_CKPT=\
 <absolute path to the step-rebased frozen parent checkpoint>; without a pointer at \
 $OUT_DIR/latest_ckpt upstream would train from scratch"
     [[ -f "$LURESTAR_PARENT_CKPT" ]] || die "LURESTAR_PARENT_CKPT does not exist: $LURESTAR_PARENT_CKPT"
-    printf '%s' "$LURESTAR_PARENT_CKPT" > "$OUT_DIR/latest_ckpt.partial"
-    mv "$OUT_DIR/latest_ckpt.partial" "$OUT_DIR/latest_ckpt"
-    echo "seeded $OUT_DIR/latest_ckpt -> $LURESTAR_PARENT_CKPT"
+    SEED_POINTER="$LURESTAR_PARENT_CKPT"
   elif [[ -n "${LURESTAR_PARENT_CKPT:-}" ]]; then
     echo "note: branch already has a resume pointer; ignoring LURESTAR_PARENT_CKPT" >&2
   fi
@@ -120,12 +127,6 @@ datamodule registration to the working copy first (see docs/CONFIG_DEVIATIONS.md
   fi
 fi
 
-[[ -f "$NEXTLAT_REPO/train.py" ]] || die "no train.py under NEXTLAT_REPO=$NEXTLAT_REPO"
-[[ -f "$NEXTLAT_REPO/defaults.yaml" ]] || die "train.py loads defaults.yaml relative to CWD \
-(train.py:348); $NEXTLAT_REPO/defaults.yaml is missing"
-
-mkdir -p "$OUT_DIR"
-
 CMD=(fabric run --devices 1 --precision "$LURESTAR_PRECISION")
 if [[ -n "$LURESTAR_STRATEGY" ]]; then CMD+=(--strategy "$LURESTAR_STRATEGY"); fi
 CMD+=("${LURESTAR_ENTRY:-train.py}" --config "$CONFIG_PATH"
@@ -138,9 +139,20 @@ echo "# model/seed  $MODEL / $SEED"
 echo "# out_dir     $OUT_DIR"
 echo "# experiment  $EXP"
 echo "# cwd         $NEXTLAT_REPO"
+[[ -n "$SEED_POINTER" ]] && echo "# would seed  $OUT_DIR/latest_ckpt -> $SEED_POINTER"
 printf '+ '; printf '%q ' "${CMD[@]}"; echo
 
-if [[ "${DRY_RUN:-0}" == "1" ]]; then exit 0; fi
+if [[ "${DRY_RUN:-0}" == "1" ]]; then
+  echo "# DRY_RUN=1: nothing was created, no pointer was written"
+  exit 0
+fi
+
+mkdir -p "$OUT_DIR"
+if [[ -n "$SEED_POINTER" ]]; then
+  printf '%s' "$SEED_POINTER" > "$OUT_DIR/latest_ckpt.partial"
+  mv "$OUT_DIR/latest_ckpt.partial" "$OUT_DIR/latest_ckpt"
+  echo "seeded $OUT_DIR/latest_ckpt -> $SEED_POINTER"
+fi
 
 cd "$NEXTLAT_REPO"
 exec "${CMD[@]}"

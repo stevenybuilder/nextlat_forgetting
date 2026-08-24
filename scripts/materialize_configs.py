@@ -9,7 +9,7 @@ hand-written smoke config dropped `data.test_generalization` and train.py died w
 omegaconf ConfigAttributeError at the first validation.
 
 This generator therefore never *writes* a config. It *edits* a parsed copy of the official
-file, and enforces four invariants before anything reaches disk:
+file, and enforces five invariants before anything reaches disk:
 
   I1  No upstream key may vanish.       Every dotted key of the source YAML must survive
                                         into the output, unless it appears in that config's
@@ -24,6 +24,14 @@ file, and enforces four invariants before anything reaches disk:
   I4  Frozen keys stay frozen.          The spec-section-8 / PROGRAM.md frozen surface may
                                         only move where a config family carries a written
                                         spec authority for it (H3 adaptation, HMM).
+  I5  Pools are bound to families.      A base run reads the frozen 200,000/20,000 corpus
+                                        and nothing else; an adaptation branch reads only
+                                        its OWN B_near / B_far bank, out of the immutable
+                                        adaptation directory, and may never name a reserved
+                                        evaluation pool. Upstream cannot tell these files
+                                        apart -- data/stargraph.py:187-190 parses only the
+                                        `5_5` in the name -- so a swapped or leaked bank is
+                                        invisible to every other check in this repository.
 
 Usage:
     .venv/bin/python scripts/materialize_configs.py            # write configs/
@@ -47,6 +55,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config_lib import (  # noqa: E402
     CONFIGS_DIR,
     DEFAULTS_YAML,
+    OFFICIAL_BST_5_5,
+    OFFICIAL_BST_5_5,
     OFFICIAL_GPT_5_5,
     OFFICIAL_NEXTLAT_5_5,
     UPSTREAM,
@@ -86,9 +96,91 @@ B_FAR_VAL = f"{MANIFESTS}/adapt/graph_5_5_bfarval_2000.txt"
 PREREGISTERED_SEEDS = [1234, 1235, 1236]
 DEFAULT_SEED = PREREGISTERED_SEEDS[0]
 
+# --------------------------------------------------------------------------------------
+# I5: pool identity.
+#
+# `data/stargraph.py:187-190` reads only `split("_")[1]` and `[2]` out of a data path, i.e.
+# `5` and `5`. Every stargraph bank in this project therefore looks identical to upstream,
+# and nothing downstream can tell B_near from B_far or either from the base corpus.
+#
+# Two mutations that the rest of this generator, `--check`, and the whole config suite were
+# blind to before this invariant existed:
+#
+#   * swapping the near and far banks. Spec sec.6's primary outcome is
+#     `erosion_near - erosion_far`; a swap negates it exactly, and every artifact downstream
+#     still carries correct-looking provenance.
+#   * pointing an adaptation bank at `E_lure` (or at the base corpus). Spec sec.5: "No
+#     E_lure graph or lure may enter base or adaptation training."
+#
+# So the branch name, the bank filename and the directory a bank may live in are bound to
+# each other here, and the binding is asserted again on the emitted files in
+# tests/test_configs.py so it does not depend on this file being right.
+# --------------------------------------------------------------------------------------
+ADAPT_BANK_DIR = f"{MANIFESTS}/adapt"
+ADAPT_BANK_TAGS = {"near": "bnear", "far": "bfar"}
+# Pools that exist only to be evaluated on. A training or validation path that names one is
+# a leakage bug, not a typo.
+RESERVED_POOL_TOKENS = ("elure", "e_lure", "apair", "a_pair", "stimuli")
+BASE_CORPUS_PATHS = (CORPUS_TRAIN, CORPUS_TEST)
+STARGRAPH_PATH_KEYS = ("data.stargraph_train_data_path", "data.stargraph_test_data_path")
+
+
+def _check_pool_identity(name: str, plan: Dict[str, Any], cfg: Dict[str, Any]) -> None:
+    """I5. Raise unless every stargraph path in `cfg` names the pool its family may use."""
+    family = plan["family"]
+    if family == "lurestar":
+        for key, expected in zip(STARGRAPH_PATH_KEYS, BASE_CORPUS_PATHS):
+            got = get_dotted(cfg, key)
+            if got != expected:
+                raise AssertionError(
+                    f"{name}: {key} is {got!r}, not the frozen base corpus {expected!r}. "
+                    f"Spec sec.8 fixes the 200,000/20,000 graph corpus for every base run."
+                )
+        return
+    if family != "adapt":
+        return
+
+    branch = plan["branch"]
+    own = ADAPT_BANK_TAGS[branch]
+    other = ADAPT_BANK_TAGS["far" if branch == "near" else "near"]
+    for key in STARGRAPH_PATH_KEYS:
+        path = get_dotted(cfg, key)
+        base = os.path.basename(path)
+        rel = os.path.relpath(path, ROOT)
+        if path in BASE_CORPUS_PATHS:
+            raise AssertionError(
+                f"{name}: {key} points at the base training corpus {path!r}; the adaptation "
+                f"branches must read their own immutable B_{branch} bank."
+            )
+        for token in RESERVED_POOL_TOKENS:
+            if token in rel.lower():
+                raise AssertionError(
+                    f"{name}: {key} = {path!r} names the reserved evaluation pool "
+                    f"{token!r}. Spec sec.5: no E_lure graph or lure may enter base or "
+                    f"adaptation training."
+                )
+        if os.path.dirname(path) != ADAPT_BANK_DIR:
+            raise AssertionError(
+                f"{name}: {key} = {path!r} is not under the immutable adaptation bank "
+                f"directory {ADAPT_BANK_DIR!r}"
+            )
+        if own not in base:
+            raise AssertionError(
+                f"{name}: {key} = {base!r} does not carry its own branch tag {own!r}. "
+                f"Spec sec.6's primary outcome is erosion_near - erosion_far, so a bank "
+                f"that is not bound to its branch silently negates the result."
+            )
+        if other in base:
+            raise AssertionError(
+                f"{name}: {key} = {base!r} carries the OPPOSITE branch tag {other!r}; the "
+                f"near and far banks are swapped."
+            )
+
 # Spec section 8 / PROGRAM.md "Frozen surface". A move here is a scientific change, not a
 # configuration change, and needs a written spec authority recorded in EXEMPT_FROZEN.
 FROZEN_KEYS = [
+    "use_bst",
+    "use_nextlat",
     "model.n_layer",
     "model.n_head",
     "model.n_embd",
@@ -97,9 +189,24 @@ FROZEN_KEYS = [
     "model.gpt_mode",
     "model.mtp_horizon",
     "model.proj_factor",
+    # The BST objective's one scientific knob, the counterpart of mtp_horizon for NextLat.
+    # core_train.py:80 feeds it into BSTConfig; upstream sets it to 2 in the shipped 5_5 BST
+    # YAML and to 1 in defaults.yaml:98, so an arm that loses the explicit value silently
+    # trains a different objective. Inert for every non-BST config (both sides resolve to 1).
+    "model.bst_pair_minimum_gap",
     "model.lambda_mse",
     "model.lambda_kl",
     "model.lambda_ce",
+    # BST objective surface. Only `bst_pair_minimum_gap` is written in the official BST
+    # YAML; the other three resolve out of defaults.yaml:98-104 and are hoisted so that a
+    # defaults change cannot move them silently. All four are read at core_train.py:75-84.
+    "model.bst_pair_minimum_gap",
+    "model.bst_pair_maximum_gap",
+    "model.bst_pair_subsample_rate",
+    "model.bst_single_gap_prediction_mode",
+    # Chunk size for BST's text head. model_bst.py:600-601 folds the resulting chunk count
+    # into `texthead_loss_div`, so this is a loss-scaling key, not a memory knob.
+    "data.pair_batch_size",
     "optimizer.optimizer_type",
     "optimizer.learning_rate",
     "optimizer.weight_decay",
@@ -271,6 +378,118 @@ def build_nextlat_lurestar(seed: int = DEFAULT_SEED) -> Dict[str, Any]:
     }
 
 
+def build_bst_lurestar(seed: int = DEFAULT_SEED) -> Dict[str, Any]:
+    """Condition 3: the competence-matched control.
+
+    `docs/DECISION_D20_competence_gate.md`, "Superseded in part": the paper's Figure 6 puts
+    GPT on G(5,5) at ~18.6% (= 1/d, chance) and BST at ~99.9%. A NextLat-versus-GPT geometry
+    gap is therefore confounded with task success; a NextLat-versus-BST gap is not, because
+    both arms solve the task and only the objective differs. The official BST YAML is the
+    GPT YAML plus `use_bst: true` and `model.bst_pair_minimum_gap: 2`, so the arm is
+    architecture-matched by construction (12 layers / 6 heads / 384 dim) rather than by
+    assertion.
+    """
+    cfg = build_gpt_lurestar(seed)
+    return {
+        "source": OFFICIAL_BST_5_5,
+        "overrides": _common_lurestar("bst", seed) + _provenance(
+            OFFICIAL_BST_5_5,
+            "Condition 3 of spec sec.8: the architecture-matched transformer trained with "
+            "the official Belief State Transformer objective on G(5,5). This is the "
+            "COMPETENCE-MATCHED control -- it solves Path-Star (~99.9%, paper Fig.6) "
+            "without a latent-transition objective, which is what makes the primary "
+            "NextLat-vs-BST geometry contrast identifiable. See "
+            "docs/DECISION_D20_competence_gate.md.",
+        ),
+        "hoists": cfg["hoists"] + [
+            Hoist("use_nextlat",
+                  "defaults.yaml:3 false. The shipped BST YAML omits the key entirely "
+                  "(unlike the GPT YAML, which states it), so restating it makes this file "
+                  "a complete model-selection statement instead of relying on the ordering "
+                  "of the if-chain at core_train.py:38-46, where use_bst is merely tested "
+                  "first."),
+            Hoist("model.bst_pair_maximum_gap",
+                  "defaults.yaml:99 is -1 (no maximum). Read unconditionally at "
+                  "core_train.py:81 for every BST run; pinned next to the minimum gap so "
+                  "the objective's surface is fully stated in the file."),
+            Hoist("model.bst_pair_subsample_rate",
+                  "defaults.yaml:102 is 1.0 (all pairs). core_train.py:82."),
+            Hoist("model.bst_single_gap_prediction_mode",
+                  "defaults.yaml:104 is 'eos'. core_train.py:41-43 asserts membership in "
+                  "['next_token', 'eos'] before the model is built, so an absent or drifted "
+                  "value fails the run at construction."),
+        ],
+        "drops": [],
+        "family": "lurestar",
+    }
+
+
+def build_bst_lurestar(seed: int = DEFAULT_SEED) -> Dict[str, Any]:
+    """Condition 3 of spec sec.8: the Belief State Transformer competence-matched control.
+
+    The official BST G(5,5) YAML differs from the official GPT G(5,5) YAML by exactly two
+    written keys -- `use_bst: true` and `model.bst_pair_minimum_gap: 2` -- plus the absence
+    of `use_nextlat` and a different `trainer.experiment_name`. It is COPIED, like the other
+    two arms; nothing here is reconstructed.
+
+    Four BST-only keys the trainer reads are NOT written in that YAML and resolve out of
+    `defaults.yaml`, which is the same shape of hazard as the NextLat `proj_factor` trap
+    (docs/FOUNDATIONS.md D-07): a scientifically relevant value reachable only through a
+    fallback. `core_train.py:75-84` puts three of them into `model_args`, and
+    `core_train.py:38-45` asserts a fourth before the model is even built. They are hoisted
+    at their resolved values and pinned in FROZEN_KEYS.
+    """
+    cfg = build_gpt_lurestar(seed)
+    return {
+        "source": OFFICIAL_BST_5_5,
+        "overrides": _common_lurestar("bst", seed) + _provenance(
+            OFFICIAL_BST_5_5,
+            "Condition 3 of spec sec.8: the architecture-matched Belief State Transformer, "
+            "the competence-matched control. The paper's Figure 6 puts BST at ~99.9% on "
+            "G(5,5) against GPT at ~18.6% (1/d chance), so BST solves Path-Star WITHOUT a "
+            "latent-transition objective and a NextLat-vs-BST PSI gap is attributable to "
+            "the objective rather than to task success. See "
+            "docs/DECISION_D20_competence_gate.md.",
+        ),
+        "hoists": cfg["hoists"] + [
+            Hoist("use_nextlat",
+                  "defaults.yaml:3 false. The BST YAML is the only 5_5 config that omits "
+                  "this flag; gpt_stargraph_5_5.yaml:2 writes it. Restated so the "
+                  "core_train.py:38-58 dispatch chain (use_bst -> use_nextlat -> "
+                  "use_mtp_*) is fully explicit in the file."),
+            Hoist("model.bst_pair_maximum_gap",
+                  "THE BST analogue of the proj_factor trap. Read at core_train.py:81, "
+                  "written in NO stargraph YAML, resolved from defaults.yaml:99 to -1, "
+                  "which model_bst.py:377-378 turns into `max_gap = document_len`, i.e. "
+                  "train on every gap. Pinned so a defaults edit cannot silently truncate "
+                  "the pair set."),
+            Hoist("model.bst_pair_subsample_rate",
+                  "Read at core_train.py:82, written in NO stargraph YAML, resolved from "
+                  "defaults.yaml:102 to 1.0, which model_bst.py:478-483 reads as 'keep all "
+                  "valid pairs' (the subsample branch is skipped entirely). Anything below "
+                  "1.0 makes the training set stochastic per step."),
+            Hoist("model.bst_single_gap_prediction_mode",
+                  "Read at core_train.py:80 and ASSERTED at core_train.py:41-44 to be one "
+                  "of ['next_token', 'eos']; resolved from defaults.yaml:104 to 'eos'. "
+                  "Inert at bst_pair_minimum_gap: 2, because model_bst.py:584-588 only "
+                  "rewrites targets for pairs of gap exactly 1 and a minimum gap of 2 "
+                  "produces none -- but a missing value would abort the run before the "
+                  "first step, and a minimum-gap change would make it live."),
+            Hoist("data.pair_batch_size",
+                  "Read at core_train.py:495 and :635 and passed to compute_loss for every "
+                  "arm; GPT and NextLat ignore it ('Extra arguments ignored for "
+                  "compatibility with BST', model_gpt.py:342, model_nextlat.py:418), BST "
+                  "does not. Written in NO stargraph YAML, resolved from defaults.yaml:67 "
+                  "to 32768. It is a LOSS-SCALING key, not a memory knob: model_bst.py:600 "
+                  "computes pair_accum_steps = ceil(n_pairs / pair_batch_size) and :601 "
+                  "folds it into texthead_loss_div, so a value below the per-sequence pair "
+                  "count turns the text-head loss into a mean of chunk means."),
+        ],
+        "drops": [],
+        "family": "lurestar",
+    }
+
+
 def _adapt(branch: str, bank: str, bank_val: str, seed: int = DEFAULT_SEED) -> Dict[str, Any]:
     out_dir = f"{RUNS}/nextlat/seed{seed}/adapt-{branch}"
     return {
@@ -341,6 +560,7 @@ def _adapt(branch: str, bank: str, bank_val: str, seed: int = DEFAULT_SEED) -> D
         ],
         "drops": [],
         "family": "adapt",
+        "branch": branch,
     }
 
 
@@ -463,6 +683,7 @@ def build_nextlat_hmm(seed: int = DEFAULT_SEED) -> Dict[str, Any]:
 BUILDERS = {
     "gpt_lurestar.yaml": build_gpt_lurestar,
     "nextlat_lurestar.yaml": build_nextlat_lurestar,
+    "bst_lurestar.yaml": build_bst_lurestar,
     "adapt_near.yaml": build_adapt_near,
     "adapt_far.yaml": build_adapt_far,
     "gpt_hmm.yaml": build_gpt_hmm,
@@ -609,6 +830,9 @@ def build_one(name: str, seed: int = DEFAULT_SEED) -> Dict[str, Any]:
             raise AssertionError(
                 f"{name}: FROZEN key {key} moved {there!r} -> {here!r} with no spec authority"
             )
+
+    # --- I5: pool identity ------------------------------------------------------------------
+    _check_pool_identity(name, plan, merged_out)
 
     audit = {
         "config": name,

@@ -327,3 +327,188 @@ encoded P0-5). Seven P1s are recorded in the review and left open, the largest b
 `scripts/run_matrix.py` and `scripts/launch_train.sh` are two contradictory launch paths for the
 same jobs — different `out_dir` layout, different experiment names, different `--strategy` default,
 different branching mechanism. They must converge before the first confirmatory run.
+
+---
+
+## Adversarial review of the `representations` track — 2026-08-23
+
+`docs/review/representations.md`. Reproduced the reported `37 passed`, verified every upstream
+`file:line` anchor in `representations.py` and `EXTRACTION.md` against the pinned tree, and ran
+**52 independently written mutants** in an isolated copy under the scratchpad. Thirty-seven died
+untouched — including asymmetric centering, pairing destroyed by independent sorting, and a
+seed-contrast that secretly tiles three seeds into 30,000 units. The estimator internals are
+sound. Everything that survived lived at the API boundary or in Layer B.
+
+**2 P0, both fixed.**
+
+1. **The centering pool was named, not enforced.** `psi_distances_centered_cosine` took a bare
+   `ndarray`. Passing the scored triple raised PSI 0.0783 → 0.1013 (+29%); passing seven rows of
+   noise that share no row with any scored state dropped it to 0.00035 (−99.6%), reported as
+   `centering_pool_n = 7`, with all 37 tests green. `EXTRACTION.md`'s "this is enforced, not
+   merely documented" was false. The implementer killed this mutant for the *implementation* and
+   left it open for the *caller*, which is the only place it can actually happen. Fixed with
+   `representations.CenteringPool`: every one of the five spec §5 conditions must be supplied or
+   explicitly `declared_missing` (recorded in the serialized metric), every scored state must be a
+   row of the pool checked per argument, condition order is canonical. A bare array is a
+   `TypeError`.
+2. **Layer B had zero executable coverage** — the GPT/NextLat asymmetry that the whole track rests
+   on. Deleting the architecture validation, or replacing the GPT branch with
+   `lm_head(hidden)`, both left the suite green; the one test aimed at it passed only because
+   `_torch()` raised first. Fixed by moving validation ahead of `_torch()` and adding a
+   numpy-backed stub `torch` with `_FakeGPT`/`_FakeNextLat` built so the mutants are
+   distinguishable (6-feature state, 5-token vocab, `token_embeds ≠ post_norm`, and a `lm_head`
+   attribute deliberately different from the projection used inside `__call__`).
+
+**2 P1 also fixed** (cheap, independent of the P0 work): the whitening leakage guard was defeated
+by `np.asarray` casting a mixed id list to strings — a leaked integer id `3` vanished the moment
+the batch also carried a string id — and "held out" was opt-in, so a whitener could score its own
+fitting rows in silence.
+
+**4 P1 left open**, largest first: `similarity_dependent_interference`'s shared-parent "assertion"
+is algebraically tautological (replacing every `margin_before` with `1e9` changes nothing and
+raises nothing) and the real invariant — one `parent_checkpoint_sha256` across both branches — is
+not representable in its signature; spec §6/H3.1–5 and §10's post-adaptation drift and
+erosion-predictor estimators do not exist yet. Eight P2 recorded.
+
+Also: commit **`fb5d035`** contains a corrupted `representations.py` — the Ledoit-Wolf shrinkage
+floor replaced by `pass`. A concurrent agent's `git add -A` captured an in-flight mutant of mine.
+The working tree is correct; the commit is not. All later mutation work was moved to an isolated
+tree copy.
+
+Tests: 37 → **49** in `tests/test_representations.py` (twelve added, each with a discrimination
+assertion; none weakened or removed). Full suite `369 passed, 5 skipped`.
+
+## Required experiment B — HMM belief geometry, frozen before any HMM model exists
+
+**The forward algorithm is validated against the definition, not against itself.**
+`src/hmm_geometry/forward.py` implements the scaled (explicitly renormalised) forward recursion
+rather than a log-space one, for a stated reason: the per-step normaliser *is*
+`P(X_t | X_1:t-1)`, so the posteriors, the exact next-observation distribution and the conditional
+log-likelihoods all fall out of one pass; and because the carried vector sums to 1 after every
+step, underflow is structurally impossible rather than merely improbable. A log-space
+implementation (`log_forward_batch`) is kept as an independent second opinion and the tests hold
+the two against each other at length 64 and at length 600.
+`tests/test_hmm_forward.py::test_brute_force_agreement` compares every posterior, predictive prior,
+next-observation distribution and conditional log-likelihood against explicit enumeration over all
+`4**L` hidden-state paths for `L = 1..6`, on a deliberately asymmetric HMM, plus every length-4
+sequence under a deterministic-emission HMM. Two negative controls check the comparison could
+fail (a transposed transition matrix and a shifted observation stream must both disagree).
+21 tests, all passing.
+
+**The HMM was chosen by a model-blind grid search and frozen.** 2,592 candidates, 79 passed all
+eleven acceptance intervals (spec §12's four criteria plus two degeneracy guards), selection by
+maximum worst-case normalised slack with a lexicographic tie-break. The same candidate wins at both
+pilot sizes tried (1,500 and 4,000 sequences), which is the only robustness check the selection rule
+gets. Frozen in `manifests/hmm_matrices.json`, `hmm_sha256 = 83d24e7f...`:
+
+| diagnostic | value | acceptance interval |
+|---|---|---|
+| mean state dwell time | 3.401 | [1.8, 4.0] (random 4-state chain = 1.333) |
+| self-transitions | 0.66 – 0.74 | [0.35, 0.80] |
+| states with `P(o|s) >= 0.10` per symbol | 3 | >= 2 |
+| posterior entropy p05 / p50 / p95 (bits) | 0.434 / 1.204 / 1.762 | p05 < 0.5, p95 > 1.3, spread > 0.9 |
+| Bayes next-obs accuracy | 0.4134 | [0.35, 0.80] |
+| best-constant-predictor chance | 0.2697 | — |
+| Bayes − chance | 0.1438 | >= 0.10 |
+| stationary distribution | 0.218 / 0.237 / 0.259 / 0.286 | min >= 0.15 |
+
+Corpus generated from the frozen matrices: 100,000 × 32 train, 10,000 × 32 validation,
+10,000 × 64 length-generalisation, seeded by `SeedSequence(5963).spawn(3)` so a split does not move
+if another split's size changes. Exact posteriors and exact next-observation distributions are
+stored for the two evaluation splits (`manifests/hmm_dataset.json` carries every SHA-256); the
+training split's posteriors are recomputable exactly and are not written.
+
+**Two threshold-design errors were found and corrected before any model existed.** Both were
+caught by looking at the yield per prefix length, not by a test.
+1. An *absolute* high-edit-distance cut, fitted by pooling all prefix lengths, lands at 17. No
+   prefix shorter than 17 symbols can reach it, so the bank silently contained no equivalent pairs
+   below length 17, and the length-64 pool cleared the same bar with far less surface change than
+   the length-32 pool — confounding exactly the length-generalisation comparison that pool exists
+   for.
+2. A single *rate* cut fails in the opposite direction: the Levenshtein rate between independent
+   strings falls with length, so a pooled 0.737 asks for a 75th-percentile pair at length 12 and a
+   90th-percentile pair at length 32 (yield collapsed to 263 and 54 pairs).
+   The frozen rule is now a **per-length quantile table** — the 75th percentile of Levenshtein
+   distance among calibration pairs *of that same prefix length* — fitted on a calibration half of
+   each band. `PREFIX_MIN` was also raised from 8 to 16: at length 8 a 4-symbol alphabet forces
+   prefix collisions between any two pools, and filtering them would delete the most probable
+   histories rather than fix anything. At 16 the measured collision count between the calibration
+   and test pools is **0**.
+
+**Pair bank, built by applying the frozen thresholds unchanged** (`manifests/hmm_eval_pairs.jsonl`,
+8,409 pairs; thresholds `manifests/hmm_thresholds.json`, sha256 `23881606...`):
+
+| set | n | posterior JS (bits) | edit distance | edit rate |
+|---|---|---|---|---|
+| predictively equivalent | 2,218 | 0.0002 mean, max 0.0006 | 27.9 mean | 0.694 |
+| predictively divergent near-lure | 3,973 | 0.378 mean, min 0.300 | 1.64 mean | 0.054 |
+| history-distance-matched control | 2,218 | 0.605 mean, min 0.376 | 27.9 mean (matched pair-for-pair) | 0.694 |
+
+Retuning is prevented structurally, not by discipline: `fit_thresholds` sees only the calibration
+pools and takes no yield target; `freeze_thresholds` raises `ThresholdMismatch` rather than
+overwrite; `load_thresholds` re-verifies the payload hash and the quantile-rule text and is the
+only function that sets `verified=True`; and `build_bank` refuses unverified thresholds, refuses a
+different HMM hash, and refuses to run on a calibration pool. `tests/test_hmm_pairs.py` verifies the
+shipped artifacts by recomputing every posterior from the frozen matrices and every edit distance
+from the raw symbols, and includes a negative control that builds a bank on permuted posteriors and
+shows the verification rejects it.
+
+**Deviation to record:** near-lure pairs are *constructed* by substituting one or two symbols in a
+held-out prefix, not found in the pool. Two independent length-16 prefixes over four symbols are
+within Levenshtein distance 2 with probability about `2.5e-7`, so a 5,000-sequence pool yields a
+handful at whatever divergence they happen to have. This mirrors the Lure-Star quartets, both
+members are genuine in-support sequences under the frozen HMM, and both posteriors are exact.
+
+**Integration plan for the trainer:** `docs/HMM_DATASET_PLAN.md`. The whole integration is one dict
+insertion (`DATAMODULES["hmm_belief"] = ...`) from a shim outside `upstream/`, plus a new datamodule
+file; no shared training code is edited. `context_length = 0` is the load-bearing config value — it
+disables Path-Star's prompt masking at `models/model_gpt.py:362` and `models/model_nextlat.py:441`,
+giving next-token loss on every position. The competence gate is not an accuracy threshold but the
+exactly known optimum: **1.2563 nats/token**, against 1.3845 for the best constant predictor. A run
+below the optimum is a bug, not a result.
+
+## Adversarial review of the Lure-Star generator — three P0 holes in the checker, closed
+
+`docs/review/lure-generator.md`. The 48 reported tests reproduced (12.26 s), and the whole
+shipped pool regenerated from its recorded seed at `--workers 4` to four **byte-identical**
+sha256s, so reproducibility and worker-independence are confirmed rather than asserted. The
+LS-1 exchangeability claim was tested rather than taken on trust: 2x20 contingency test on the
+critical vs safe edit-slot marginals over 2,000 quartets gives chi2=22.59, p=0.256. The
+impossibility proof in `STIMULUS_DESIGN.md` §2 is correct.
+
+**What broke: `check_quartet` certified three kinds of record it should reject.**
+
+1. **Mismatched suffix depths.** A quartet whose safe swap is depth-1 and whose critical swap
+   is depth-3 passed with zero problems. Depth is the magnitude of the manipulation (three
+   nodes moved per arm vs one) but *both* are two-token prompt edits, so every token-level
+   assertion in the suite passes on an unmatched pair. Closed as invariant **LS-0**: the depth
+   is re-derived from the anchor's solved arms and `record["depth"]` is cross-checked against
+   it, never trusted.
+2. **A near lure relabelled as the far control.** `far_critical` with 18/20 edge overlap
+   passed: the checker only compared recorded-vs-recomputed overlap and had no cap, because
+   `far_max_edge_overlap` lived only in the generator. H3's near-minus-far contrast would have
+   been measured against a near lure. Closed: the cap is a checker parameter, threaded from
+   `QuartetConfig`.
+3. **A falsified `graph_key`.** `check_quartet` never recomputed the stored identities, and
+   both the CLI gate and the leakage test read `graph_key` off the record — so a verbatim
+   training line carrying a bogus key read as clean. This is the same failure *mechanism* as
+   the `TrainingIndex` bug already fixed here: that fix removed the symptom, not the pattern of
+   consulting a self-reported field. Closed: `check_quartet` recomputes `graph_key`,
+   `prompt_sha256` and `answer` from the line, and the gate is now
+   `generate.leaked_quartet_ids()`, which keys off the line.
+
+Six regression tests added, each mutation-tested against a checker with only its own fix
+removed; all six fail without it. No fix touches the RNG stream, and a full post-fix
+regeneration reproduces all four manifest hashes exactly. `54 passed`; whole repo `389 passed`.
+
+**Left open, deliberately, with reasons in the review.** (a) Spec §6 requires the near and far
+H3 branches to match on *target-path distribution*; measured, they do not — `B_near` reproduces
+the parent's target token at path positions 2/3 with probability 0.343/0.670 versus 0.049/0.026
+for `B_far`, which biases `erosion_near - erosion_far` against the hypothesis. Unmet and, unlike
+LS-1, not declared. (b) `near_safe_aligned` — the LS-2 robustness condition — cannot be consumed:
+`representations.CENTERING_POOL_CONDITIONS` omits it and `from_conditions` raises on it, so one
+sixth of the manifest is currently un-analysable. (c) E_lure base edge orders are not drawn from
+the corpus's uniform-shuffle distribution: the pinned edit slots are U-shaped (chi2 p=2.9e-35 vs
+uniform), a consequence of drawing the slot gap uniformly. It does not bias PSI (see the
+exchangeability test above) but it does shift absolute competence on E_lure relative to the
+held-out corpus, which matters for spec §10's 90% gate.

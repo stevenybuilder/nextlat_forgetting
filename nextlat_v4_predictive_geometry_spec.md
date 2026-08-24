@@ -117,11 +117,11 @@ Use `G(5,5)` for the confirmatory Lure-Star experiment. Match the paper's full c
 - node IDs sampled from `1...100`;
 - 20,000 training updates;
 - batch size 512;
-- five seeds;
+- five seeds, all confirmatory;
 - a 12-layer, 6-head, 384-dimensional transformer;
 - `mtp_horizon=3`, because `l-2=3`.
 
-Hold the architecture, dataset, batch size, and training steps at paper scale for the confirmatory Path-Star results; the profiling gate in section 11 exists to confirm that is affordable before launch, and it is (measured: 9.4 GPU-hours for Path-Star plus HMM). Where a benchmark cannot be afforded at paper scale, either run it at a stated reduced scale behind a competence gate and label every number with the scale it was produced at, or decline it on cost and record the price. Do not fake parity. The paper used five seeds; this extension requires three preregistered confirmatory seeds and should run the remaining two paper seeds only if time permits. A tiny run may be used solely to test the data pipeline, checkpoint recovery, and metrics; it cannot contribute scientific results.
+Hold the architecture, dataset, batch size, and training steps at paper scale for the confirmatory Path-Star results; the profiling gate in section 11 exists to confirm that is affordable before launch, and it is (measured: 9.4 GPU-hours for Path-Star plus HMM). Where a benchmark cannot be afforded at paper scale, either run it at a stated reduced scale behind a competence gate and label every number with the scale it was produced at, or decline it on cost and record the price. Do not fake parity. The paper used five seeds and this extension preregisters all five as confirmatory, matching the paper exactly. A tiny run may be used solely to test the data pipeline, checkpoint recovery, and metrics; it cannot contribute scientific results.
 
 ### Exact matched stimuli
 
@@ -287,14 +287,31 @@ Patching the final pre-logit state and calling the resulting output change a dis
 
 ### Conditions
 
-1. The official repository's GPT implementation with standard next-token training.
-2. The architecture-matched transformer trained with the official NextLat objective on `G(5,5)`.
+Three architecture-matched arms, all 12-layer / 6-head / 384-dim on `G(5,5)`, differing only in
+training objective:
+
+1. **GPT** - the official repository's implementation with standard next-token training.
+2. **NextLat** - the official NextLat objective.
+3. **BST** - the official Belief State Transformer objective (`use_bst: true`,
+   `bst_pair_minimum_gap: 2`; the config differs from the GPT config by those two keys alone).
+
+BST is the **competence-matched control**, and it is what makes the cross-model comparison
+identifiable. The paper's Figure 6 puts GPT on `G(5,5)` at ~18.6%, which is 1/d chance, so a
+GPT-versus-NextLat geometry difference admits a trivial reading: NextLat organises the space
+because NextLat solved the task. BST solves `G(5,5)` at ~99.9% *without* a latent-transition
+objective. Any PSI gap between NextLat and BST is therefore attributable to the objective rather
+than to task competence, which is the claim this project is actually making.
+
+Cost, measured against the profiled A100 rate: 3.7 GPU-hours, ~20 compute units, 1.1% of the
+available balance. Preregistered contrasts, in priority order: NextLat vs BST (competence-matched,
+primary), NextLat vs GPT (secondary, confounded by competence and reported as such), BST vs GPT
+(shows how much of any effect is competence alone).
 
 ### Configuration authority
 
 At the pinned repository commit, copy the official Path-Star `G(5,5)` GPT and NextLat YAML configurations. Reconstructing an approximate configuration from this document silently drops keys the trainer requires - this already cost one failed run in this project, where a hand-written config died on a missing `test_generalization` key. Permissible changes are limited to:
 
-- the three preregistered confirmatory seeds;
+- the five preregistered confirmatory seeds;
 - output paths and experiment names;
 - additional checkpoint/recovery frequency;
 - model-output hooks needed to save hidden states;
@@ -331,8 +348,16 @@ optimizer:
   schedule: constant
   clip_gradient_norm: 100
 sweep:
-  - seed: [1234, 1235, 1236]
+  - seed: [1234, 1235, 1236, 1237, 1238]
 ```
+
+**All five paper seeds are confirmatory** (decided 2026-08-23, before any model was trained -
+nothing here is being chosen after seeing a result). Seeds are the inferential unit for every
+cross-model contrast, so at three seeds per arm the headline comparison would rest on three
+numbers against three numbers, which is far weaker than the item-level analyses backed by 2,000
+quartets. Five seeds roughly doubles the power on the one comparison the central claim depends on,
+at a measured cost of ~50 additional compute units (2.8% of the available balance). Full parity
+with the paper also removes an obvious reviewer objection before it is raised.
 
 The paper reports a three-layer latent-dynamics MLP with hidden dimension 384 for Path-Star. Verify that the official NextLat YAML resolves to those values and save the fully materialized configuration with every run.
 
@@ -430,7 +455,7 @@ Near and far branches must store the same `parent_checkpoint_sha256`.
 ### Geometry
 
 - final-state PSI with paired 95% bootstrap intervals;
-- GPT versus NextLat PSI contrast across three seeds;
+- cross-model PSI contrasts across five seeds;
 - distance–margin relationship on held-out items;
 - post-adaptation state drift;
 - pre-adaptation distance as a predictor of item-level erosion.
@@ -447,7 +472,7 @@ A strong result requires:
 3. geometry predicting planning beyond baseline confidence;
 4. near-specific interference while both near/far branches acquire new examples;
 5. pre-adaptation collisions predicting later erosion;
-6. replication across three seeds.
+6. replication across five seeds.
 7. HMM thresholds and pair selection frozen without inspecting model representations.
 8. NextLat improves at least two complementary HMM belief-geometry outcomes relative to GPT.
 
@@ -571,7 +596,7 @@ Store posterior vectors and exact next-observation distributions with the immuta
 
 ### HMM models
 
-Train GPT and NextLat from scratch for the same three seeds:
+Train GPT and NextLat from scratch for the same five seeds:
 
 ```yaml
 data:
@@ -592,8 +617,16 @@ trainer:
   val_interval: 300
   compile: false
 sweep:
-  - seed: [1234, 1235, 1236]
+  - seed: [1234, 1235, 1236, 1237, 1238]
 ```
+
+**All five paper seeds are confirmatory** (decided 2026-08-23, before any model was trained -
+nothing here is being chosen after seeing a result). Seeds are the inferential unit for every
+cross-model contrast, so at three seeds per arm the headline comparison would rest on three
+numbers against three numbers, which is far weaker than the item-level analyses backed by 2,000
+quartets. Five seeds roughly doubles the power on the one comparison the central claim depends on,
+at a measured cost of ~50 additional compute units (2.8% of the available balance). Full parity
+with the paper also removes an obvious reviewer objection before it is raised.
 
 Use `d=1` with Smooth L1 only because one-step transition consistency is sufficient for the paper's belief-state result, and the paper's ablation finds Smooth L1 alone strongest at `d=1` on its future-token probe. Confirm the small models learn next-observation prediction before running geometry analysis.
 

@@ -55,7 +55,7 @@ def _write_job(tmp_path: Path, *, model: str, task: str = "lurestar",
                eff_batch: int = 512, block_size: int = 69,
                steps: int = 500, warmup: int = 100,
                step_scale: float = 1.0) -> dict:
-    out_dir = tmp_path / "root" / "runs" / model / "seed1234" / "base"
+    out_dir = tmp_path / "root" / "runs" / task / model / "seed1234" / "base"
     exp = f"{model}-seed1234-base"
     version = out_dir / exp / "version_0"
     version.mkdir(parents=True)
@@ -232,6 +232,100 @@ def test_missing_probe_is_reported_not_silently_zero(tmp_path: Path) -> None:
     rec = ps.summarize_job(job)
     assert "peak_allocated_gb" not in rec
     assert rec["probe_missing"] == job["probe_glob"]
+    # ... and the record must SAY which spec section 11 quantities were never measured,
+    # because a `-` in a table cell is what let the RUNLOG bug survive the first time.
+    assert "peak allocated VRAM" in rec["missing_required"]
+    assert "peak reserved VRAM" in rec["missing_required"]
+
+
+def _complete_gate(tmp_path: Path) -> Path:
+    """All four spec section 11 jobs, every measurement present."""
+    for task, steps, warm, eb in (("lurestar", 500, 100, 512), ("hmm", 300, 60, 256)):
+        for model in ("gpt", "nextlat"):
+            _write_job(tmp_path, model=model, task=task, eff_batch=eb,
+                       steps=steps, warmup=warm)
+    return tmp_path / "jobs"
+
+
+def _run_gate(jobs_dir: Path, out: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [PYTHON, str(REPO / "scripts" / "profile_summarize.py"),
+         "--jobs-dir", str(jobs_dir), "--out", str(out)],
+        capture_output=True, text=True)
+
+
+def test_gate_passes_only_when_every_required_measurement_is_present(tmp_path: Path) -> None:
+    """Positive control for the test below: this exact input must exit 0, otherwise the
+    negative control proves nothing."""
+    jobs = _complete_gate(tmp_path)
+    proc = _run_gate(jobs, tmp_path / "summary.json")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    summary = json.loads((tmp_path / "summary.json").read_text())
+    assert set(summary["records"]) == {"lurestar-gpt", "lurestar-nextlat",
+                                       "hmm-gpt", "hmm-nextlat"}
+    for rec in summary["records"].values():
+        assert rec["missing_required"] == []
+
+
+def test_gate_fails_when_peak_vram_was_never_measured(tmp_path: Path) -> None:
+    """docs/RUNLOG.md: 'Peak VRAM is therefore still unmeasured.' A complete-looking gate --
+    four jobs, returncode 0, a full metrics.csv, a real seconds-per-step -- whose in-process
+    probe never landed must NOT exit 0, or the profiling wrapper has changed nothing.
+    Reproduced as a P0 in docs/review/configs-and-launch.md."""
+    jobs = _complete_gate(tmp_path)
+    removed = 0
+    for path in jobs.glob("*.probe.*.json"):
+        path.unlink()
+        removed += 1
+    assert removed == 4, "fixture changed: expected one probe per job"
+
+    proc = _run_gate(jobs, tmp_path / "summary.json")
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "UNMEASURED" in proc.stderr
+    for job in ("lurestar-gpt", "lurestar-nextlat", "hmm-gpt", "hmm-nextlat"):
+        assert f"UNMEASURED {job}" in proc.stderr
+    assert "peak allocated VRAM" in proc.stderr and "peak reserved VRAM" in proc.stderr
+    # the numbers it *could* measure are still reported, so the failure is diagnosable
+    summary = json.loads((tmp_path / "summary.json").read_text())
+    assert summary["records"]["lurestar-gpt"]["seconds_per_step_median"] is not None
+
+
+@pytest.mark.parametrize("field,label", sorted(ps.REQUIRED_MEASUREMENTS.items()))
+def test_every_spec_section_11_quantity_individually_fails_the_gate(
+    tmp_path: Path, field: str, label: str
+) -> None:
+    """Not just peak VRAM: dropping ANY single required quantity must fail the gate. Without
+    this, a partial probe (say, checkpoint writes recorded but VRAM not) could still pass."""
+    jobs = _complete_gate(tmp_path)
+    out = tmp_path / "summary.json"
+    assert _run_gate(jobs, out).returncode == 0
+
+    manifest = jobs / "lurestar-gpt.job.json"
+    job = json.loads(manifest.read_text())
+    rec = ps.summarize_job(job)
+    assert rec.get(field) is not None, f"fixture never produced {field}"
+
+    original = ps.summarize_job
+
+    def _blanked(j):
+        r = original(j)
+        if j["job"] == "lurestar-gpt":
+            r[field] = None
+            r["missing_required"] = sorted(
+                lbl for f, lbl in ps.REQUIRED_MEASUREMENTS.items() if r.get(f) is None)
+        return r
+
+    ps.summarize_job = _blanked
+    try:
+        records = {}
+        for path in sorted(jobs.glob("*.job.json")):
+            j = json.loads(path.read_text())
+            records[j["job"]] = ps.summarize_job(j)
+        unmeasured = {k: r["missing_required"] for k, r in records.items()
+                      if r.get("missing_required")}
+        assert unmeasured == {"lurestar-gpt": [label]}, unmeasured
+    finally:
+        ps.summarize_job = original
 
 
 def test_cli_writes_summary_and_markdown(tmp_path: Path) -> None:

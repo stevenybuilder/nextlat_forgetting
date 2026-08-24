@@ -59,6 +59,30 @@ null, the honest summary is that the within-NextLat geometry-behaviour-interfere
 the cross-model comparison was not cleanly identifiable on Path-Star. That is a weaker paper than the
 one the spec imagined, and it is the one the evidence supports.
 
+## Superseded in part, 2026-08-23: BST resolves the confound cheaply
+
+After this decision was written, the competence confound turned out to have a direct fix already
+sitting in the pinned repository. The paper's own Figure 6 reports **BST at ~99.9% on G(5,5)** -
+a model that solves the task, is architecture-matched to GPT and NextLat, and is trained without a
+latent-transition objective. `config/stargraph/5_5/bst_stargraph_5_5.yaml` differs from the GPT
+config by exactly two keys.
+
+Adding BST as a third arm at three seeds costs 3.7 GPU-hours, ~20 compute units, 1.1% of the
+balance. It converts the primary cross-model contrast from NextLat-versus-a-model-at-chance into
+**NextLat versus BST**, where both arms solve the task and the only systematic difference is the
+objective. H2 and H3 stop being degenerate for the control arm, because BST has a real
+correct-branch margin to predict and to erode.
+
+Points 2 and 3 above are therefore **softened rather than withdrawn**: the within-NextLat chain
+remains valuable and is still reported, but the cross-model Lure-Star contrast is no longer
+demoted - it is re-pointed at BST. Point 1 stands unchanged: the 90% competence gate applies to
+NextLat and BST, and GPT's chance-level accuracy remains a preregistered replication of Figure 6
+rather than a stop condition. Point 4 stands: the HMM still carries an independent cross-model
+contrast in a regime where all three arms are competent.
+
+Approved by the user on 2026-08-23 alongside a decision to keep seeds 1237 and 1238 as a declared
+extension rather than running five seeds up front.
+
 ## How to overturn this
 
 Two alternatives were considered and rejected, and either can be reinstated by the human:

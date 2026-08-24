@@ -33,6 +33,24 @@ So for NextLat the caller must apply ``model.lm_head(h)`` itself (the head is de
 models/model_nextlat.py:121).  `_forward_gpt` / `_forward_nextlat` below encode exactly
 this difference and nothing else.
 
+**BST is a third case and it does not have a single clean analogue.**  Its encoder is two
+stacks, and each has its own final norm:
+
+    BST forward   fwd = self.transformer_f.norm(fwd)   models/model_bst.py:287
+    BST backward  bwd = self.transformer_b.norm(bwd)   models/model_bst.py:313
+
+and neither feeds ``lm_head`` directly.  The readout is a two-input ``TextHead`` that
+concatenates them, adds a SwiGLU MLP residual, applies a THIRD norm over 2*n_embd, splits
+the result and only then projects (models/model_bst.py:91-104).  In GPT and NextLat the
+"final post-norm state" and the "immediate pre-logit state" are the same tensor; in BST
+they are three different tensors.  The choice we make, and the reasons, are in
+docs/EXTRACTION.md §3.  In one line: the PRIMARY BST state is the forward encoder's
+post-norm output (model_bst.py:287) because it is the only one that is architecturally the
+same object as the other two arms, is causal over the prompt alone, and is the only
+item-varying input to BST's own inference path.  The backward encoder is excluded because
+under the reverse-causal mask (model_bst.py:213-217) ``bwd[62]`` attends tokens 62..68 and
+therefore CONTAINS THE ANSWER.
+
 ``transformer.norm`` is ``LayerNorm(n_embd, bias=config.bias)`` and the shipped 5_5 configs
 set ``bias: false``.  ``LayerNorm.forward`` (models/model_base.py:823-830) dispatches to
 ``F.rms_norm`` when ``bias is None``.  **The extracted state is therefore RMS-normalized,
@@ -57,6 +75,12 @@ import numpy as np
 
 __all__ = [
     "EQ_TOKEN_ID",
+    "EOS_TOKEN_ID",
+    "ARCHITECTURES",
+    "BST_STATE_POLICY",
+    "BST_STATE_ROLES",
+    "HIDDEN_STATE_MODULE_PATH",
+    "STATE_SOURCE",
     "PSI_EXTRACTION_INDEX",
     "BRANCH_MARGIN_INDEX",
     "EXTRACTION_INDICES",
@@ -78,6 +102,9 @@ __all__ = [
     "TORCH_AVAILABLE",
     "hidden_state_hook",
     "forward_states_and_logits",
+    "forward_all_states",
+    "bst_backward_eos_state",
+    "bst_texthead_prelogit",
     "extract_positions",
 ]
 
@@ -89,6 +116,17 @@ __all__ = [
 # Tokenizer (upstream data/stargraph.py:9-30) with maxNodes=100:
 #     node ids 0..99 | '|'=100 | '='=101 | '/'=102 | '$'=103 | EOS=104, vocab_size=106.
 EQ_TOKEN_ID = 101
+
+#: EOS is ``maxNodes + 4`` (data/stargraph.py:32).  Stargraph has no semantic EOS; the id
+#: exists "for compatibility with the bst training code" (data/stargraph.py:29-31) and is
+#: appended to every serialized line by ``Tokenizer.tokenize`` (data/stargraph.py:52-58),
+#: so index 68 of a G(5,5) sequence is an EOS.  BST needs it: its inference-time backward
+#: embedding is the encoding of a lone EOS (model_bst.py:806-810).
+EOS_TOKEN_ID = 104
+
+#: The three architecture-matched arms of spec §8.  Order is the preregistered priority
+#: order of the cross-model contrasts, not alphabetical.
+ARCHITECTURES = ("nextlat", "bst", "gpt")
 
 # ------------------------------------------------------------------------------------
 # THE CORRECTION (frozen 2026-08-23, before any model exists; see docs/EXTRACTION.md)
@@ -150,6 +188,68 @@ CENTERING_POOL_CONDITIONS = (
     "near_safe",
     "near_critical",
     "far_critical",
+)
+
+
+#: What "the final post-normalization hidden state" resolves to in each arm, with the
+#: upstream line that produces it.  Written down here because for BST the answer is a
+#: CHOICE among three candidates rather than a lookup, and a choice that is not recorded
+#: next to the code is a choice that gets quietly revised.  Full argument: docs/EXTRACTION.md §3.
+STATE_SOURCE = {
+    "gpt": "models/model_gpt.py:276  x = self.transformer.norm(x)",
+    "nextlat": "models/model_nextlat.py:197  text_embd = self.transformer.norm(x)",
+    "bst": "models/model_bst.py:287  fwd = self.transformer_f.norm(fwd)",
+}
+
+#: Module path of that state's producing submodule, relative to the ``ModelBase`` wrapper.
+#: Used only by :func:`hidden_state_hook`; the preferred capture needs no hook.
+HIDDEN_STATE_MODULE_PATH = {
+    "gpt": "model.transformer.norm",
+    "nextlat": "model.transformer.norm",
+    "bst": "encoder.transformer_f.norm",
+}
+
+#: BST returns more than one candidate state, so every one that we extract is named and
+#: given a role.  Nothing is extracted "and then we decide".
+BST_STATE_ROLES = {
+    "hidden": (
+        "PRIMARY. Forward-encoder final post-norm state, model_bst.py:287. The analogue "
+        "of the GPT/NextLat state: same Block class (imported at model_bst.py:28), same "
+        "12L/6H/384, same LayerNorm(bias=False) -> F.rms_norm dispatch, same causal mask, "
+        "same (B,T,384) shape, same next-token index convention (fwd[t] predicts seq[t+1], "
+        "model_bst.py:581)."
+    ),
+    "hidden_texthead": (
+        "DECLARED SECONDARY. TextHead pre-logit state x_next, model_bst.py:91-100, computed "
+        "with the inference-time backward embedding. This is the state lm_head actually "
+        "consumes (model_bst.py:103), so it is the functional analogue; it is secondary "
+        "because it is 384-d only after a chunk of a 768-d norm and because, with the "
+        "backward input held at its inference-time constant, it is a fixed nonlinear "
+        "reparameterization of `hidden` and carries no extra information."
+    ),
+    "excluded_backward": (
+        "EXCLUDED. Backward-encoder post-norm state, model_bst.py:313. Under the "
+        "reverse-causal mask (model_bst.py:213-217) bwd[t] attends tokens t..T, so bwd[62] "
+        "encodes the answer path. Using it would make PSI a measurement of the target, not "
+        "of the history representation that spec §7 defines."
+    ),
+}
+
+#: How BST's logits are produced, and why they cannot be ``lm_head(hidden)``.
+BST_STATE_POLICY = (
+    "BST has no single tensor that is both the final post-normalization hidden state and "
+    "the immediate pre-logit state; in GPT and NextLat those coincide and in BST they do "
+    "not. We take the FORWARD encoder's post-norm state (model_bst.py:287) as the primary "
+    "analogue and report the TextHead pre-logit state (model_bst.py:91-100) as a declared "
+    "secondary. BST logits are NEVER lm_head(hidden): the head is a two-input TextHead "
+    "(model_bst.py:83-110) whose lm_head is trained on the post-MLP, post-norm, chunked "
+    "768->384 half, so lm_head(forward_state) is type-compatible and semantically wrong. "
+    "The backward input is the encoding of a lone EOS token, which is exactly what "
+    "BST.generate does at model_bst.py:806-810 and therefore what produced the paper's "
+    "Figure 6 accuracy. It equals bwd[68] of the full sequence (the terminal EOS attends "
+    "only itself under the reverse-causal document mask and EOS always takes position 0, "
+    "model_base.py:571-583), so it is a state the model was trained on rather than an "
+    "off-distribution stand-in."
 )
 
 
@@ -676,12 +776,16 @@ except Exception:  # pragma: no cover
 
 
 def hidden_state_hook(store: dict, key: str = "h"):
-    """Fallback capture: a forward hook for ``model.model.transformer.norm``.
+    """Fallback capture: a forward hook on the state-producing norm module.
 
     Prefer :func:`forward_states_and_logits`, which needs no hook at all.  Use this only
     when the state must be captured inside an unmodified ``compute_loss`` call.  The
-    module path is identical for GPT and NextLat.  Requires ``trainer.compile: false``
-    (which the spec already requires) or the submodule path gains a ``_orig_mod`` level.
+    module path is ``model.transformer.norm`` for GPT and NextLat and
+    ``encoder.transformer_f.norm`` for BST; see :data:`HIDDEN_STATE_MODULE_PATH`.
+    Requires ``trainer.compile: false`` (which the spec already requires) or the submodule
+    path gains a ``_orig_mod`` level — and for BST specifically, ``compile()`` rebinds
+    ``raw_f_enc`` itself (model_bst.py:317-325), so a compiled BST is a harder case than a
+    compiled GPT and is simply out of scope.
     """
 
     def _capture(module, inputs, output):  # pragma: no cover - needs torch
@@ -690,35 +794,153 @@ def hidden_state_hook(store: dict, key: str = "h"):
     return _capture
 
 
-def forward_states_and_logits(inner_model, tokens, *, architecture: str, mask=None):
-    """Run one forward pass and return ``(hidden_states, logits)`` as torch tensors.
-
-    ``inner_model`` is the *inner* ``Transformer`` / ``NextLatTransformer`` (i.e.
-    ``wrapper.model``), ``tokens`` is a ``(B, T)`` LongTensor of the FULL serialized
-    sequence, and ``architecture`` is ``"gpt"`` or ``"nextlat"``.
-
-    This function exists solely to absorb the asymmetry documented at the top of this
-    module.  It applies no normalization, no centering and no scaling: the returned
-    hidden state is exactly ``transformer.norm(x)`` (model_gpt.py:276 /
-    model_nextlat.py:197), which is RMS-normalized because ``bias: false``.
-    """
+def _check_architecture(architecture: str) -> str:
     arch = str(architecture).lower()
-    if arch not in ("gpt", "nextlat"):
-        raise ValueError(f"architecture must be 'gpt' or 'nextlat'; got {architecture!r}")
+    if arch not in ARCHITECTURES:
+        raise ValueError(
+            f"architecture must be 'gpt', 'nextlat' or 'bst'; got {architecture!r}"
+        )
+    return arch
+
+
+def bst_backward_eos_state(encoder, tokens, *, eos_token_id: int = EOS_TOKEN_ID):
+    """BST's inference-time backward embedding: the encoding of a lone EOS token.
+
+    This is not our invention.  ``BST.generate`` computes exactly this
+    (model_bst.py:806-810) and it is the only backward input BST ever uses at inference,
+    so it is the one behind the paper's Figure 6 accuracy.  It is also not off
+    distribution: under the reverse-causal document mask the terminal EOS of a serialized
+    sequence attends only itself (model_bst.py:205-217) and EOS always takes document
+    position 0 (model_base.py:571-583), so this vector equals ``bwd[68]`` of a real
+    G(5,5) sequence — an endpoint the model was trained against.
+
+    Returns a ``(B, 1, n_embd)`` tensor.
+    """
+    eos = tokens.new_full((tokens.shape[0], 1), int(eos_token_id))
+    _, bwd = encoder(eos, compute_forward=False, compute_backward=True)
+    return bwd
+
+
+def bst_texthead_prelogit(text_head, fwd, bwd):
+    """Re-derive ``TextHead``'s pre-logit split ``(x_next, x_prev)``.
+
+    Line-for-line model_bst.py:91-100.  It is duplicated rather than hooked because the
+    upstream head returns only stacked logits when targets are None (model_bst.py:102-110)
+    and we want the state, not the projection.  The duplication is made self-checking by
+    :func:`forward_all_states`, which asserts ``lm_head(x_next)`` reproduces the head's own
+    returned next-token logits; if upstream's head ever changes, that assertion fails
+    rather than this function silently returning a stale state.
+    """
     torch = _torch()
+    x = torch.cat([fwd, bwd], dim=-1)      # model_bst.py:91
+    x = x + text_head.mlp(x)               # model_bst.py:94
+    x = text_head.norm(x)                  # model_bst.py:95
+    x_next, x_prev = x.chunk(2, dim=-1)    # model_bst.py:100
+    return x_next, x_prev
+
+
+def _forward_gpt(inner_model, tokens, kwargs):
+    # model_gpt.py:279-291 — targets is None, so the first return IS the logits.
+    logits, hidden = inner_model(tokens, **kwargs)
+    return {"hidden": hidden, "logits": logits}
+
+
+def _forward_nextlat(inner_model, tokens, kwargs):
+    # model_nextlat.py:199-200 early-returns (token_embeds, text_embd); the head at
+    # model_nextlat.py:121 is never applied, so apply it ourselves.
+    _token_embeds, hidden = inner_model(tokens, **kwargs)
+    return {"hidden": hidden, "logits": inner_model.lm_head(hidden)}
+
+
+def _forward_bst(model, tokens, *, eos_token_id: int, verify_texthead: bool = True):
+    """BST: forward-encoder state as `hidden`, TextHead next-token logits as `logits`.
+
+    ``model`` here is the ``BST`` wrapper itself (model_bst.py:327), NOT ``wrapper.model``
+    — BST has no ``.model``, and the logit path needs both ``.encoder`` (model_bst.py:338)
+    and ``.text_head`` (model_bst.py:339).  That asymmetry in the argument is the price of
+    BST having two submodules where the other two arms have one; it is checked below and
+    raises a named error rather than an ``AttributeError`` forty lines deep.
+    """
+    torch = _torch()
+    encoder = getattr(model, "encoder", None)
+    text_head = getattr(model, "text_head", None)
+    if encoder is None or text_head is None:
+        raise ValueError(
+            "for architecture='bst' pass the BST wrapper itself (it has .encoder and "
+            ".text_head, model_bst.py:338-339), not wrapper.model as for gpt/nextlat"
+        )
+    # Forward encoder only.  It is causal (model_bst.py:210-211), so fwd[62] depends on
+    # tokens 0..62 exactly as the GPT/NextLat state does — feeding the full serialized
+    # sequence leaks nothing into the extraction indices.
+    fwd, _ = encoder(tokens, compute_forward=True, compute_backward=False)  # :245-270
+    bwd_eos = bst_backward_eos_state(encoder, tokens, eos_token_id=eos_token_id)
+    bwd = bwd_eos.expand(fwd.shape[0], fwd.shape[1], fwd.shape[2])
+    # model_bst.py:102-110 stacks [next, prev] at dim=1, so index 0 is the next-token half.
+    logits = text_head(fwd, bwd)[:, 0]
+    x_next, _x_prev = bst_texthead_prelogit(text_head, fwd, bwd)
+    if verify_texthead:
+        check = text_head.lm_head(x_next)
+        if not torch.allclose(check, logits, atol=1e-4, rtol=1e-4):
+            raise RuntimeError(
+                "bst_texthead_prelogit no longer reproduces TextHead's own next-token "
+                "logits; upstream models/model_bst.py:91-104 must have changed"
+            )
+    return {"hidden": fwd, "logits": logits, "hidden_texthead": x_next}
+
+
+def forward_all_states(
+    model,
+    tokens,
+    *,
+    architecture: str,
+    mask=None,
+    eos_token_id: int = EOS_TOKEN_ID,
+    verify_texthead: bool = True,
+) -> dict:
+    """One forward pass -> ``{"hidden": ..., "logits": ..., ["hidden_texthead": ...]}``.
+
+    ``model`` is the *inner* ``Transformer`` / ``NextLatTransformer`` (``wrapper.model``)
+    for ``"gpt"`` and ``"nextlat"``, and the ``BST`` wrapper for ``"bst"``.  ``tokens`` is
+    a ``(B, T)`` LongTensor of the FULL serialized sequence.
+
+    This function exists solely to absorb the three-way asymmetry documented at the top of
+    this module and in :data:`BST_STATE_POLICY`.  It applies no normalization, no centering
+    and no scaling.  ``hidden`` is exactly the tensor named in :data:`STATE_SOURCE`, which
+    is RMS-normalized in all three arms because ``bias: false``.  For BST, and only for
+    BST, ``hidden_texthead`` is returned as well — the declared secondary state.
+    """
+    arch = _check_architecture(architecture)
+    torch = _torch()
+    if arch == "bst":
+        if mask is not None:
+            raise ValueError(
+                "BST builds its own forward/backward document masks inside the encoder "
+                "(model_bst.py:186-219); an external mask has nowhere to go"
+            )
+        with torch.no_grad():
+            return _forward_bst(
+                model, tokens, eos_token_id=eos_token_id, verify_texthead=verify_texthead
+            )
     kwargs = {"return_hidden_states": True}
     if mask is not None:
         kwargs["mask"] = mask
     with torch.no_grad():
-        first, hidden = inner_model(tokens, **kwargs)
         if arch == "gpt":
-            # model_gpt.py:279-291 — targets is None, so `first` IS the logits.
-            logits = first
-        else:
-            # model_nextlat.py:199-200 early-returns (token_embeds, text_embd); the head
-            # at model_nextlat.py:121 is never applied, so apply it ourselves.
-            logits = inner_model.lm_head(hidden)
-    return hidden, logits
+            return _forward_gpt(model, tokens, kwargs)
+        return _forward_nextlat(model, tokens, kwargs)
+
+
+def forward_states_and_logits(inner_model, tokens, *, architecture: str, mask=None, **kw):
+    """``(hidden_states, logits)`` for one forward pass.  See :func:`forward_all_states`.
+
+    Kept as the two-tuple entry point because that is what the GPT/NextLat call sites
+    want.  For BST it returns the PRIMARY state and drops the declared secondary; use
+    :func:`forward_all_states` when you need both.
+    """
+    out = forward_all_states(
+        inner_model, tokens, architecture=architecture, mask=mask, **kw
+    )
+    return out["hidden"], out["logits"]
 
 
 def extract_positions(
@@ -729,12 +951,16 @@ def extract_positions(
     positions: Sequence[int] = (PSI_EXTRACTION_INDEX, BRANCH_MARGIN_INDEX),
     batch_size: int = 256,
     device: Optional[str] = None,
+    eos_token_id: int = EOS_TOKEN_ID,
 ) -> dict:
     """Batched extraction -> plain numpy, ready for Layer A.
 
     Returns ``{"positions": (P,) int, "hidden": (N, P, D) float32,
-    "logits": (N, P, V) float32}``.  Nothing else crosses the torch boundary.
+    "logits": (N, P, V) float32, "architecture": str, "state_source": str}``, plus
+    ``"hidden_texthead": (N, P, D) float32`` for BST only (the declared secondary state,
+    :data:`BST_STATE_ROLES`).  Nothing else crosses the torch boundary.
     """
+    _check_architecture(architecture)
     torch = _torch()
     tok = torch.as_tensor(np.asarray(tokens), dtype=torch.long)
     if tok.ndim != 2:
@@ -749,20 +975,26 @@ def extract_positions(
     was_training = getattr(inner_model, "training", False)
     if hasattr(inner_model, "eval"):
         inner_model.eval()
-    h_out, l_out = [], []
+    parts: dict = {}
     try:
         for start in range(0, tok.shape[0], batch_size):
             chunk = tok[start : start + batch_size]
-            hidden, logits = forward_states_and_logits(
-                inner_model, chunk, architecture=architecture
+            out = forward_all_states(
+                inner_model, chunk, architecture=architecture, eos_token_id=eos_token_id
             )
-            h_out.append(hidden.index_select(1, pos_t).float().cpu().numpy())
-            l_out.append(logits.index_select(1, pos_t).float().cpu().numpy())
+            for name, tensor in out.items():
+                parts.setdefault(name, []).append(
+                    tensor.index_select(1, pos_t).float().cpu().numpy()
+                )
     finally:
         if was_training and hasattr(inner_model, "train"):
             inner_model.train()
-    return {
+    arch = str(architecture).lower()
+    result = {
         "positions": pos,
-        "hidden": np.concatenate(h_out, axis=0),
-        "logits": np.concatenate(l_out, axis=0),
+        "architecture": arch,
+        "state_source": STATE_SOURCE[arch],
     }
+    for name, chunks in parts.items():
+        result[name] = np.concatenate(chunks, axis=0)
+    return result

@@ -6,6 +6,8 @@
     1236
   ],
   "frozen_keys": [
+    "use_bst",
+    "use_nextlat",
     "model.n_layer",
     "model.n_head",
     "model.n_embd",
@@ -14,9 +16,15 @@
     "model.gpt_mode",
     "model.mtp_horizon",
     "model.proj_factor",
+    "model.bst_pair_minimum_gap",
     "model.lambda_mse",
     "model.lambda_kl",
     "model.lambda_ce",
+    "model.bst_pair_minimum_gap",
+    "model.bst_pair_maximum_gap",
+    "model.bst_pair_subsample_rate",
+    "model.bst_single_gap_prediction_mode",
+    "data.pair_batch_size",
     "optimizer.optimizer_type",
     "optimizer.learning_rate",
     "optimizer.weight_decay",
@@ -349,6 +357,154 @@
         {
           "key": "model.lambda_ce",
           "reason": "defaults.yaml:116 is 0.0 and the paper's Path-Star setting is 0.0. Restated because it is a loss coefficient on the frozen surface."
+        }
+      ],
+      "drops": []
+    },
+    {
+      "config": "bst_lurestar.yaml",
+      "family": "lurestar",
+      "source_config": "config/stargraph/5_5/bst_stargraph_5_5.yaml",
+      "source_config_sha256": "158a848e436a1e6e4c682f740266fe6c89b9a074f18909152302ceda84a06269",
+      "defaults_sha256": "f3b0fc3ddd38809a36ade1804d9eb3b4a539353ab11ab1b89b2503f1e0176231",
+      "upstream_commit": "3770be6009cea2b3c455a9ce7f2ca88b504bb955",
+      "overrides": [
+        {
+          "key": "seed",
+          "value": 1234,
+          "category": "SEED",
+          "authority": "spec sec.8 'Configuration authority' permitted-change list",
+          "reason": "One of the three preregistered confirmatory seeds. Stated explicitly instead of via `sweep:`, whose experiment-directory name is built by iterating a Python set (train.py:280,322) and therefore varies with PYTHONHASHSEED.",
+          "inert_ok": true
+        },
+        {
+          "key": "trainer.compile",
+          "value": false,
+          "category": "CORRECTION",
+          "authority": "docs/RUNLOG.md session 1 (established correction) + spec sec.8 'Set compile:false'",
+          "reason": "The shipped YAML sets true; upstream README.md:117-122 reports inconsistent Path-Star results under torch.compile. Also keeps submodule paths free of the _orig_mod level so the hidden-state hook resolves.",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.out_dir",
+          "value": "/content/lurestar/runs/bst/seed1234/base",
+          "category": "OUTPUT",
+          "authority": "spec sec.9 'Colab interruption and recovery contract'",
+          "reason": "Absolute and unique per job. latest_ckpt/recovery_ckpt pointers live at out_dir (core_train.py:945,971), so a shared out_dir lets one job's pointer capture another's resume.",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.experiment_name",
+          "value": "bst-seed1234-base",
+          "category": "OUTPUT",
+          "authority": "spec sec.9 'Colab interruption and recovery contract'",
+          "reason": "Deterministic job id. Contains the substring 'seed', which suppresses the automatic '-seed{n}' suffix at train.py:96-97.",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.save_recovery_checkpoint",
+          "value": 250,
+          "category": "CKPT",
+          "authority": "spec sec.9 'Colab interruption and recovery contract'",
+          "reason": "defaults.yaml:24 ships -1 (disabled). 250 steps is the spec's initial recovery cadence; the profiling gate reprices it against the 10-minute rule.",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.log_to_wandb",
+          "value": false,
+          "category": "EXEC",
+          "authority": "execution environment necessity (no scientific surface)",
+          "reason": "defaults.yaml:34 is true and the shipped 5_5 YAMLs never override it, so a naive run tries to wandb.init on the first log. CSV logging (log_to_file) remains the record of every metric.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.stargraph_train_data_path",
+          "value": "/content/lurestar/data/stargraph/graph_5_5_sample_200000.txt",
+          "category": "MANIFEST",
+          "authority": "spec sec.8 'Configuration authority' permitted-change list",
+          "reason": "Absolute path to the frozen 200,000-graph corpus. Filename keeps the graph_5_5_..._200000 form that data/stargraph.py:187-190 parses and asserts.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.stargraph_test_data_path",
+          "value": "/content/lurestar/data/stargraph/graph_5_5_test_20000.txt",
+          "category": "MANIFEST",
+          "authority": "spec sec.8 'Configuration authority' permitted-change list",
+          "reason": "Absolute path to the frozen 20,000-graph held-out corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "provenance",
+          "value": {
+            "upstream_repo": "JaydenTeoh/NextLat",
+            "upstream_commit": "3770be6009cea2b3c455a9ce7f2ca88b504bb955",
+            "source_config": "config/stargraph/5_5/bst_stargraph_5_5.yaml",
+            "source_config_sha256": "158a848e436a1e6e4c682f740266fe6c89b9a074f18909152302ceda84a06269",
+            "generator": "scripts/materialize_configs.py",
+            "note": "Condition 3 of spec sec.8: the architecture-matched Belief State Transformer, the competence-matched control. The paper's Figure 6 puts BST at ~99.9% on G(5,5) against GPT at ~18.6% (1/d chance), so BST solves Path-Star WITHOUT a latent-transition objective and a NextLat-vs-BST PSI gap is attributable to the objective rather than to task success. See docs/DECISION_D20_competence_gate.md."
+          },
+          "category": "PROVENANCE",
+          "authority": "spec sec.9 'Colab interruption and recovery contract'",
+          "reason": "Additive block, read by nothing. It lands in materialized_config.yaml with every run (train.py:192-194), which is what spec sec.9 requires to be persisted before training.",
+          "inert_ok": false
+        },
+        {
+          "key": "preregistration",
+          "value": {
+            "confirmatory_seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "primary_distance": "centered cosine",
+            "robustness_distance": "whitened Euclidean"
+          },
+          "category": "PROVENANCE",
+          "authority": "spec sec.8 'Configuration authority' permitted-change list",
+          "reason": "Additive block recording the preregistration inside the artifact that the run archives. Read by nothing.",
+          "inert_ok": false
+        }
+      ],
+      "hoists": [
+        {
+          "key": "trainer.save_last_checkpoint",
+          "reason": "spec sec.8 lists it explicitly; defaults.yaml:18 already true. Restated so the frozen base checkpoint cannot be lost to a defaults change."
+        },
+        {
+          "key": "trainer.save_best_checkpoint",
+          "reason": "spec sec.8 lists it explicitly; defaults.yaml:20 already true."
+        },
+        {
+          "key": "trainer.log_to_file",
+          "reason": "defaults.yaml:33 already true. The CSVLogger output is the only metric record once W&B is off."
+        },
+        {
+          "key": "trainer.init_from",
+          "reason": "already 'scratch' in the shipped YAML; restated next to out_dir because the two together decide whether a relaunch resumes or restarts."
+        },
+        {
+          "key": "model.compute_hidden_state_rank",
+          "reason": "defaults.yaml:111 false. Kept false: spec sec.2 rules out effective rank as a standalone contribution and the in-training SVD costs throughput. Hidden states are captured offline instead (see hoist note in docs)."
+        },
+        {
+          "key": "use_nextlat",
+          "reason": "defaults.yaml:3 false. The BST YAML is the only 5_5 config that omits this flag; gpt_stargraph_5_5.yaml:2 writes it. Restated so the core_train.py:38-58 dispatch chain (use_bst -> use_nextlat -> use_mtp_*) is fully explicit in the file."
+        },
+        {
+          "key": "model.bst_pair_maximum_gap",
+          "reason": "THE BST analogue of the proj_factor trap. Read at core_train.py:81, written in NO stargraph YAML, resolved from defaults.yaml:99 to -1, which model_bst.py:377-378 turns into `max_gap = document_len`, i.e. train on every gap. Pinned so a defaults edit cannot silently truncate the pair set."
+        },
+        {
+          "key": "model.bst_pair_subsample_rate",
+          "reason": "Read at core_train.py:82, written in NO stargraph YAML, resolved from defaults.yaml:102 to 1.0, which model_bst.py:478-483 reads as 'keep all valid pairs' (the subsample branch is skipped entirely). Anything below 1.0 makes the training set stochastic per step."
+        },
+        {
+          "key": "model.bst_single_gap_prediction_mode",
+          "reason": "Read at core_train.py:80 and ASSERTED at core_train.py:41-44 to be one of ['next_token', 'eos']; resolved from defaults.yaml:104 to 'eos'. Inert at bst_pair_minimum_gap: 2, because model_bst.py:584-588 only rewrites targets for pairs of gap exactly 1 and a minimum gap of 2 produces none -- but a missing value would abort the run before the first step, and a minimum-gap change would make it live."
+        },
+        {
+          "key": "data.pair_batch_size",
+          "reason": "Read at core_train.py:495 and :635 and passed to compute_loss for every arm; GPT and NextLat ignore it ('Extra arguments ignored for compatibility with BST', model_gpt.py:342, model_nextlat.py:418), BST does not. Written in NO stargraph YAML, resolved from defaults.yaml:67 to 32768. It is a LOSS-SCALING key, not a memory knob: model_bst.py:600 computes pair_accum_steps = ceil(n_pairs / pair_batch_size) and :601 folds it into texthead_loss_div, so a value below the per-sequence pair count turns the text-head loss into a mean of chunk means."
         }
       ],
       "drops": []

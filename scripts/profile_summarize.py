@@ -47,6 +47,25 @@ ADAPT_BRANCHES_PER_MODEL = N_SEEDS * 2  # near + far, per seed
 HMM_STEPS = 3000
 INTERRUPTION_MARGIN = 0.20  # spec section 11: "a 20% interruption margin"
 
+# Spec section 11's "Record:" list, as record fields. A gate that cannot produce one of
+# these has not measured it, and reporting `-` while exiting 0 is exactly the failure
+# docs/RUNLOG.md left open ("Peak VRAM is therefore still unmeasured"): the first profiling
+# attempt read torch.cuda in the driver process and silently returned 0.00 GB, and the
+# replacement is only an improvement if a probe that never landed FAILS the gate instead of
+# blanking two table rows. GPU utilization is deliberately not in this list: nvidia-smi may
+# legitimately be unavailable on a runtime, and profile.sh says so on stderr.
+REQUIRED_MEASUREMENTS = {
+    "seconds_per_step_median": "median seconds per step",
+    "seconds_per_step_p95": "p95 seconds per step",
+    "examples_per_second": "examples per second",
+    "tokens_per_second": "tokens per second",
+    "peak_allocated_gb": "peak allocated VRAM",
+    "peak_reserved_gb": "peak reserved VRAM",
+    "host_input_wait_seconds": "host-input wait",
+    "checkpoint_write_seconds_median": "checkpoint-write duration",
+    "checkpoint_bytes_median": "checkpoint-write bytes",
+}
+
 
 def _f(value: str) -> Optional[float]:
     if value is None or value == "":
@@ -258,6 +277,12 @@ def summarize_job(job: Dict[str, Any]) -> Dict[str, Any]:
     else:
         rec["probe_missing"] = job["probe_glob"]
 
+    # Spec section 11's record list, checked per job. `-` in a table cell is not a
+    # measurement; a gate that blanks a required row must not exit 0.
+    rec["missing_required"] = sorted(
+        label for field, label in REQUIRED_MEASUREMENTS.items() if rec.get(field) is None
+    )
+
     acc = last_value(rows, r"test_accuracy$")
     if acc:
         rec["validation_accuracy"] = acc
@@ -395,6 +420,8 @@ def render_table(records: Dict[str, Dict[str, Any]], task: str) -> List[str]:
             lines.append(f"| {acc['metric']} @ step {int(acc['step'] or 0)} ({key}) | "
                          + " | ".join(_fmt(acc["value"], ".4f") if k == key else "-" for k in keys)
                          + " |")
+    lines.append("| UNMEASURED (spec sec.11) | " + " | ".join(
+        ", ".join(records[k].get("missing_required") or []) or "none" for k in keys) + " |")
     con = contrast(records, task)
     if con:
         lines += ["", "NextLat vs GPT: " + ", ".join(
@@ -457,6 +484,16 @@ def main() -> int:
               if r.get("returncode") not in (0, None) or r.get("seconds_per_step_median") is None]
     if failed:
         print(f"INCOMPLETE: jobs without a usable profile: {failed}", file=sys.stderr)
+        return 1
+    unmeasured = {k: r["missing_required"] for k, r in records.items()
+                  if r.get("missing_required")}
+    if unmeasured:
+        for job, labels in sorted(unmeasured.items()):
+            print(f"UNMEASURED {job}: " + ", ".join(labels), file=sys.stderr)
+        print("INCOMPLETE: spec section 11 requires every quantity above to be RECORDED. "
+              "A blank table cell is not a measurement — check that fabric ran "
+              "scripts/profile_entry.py (LURESTAR_ENTRY) and that PROFILE_PROBE_JSON "
+              "matched the probe_glob in the job manifest.", file=sys.stderr)
         return 1
     if proj.get("incomplete_for"):
         # A half-run gate is not a gate. PROGRAM.md invariant 2 requires a measured

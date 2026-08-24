@@ -92,6 +92,29 @@ Two invariants, both per-item, both asserted in the acceptance tests. The pool i
 once and both are available for every quartet, so the analysis does not choose between them
 after seeing model states — the primary is fixed here, before any model is trained.
 
+### LS-0 — one common suffix depth (added by adversarial review, 2026-08-23)
+
+> Both near lures are suffix swaps at the **same depth `k`**, re-derived by
+> `validate.check_quartet` from the anchor's own solved arms — never read from the
+> record's `depth` field, which is instead cross-checked against the re-derived value.
+
+Graph validity already forces the two edges *inside* one swap to share a depth: a head
+transposition across unequal depths leaves an arm of the wrong length and the solver
+rejects it. It does **not** force the safe swap and the critical swap to use the same
+depth, and depth is the magnitude of the manipulation — a depth-1 swap moves three nodes
+of each arm, a depth-3 swap moves one. Both are two-token prompt edits, so every
+token-level assertion in the suite passes on a depth-mismatched pair. Before this
+invariant existed the checker certified such a quartet with zero problems; the generator
+never produced one, but the checker is what certifies a written manifest.
+
+`check_quartet` now also caps `|E_far ∩ E_base|` at `far_max_edge_overlap` (default 2,
+the shipped value, passed through from `QuartetConfig`), and recomputes every stored
+`graph_key`, `prompt_sha256` and `answer` from the condition's own `line`. The no-leakage
+gate (`generate.leaked_quartet_ids`) likewise keys off the line rather than the stored
+field. All three were holes through which a broken record passed clean; see
+`docs/review/lure-generator.md` P0-1 … P0-3. None of them changed the generator's RNG
+stream, so every manifest sha256 is unchanged.
+
 ### LS-1 — shared anchor, exchangeable position (primary)
 
 > `near_safe` and `near_critical` are each an exact **two-token edit of the same `base`

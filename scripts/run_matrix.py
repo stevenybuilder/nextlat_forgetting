@@ -22,6 +22,17 @@ job wrote last owns the pointer. If an H3 `far` branch ever resumed from the `ne
 pointer, both branches would silently share a parent and the near-minus-far contrast -- the whole
 of H3 -- would be measuring nothing. `validate_matrix` makes that unrepresentable.
 
+The matrix is three architecture-matched arms (spec section 8) at the three preregistered
+seeds: `gpt`, `nextlat` and `bst`. BST is the COMPETENCE-MATCHED control -- the paper's
+Figure 6 puts GPT on G(5,5) at ~18.6% (= 1/d, chance) and BST at ~99.9% -- so the primary
+cross-model contrast is NextLat vs BST, where both arms solve the task and only the training
+objective differs. NextLat vs GPT stays secondary and competence-confounded; BST vs GPT
+measures how much of any effect is competence alone. See
+`docs/DECISION_D20_competence_gate.md`, section "Superseded in part".
+
+That makes 3 models x 3 seeds = 9 base jobs and 3 x 3 x {near, far} = 18 adaptation
+branches, 27 jobs in all.
+
 Usage::
 
     python scripts/run_matrix.py --root gs-mirror/lurestar --print-plan
@@ -51,7 +62,10 @@ from lurestar.durable_checkpoint import (  # noqa: E402
     sha256_file,
 )
 
-MODELS = ("gpt", "nextlat")
+# Spec section 8, three architecture-matched arms. `bst` is the competence-matched control
+# and the one that makes the cross-model geometry contrast identifiable
+# (docs/DECISION_D20_competence_gate.md); it is not an optional extra.
+MODELS = ("gpt", "nextlat", "bst")
 SEEDS = (1234, 1235, 1236)          # PROGRAM.md: frozen, three preregistered confirmatory seeds
 CONDITIONS = ("near", "far")
 
@@ -75,12 +89,18 @@ DEFAULT_MANIFESTS: dict[str, tuple[str, ...]] = {
 
 
 def default_config_for(model: str, phase: str, condition: str | None) -> str:
-    """The six real deliverables in `configs/`, from `scripts/materialize_configs.py`.
+    """The real deliverables in `configs/`, from `scripts/materialize_configs.py`.
 
-    There is no `{model}_lurestar_base.yaml` and no `{model}_lurestar_adapt.yaml`. And near
-    and far are SEPARATE files because they are the two arms of the H3 contrast; handing both
-    arms one config would collapse that contrast at the configuration layer.
+    There is no `{model}_lurestar_base.yaml` and no `{model}_lurestar_adapt.yaml`. Each of
+    the three arms has its own base file -- `gpt_lurestar.yaml`, `nextlat_lurestar.yaml`,
+    `bst_lurestar.yaml` -- because each is a copy of a DIFFERENT official upstream YAML, and
+    the BST one carries `model.bst_pair_minimum_gap: 2`, which `defaults.yaml:98` resolves to
+    1 if it is ever lost. Near and far are SEPARATE files because they are the two arms of the
+    H3 contrast; handing both arms one config would collapse that contrast at the
+    configuration layer.
     """
+    if model not in MODELS:
+        raise ValueError(f"unknown model {model!r}")
     if phase == "base":
         return str(_REPO / "configs" / f"{model}_lurestar.yaml")
     if condition not in CONDITIONS:
@@ -90,17 +110,38 @@ def default_config_for(model: str, phase: str, condition: str | None) -> str:
     return str(_REPO / "configs" / f"adapt_{condition}.yaml")
 
 
+# The one file `configs/adapt_{near,far}.yaml` drives all three arms, so each non-NextLat arm
+# has to restate its own model selection on the command line. `core_train.py:38-46` picks the
+# model class from these flags: `use_bst` is tested FIRST, then `use_nextlat`, then GPT as the
+# fallthrough. We do not lean on that ordering -- every arm states both flags -- because a
+# silent objective swap here is invisible in every artifact the run produces.
+ADAPT_MODEL_OVERRIDES: dict[str, tuple[str, ...]] = {
+    # `use_nextlat: true` at configs/adapt_near.yaml:20; without the flip a GPT branch trains
+    # a NextLat model. `scripts/launch_train.sh` does the same thing for the same reason.
+    "gpt": ("use_nextlat=false",),
+    "nextlat": (),
+    # BST additionally needs its objective's one scientific knob restated: the adapt configs
+    # are copies of the NextLat YAML, which never mentions `bst_pair_minimum_gap`, so the
+    # merge falls through to `defaults.yaml:98` = 1 while the BST parent was trained at 2
+    # (`config/stargraph/5_5/bst_stargraph_5_5.yaml:42`, `core_train.py:80`). Adapting a
+    # gap-2 parent under a gap-1 objective would change the loss between base and adaptation
+    # in the BST arm only, which is exactly the confound the arm exists to remove.
+    "bst": ("use_nextlat=false", "use_bst=true", "model.bst_pair_minimum_gap=2"),
+}
+
+
 def default_overrides_for(model: str, phase: str) -> tuple[str, ...]:
     """`configs/adapt_{near,far}.yaml` are derived from the NextLat G(5,5) YAML.
 
-    Its key set is a superset of the GPT one, so the GPT branch is the same file with the
-    model flag flipped -- `use_nextlat: true` at `configs/adapt_near.yaml:20`. Without this
-    override every GPT adaptation job trains a NextLat model. `scripts/launch_train.sh:78`
-    does the same thing for the same reason.
+    Its key set is a superset of the GPT one, so every arm can share the file as long as the
+    model-selection flags are overridden per arm. Base jobs need nothing: each arm's base
+    config is a copy of its own official upstream YAML.
     """
-    if phase == "adapt" and model == "gpt":
-        return ("use_nextlat=false",)
-    return ()
+    if model not in MODELS:
+        raise ValueError(f"unknown model {model!r}")
+    if phase != "adapt":
+        return ()
+    return ADAPT_MODEL_OVERRIDES[model]
 
 
 # --------------------------------------------------------------------------------------
@@ -108,7 +149,7 @@ def default_overrides_for(model: str, phase: str) -> tuple[str, ...]:
 # --------------------------------------------------------------------------------------
 
 def job_id(model: str, seed: int, phase: str, condition: str | None = None) -> str:
-    """Deterministic ids: `nextlat-s1234-base`, `gpt-s1235-adapt-near`.
+    """Deterministic ids: `nextlat-s1234-base`, `gpt-s1235-adapt-near`, `bst-s1236-adapt-far`.
 
     Deterministic because the ledger, the output root and the GCS prefix are all keyed by it;
     a job id that depended on iteration order or a timestamp would make a resume a new job.
@@ -119,6 +160,32 @@ def job_id(model: str, seed: int, phase: str, condition: str | None = None) -> s
     if condition is not None:
         parts.append(condition)
     return "-".join(parts)
+
+
+def upstream_experiment_dir_name(experiment_name: str, seed: int) -> str:
+    """Deviation D-18: the trainer RENAMES the experiment before it builds any path.
+
+    `train.py:98-99`, verbatim::
+
+        if "seed" not in experiment_name:
+            experiment_name = experiment_name + f"-seed{config.seed}"
+
+    and `config.trainer.experiment_name` is then overwritten with the result (`train.py:125`)
+    and joined onto `trainer.out_dir` to build every checkpoint path (`core_train.py:933`,
+    `core_train.py:959`). The job ids here are `gpt-s1234-base` / `bst-s1236-adapt-far`, which
+    do NOT contain the substring "seed" -- `s1234` is not `seed` -- so the real on-disk
+    directory is `{out_dir}/{job_id}-seed{seed}/`.
+
+    A runner that predicts `{out_dir}/{job_id}/` instead points `DurableCheckpointer` at a
+    directory that never exists: `adopt_existing` finds nothing, `resolve()` returns None, and
+    `run_job` records "job exited 0 but left no verified checkpoint" -- marking a good
+    20,000-step run FAILED, and then planning `init_from=scratch` on top of it on the retry.
+    The substring test is honoured rather than worked around, so a job id that DOES contain
+    "seed" is left alone exactly as upstream leaves it alone.
+    """
+    if "seed" not in experiment_name:
+        return f"{experiment_name}-seed{int(seed)}"
+    return experiment_name
 
 
 @dataclasses.dataclass(frozen=True)
@@ -138,10 +205,27 @@ class JobSpec:
 
     @property
     def experiment_name(self) -> str:
+        """What we pass to `trainer.experiment_name=` on the command line."""
         return self.job_id
 
+    @property
+    def experiment_dir_name(self) -> str:
+        """What upstream will actually have called the directory (D-18). Never `job_id`."""
+        return upstream_experiment_dir_name(self.experiment_name, self.seed)
+
+    @property
+    def checkpoint_dir(self) -> str:
+        """The real on-disk checkpoint directory: `{out_root}/{experiment_name}-seed{seed}`."""
+        return str(pathlib.Path(self.out_root) / self.experiment_dir_name)
+
     def to_dict(self) -> dict:
-        return dataclasses.asdict(self)
+        d = dataclasses.asdict(self)
+        # Properties are not dataclass fields, and `--print-plan` is how a human checks the
+        # path the runner is about to hash. D-18 is invisible without it.
+        d["experiment_name"] = self.experiment_name
+        d["experiment_dir_name"] = self.experiment_dir_name
+        d["checkpoint_dir"] = self.checkpoint_dir
+        return d
 
 
 def build_matrix(
@@ -451,7 +535,9 @@ class MatrixRunner:
 
     def checkpointer(self, spec: JobSpec) -> DurableCheckpointer:
         return DurableCheckpointer(
-            spec.out_root, spec.job_id, experiment_name=spec.experiment_name,
+            # `experiment_name=` here names a DIRECTORY, so it must be the name upstream
+            # will have used, not the one we asked for on the command line (D-18).
+            spec.out_root, spec.job_id, experiment_name=spec.experiment_dir_name,
             serializer=self.serializer, sync=self.sync, logger=self.echo,
         )
 
@@ -624,9 +710,40 @@ class MatrixRunner:
             states[spec.job_id] = entry
             return entry
 
+        # ---- D-19: a clean exit is not evidence that anything was trained --------------
+        start = plan.parent_steps or 0
+        updates = final.step - start
+        if updates < spec.train_batches:
+            entry = self.ledger.append({
+                "job_id": spec.job_id, "status": FAILED,
+                "step": final.step, "updates": updates,
+                "reason": (
+                    f"exited 0 at step {final.step} having taken {updates} of the "
+                    f"{spec.train_batches} updates it was launched for (parent at step "
+                    f"{start}). Deviation D-19: --checkpoint_path restores training_steps "
+                    "(models/model_base.py:437), core_train.py:309 seeds self.step from it, "
+                    "and core_train.py:569 returns as soon as self.step > "
+                    "trainer.train_batches -- so a 500-step adaptation branch launched off a "
+                    "20,000-step parent without the offset returns after ONE update and "
+                    "looks like a clean completion. Zero adaptation is a FAILED job, not a "
+                    "DONE one."
+                ),
+                "parent_job_id": spec.parent_job_id,
+                "parent_checkpoint_sha256": plan.parent_checkpoint_sha256,
+                **self._identity(spec),
+            })
+            states[spec.job_id] = entry
+            return entry
+
         ck.finalize()   # clear the stale recovery pointer; core_train.py:145-151
         entry = self.ledger.append({
             "job_id": spec.job_id, "status": DONE, "step": final.step,
+            # `step` is upstream's offset-carrying counter; `updates` is the quantity
+            # PROGRAM.md actually freezes, and the two differ by the parent offset on every
+            # adaptation branch. Recording both is what makes a zero-update run legible in
+            # the ledger instead of indistinguishable from a good one.
+            "updates": updates,
+            "parent_steps": plan.parent_steps,
             "final_checkpoint": final.path, "final_checkpoint_sha256": final.sha256,
             "artifacts": artifacts,
             "parent_job_id": spec.parent_job_id,
@@ -634,7 +751,9 @@ class MatrixRunner:
             **self._identity(spec),
         })
         states[spec.job_id] = entry
-        self.echo(f"[run_matrix] {spec.job_id}: DONE at step {final.step}")
+        self.echo(
+            f"[run_matrix] {spec.job_id}: DONE at step {final.step} ({updates} updates)"
+        )
         return entry
 
     def run(self, jobs: t.Sequence[JobSpec]) -> dict[str, dict]:

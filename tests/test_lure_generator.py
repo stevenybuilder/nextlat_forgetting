@@ -22,6 +22,7 @@ import pytest
 
 from lurestar.generate import (
     ARM_LEN,
+    _condition_record,
     N_EDGES,
     NUM_ARMS,
     SWAP_DEPTHS,
@@ -29,9 +30,11 @@ from lurestar.generate import (
     build_a_pair_pools,
     build_e_lure,
     graph_from_line,
+    leaked_quartet_ids,
     make_quartet,
     read_jsonl,
     suffix_swap,
+    swap_edit_slots,
     write_jsonl,
 )
 from lurestar.validate import (
@@ -444,6 +447,121 @@ def test_checker_rejects_a_genuinely_gap_mismatched_quartet():
 def test_self_check_refuses_to_emit_a_gap_mismatched_quartet():
     with pytest.raises(GraphError, match="LS-1"):
         make_quartet(MASTER_SEED, 0, QuartetConfig(), slot_pairs=((2, 5), (7, 18)))
+
+
+def test_checker_rejects_near_lures_at_MISMATCHED_SUFFIX_DEPTHS(quartets):
+    """P0 regression. A safe swap at one depth and a critical swap at another is an
+    unmatched pair: depth is the magnitude of the perturbation (a depth-1 swap moves
+    three nodes per arm, a depth-3 swap moves one), yet BOTH are two-token prompt edits,
+    so every token-level assertion in this file passes on such a quartet. The checker
+    must re-derive the depth from the solved anchor and refuse.
+    """
+    caught = 0
+    tried = 0
+    for rec in quartets[:400]:
+        base = graph_from_line(rec["conditions"]["base"]["line"])
+        s0, s1 = rec["safe_arms"]
+        for d2 in SWAP_DEPTHS:
+            if d2 == rec["depth"]:
+                continue
+            slots = sorted(swap_edit_slots(base, s0, s1, d2))
+            pc = sorted(rec["edit_slots"]["near_critical"])
+            # Only the depth may differ: keep the pair disjoint from critical's and give
+            # it the same gap, so LS-1 still holds and depth is the ONLY violation.
+            if slots[1] - slots[0] != pc[1] - pc[0] or set(slots) & set(pc):
+                continue
+            rogue = json.loads(json.dumps(rec))
+            rogue["conditions"]["near_safe"] = _condition_record(
+                suffix_swap(base, s0, s1, d2)
+            )
+            rogue["edit_slots"]["near_safe"] = slots
+            rogue["edit_token_positions"]["near_safe"] = [
+                edge_slot_token_positions(x)[1] for x in slots
+            ]
+            tried += 1
+            problems = check_quartet(rogue)
+            assert problems, (rec["quartet_id"], rec["depth"], d2)
+            assert any("LS-0" in p for p in problems), problems
+            # ... and nothing else is wrong with it: LS-1 still passes.
+            assert not any("LS-1" in p for p in problems), problems
+            caught += 1
+            break
+    assert tried >= 10, f"only {tried} depth-mismatched rogues constructible"
+    assert caught == tried
+
+
+def test_checker_rejects_a_near_lure_relabelled_as_the_FAR_CONTROL(quartets):
+    """P0 regression. far_critical's defining property is low edge overlap. Without an
+    explicit cap the checker certified an 18/20-overlap near lure as the far control,
+    which is the control H3's primary near-minus-far contrast is measured against.
+    """
+    for rec in quartets[:50]:
+        base = graph_from_line(rec["conditions"]["base"]["line"])
+        near = suffix_swap(base, 0, rec["critical_arm"], rec["depth"])
+        rogue = json.loads(json.dumps(rec))
+        rogue["conditions"]["far_critical"] = _condition_record(near)
+        overlap = len(
+            set(parse_line(near.serialize()).edges)
+            & set(parse_line(rec["conditions"]["base"]["line"]).edges)
+        )
+        assert overlap == N_EDGES - 2
+        rogue["far_edge_overlap"] = overlap  # honestly recorded — only the cap catches it
+        problems = check_quartet(rogue)
+        assert any("exceeds the cap" in p for p in problems), problems
+    # The cap is a parameter, and a loosened cap must actually loosen it.
+    assert not any(
+        "exceeds the cap" in p
+        for p in check_quartet(quartets[0], far_max_edge_overlap=2)
+    )
+    tight = check_quartet(quartets[0], far_max_edge_overlap=-1)
+    assert any("exceeds the cap" in p for p in tight), tight
+
+
+@pytest.mark.parametrize("field", ["graph_key", "prompt_sha256", "answer"])
+def test_checker_recomputes_stored_identities_and_rejects_a_wrong_one(quartets, field):
+    """P0 regression. generate.py's no-leakage gate and the leakage tests consult
+    ``graph_key``. A record whose stored key does not match its own line would sail
+    through both — a training item copied verbatim with a bogus key reads as clean.
+    """
+    for cond in CONDITIONS:
+        rec = json.loads(json.dumps(quartets[3]))
+        entry = rec["conditions"][cond]
+        entry[field] = "0" * 64 if field != "answer" else list(reversed(entry["answer"]))
+        problems = check_quartet(rec)
+        assert any(cond in p and field.split("_")[0] in p for p in problems), (
+            cond, field, problems
+        )
+
+
+def test_leakage_gate_recomputes_the_key_instead_of_trusting_the_record(
+    quartets, train_index, train_lines
+):
+    """P0 regression on the CLI gate itself (``generate.leaked_quartet_ids``).
+
+    A verbatim training line smuggled into a quartet with a falsified ``graph_key`` and
+    ``prompt_sha256`` must still be flagged. A gate that reads the stored fields returns
+    "clean" here, which is precisely how a leakage guarantee becomes decorative.
+    """
+    clean = json.loads(json.dumps(quartets[:5]))
+    assert leaked_quartet_ids(clean, train_index) == []
+
+    poisoned = json.loads(json.dumps(quartets[:5]))
+    line = train_lines[77]
+    poisoned[2]["conditions"]["far_critical"] = {
+        "line": line,
+        "graph_key": "0" * 64,          # forged
+        "prompt_sha256": "0" * 64,      # forged
+        "answer": list(parse_line(line).answer),
+    }
+    assert leaked_quartet_ids(poisoned, train_index) == [poisoned[2]["quartet_id"]]
+
+    # And a *reshuffled* training graph — a different prompt string, same graph — must
+    # be caught too, otherwise only verbatim copies would be.
+    g = graph_from_line(line)
+    reshuffled = type(g)(g.source, g.goal, g.arms, tuple(int(x) for x in np.random.default_rng(5).permutation(N_EDGES)))
+    assert reshuffled.serialize() != line
+    poisoned[2]["conditions"]["far_critical"]["line"] = reshuffled.serialize()
+    assert leaked_quartet_ids(poisoned, train_index) == [poisoned[2]["quartet_id"]]
 
 
 def test_checker_rejects_a_tampered_answer(quartets):

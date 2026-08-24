@@ -24,9 +24,14 @@ from run_matrix import (
     Ledger,
     MatrixRunner,
     ResumePlan,
+    MODELS,
+    SEEDS,
     assert_branch_parity,
     build_matrix,
+    default_config_for,
+    default_overrides_for,
     job_id,
+    upstream_experiment_dir_name,
     validate_matrix,
     write_step_metrics,
 )
@@ -39,24 +44,50 @@ SER = pickle_serializer()
 # --------------------------------------------------------------------------------------
 
 class FakeLauncher:
-    """Trains `steps_per_call` further steps, checkpointing every 10, then stops or fails."""
+    """Trains up to the OFFSET step target, checkpointing every 10, then stops or fails.
 
-    def __init__(self, total: int = 50, stop_at: dict[str, int] | None = None,
-                 fail: set[str] | None = None):
-        self.total = total
+    The offset is the point. `--checkpoint_path` restores `training_steps`
+    (`models/model_base.py:437`), `core_train.py:309` seeds `self.step` from it, and
+    `core_train.py:569` returns as soon as `self.step > trainer.train_batches`. So a branch
+    off a P-step parent begins at step P and must be asked for `P + adapt_steps`, not
+    `adapt_steps`. This launcher reproduces that arithmetic, which is what makes `updates`
+    (steps taken beyond the parent) a real quantity in these tests instead of a relabelled
+    step counter -- and what lets `ignore_parent_offset=True` reproduce deviation D-19.
+
+    It also writes its checkpoints into `spec.experiment_dir_name`, i.e. the directory
+    upstream would really have created after `train.py:98-99` appended `-seed{seed}` (D-18).
+    """
+
+    def __init__(self, stop_at: dict[str, int] | None = None,
+                 fail: set[str] | None = None, ignore_parent_offset: bool = False):
         self.stop_at = stop_at or {}
         self.fail = fail or set()
+        self.ignore_parent_offset = ignore_parent_offset
         self.calls: list[ResumePlan] = []
+        self.updates: dict[str, int] = {}
+
+    @staticmethod
+    def _ckpt(spec: JobSpec) -> DurableCheckpointer:
+        return DurableCheckpointer(spec.out_root, spec.job_id,
+                                   experiment_name=spec.experiment_dir_name, serializer=SER)
+
+    def target(self, plan: ResumePlan) -> int:
+        """What `FabricLauncher.command` puts in `trainer.train_batches=`."""
+        if self.ignore_parent_offset:
+            return plan.spec.train_batches      # the D-19 bug, verbatim
+        return (plan.parent_steps or 0) + plan.spec.train_batches
 
     def __call__(self, plan: ResumePlan) -> LaunchResult:
         self.calls.append(plan)
         spec = plan.spec
-        ck = DurableCheckpointer(spec.out_root, spec.job_id,
-                                 experiment_name=spec.experiment_name, serializer=SER)
-        stop = self.stop_at.get(spec.job_id, self.total)
-        step = plan.resume_step
-        while step < min(stop, self.total):
+        ck = self._ckpt(spec)
+        target = self.target(plan)
+        start = plan.resume_step or (plan.parent_steps or 0)
+        stop = self.stop_at.get(spec.job_id, target)
+        step = start
+        while step < min(stop, target):
             step += 1
+            self.updates[spec.job_id] = self.updates.get(spec.job_id, 0) + 1
             if step % 10 == 0:
                 ck.save({"step": step, "job": spec.job_id,
                          "parent": plan.parent_checkpoint_sha256}, step)
@@ -64,7 +95,7 @@ class FakeLauncher:
                                    {"loss": 1.0 / step})
         if spec.job_id in self.fail:
             return LaunchResult(1, step, "simulated crash")
-        if step < self.total:
+        if step < target:
             return LaunchResult(137, step, "simulated runtime disconnect")
         ck.save({"step": step, "job": spec.job_id,
                  "parent": plan.parent_checkpoint_sha256}, step, kind="final")
@@ -96,20 +127,63 @@ def test_job_ids_are_deterministic_and_match_the_spec():
     assert job_id("nextlat", 1234, "base") == "nextlat-s1234-base"
     assert job_id("gpt", 1235, "adapt", "near") == "gpt-s1235-adapt-near"
     assert job_id("gpt", 1235, "adapt", "far") == "gpt-s1235-adapt-far"
+    assert job_id("bst", 1236, "base") == "bst-s1236-base"
+    assert job_id("bst", 1236, "adapt", "far") == "bst-s1236-adapt-far"
     with pytest.raises(ValueError):
         job_id("llama", 1234, "base")
 
 
-def test_every_branch_gets_its_own_output_root(tmp_path):
+def test_the_matrix_is_three_arms(tmp_path):
+    """Spec sec.8: gpt, nextlat AND bst, at the three preregistered seeds.
+
+    BST is the competence-matched control (docs/DECISION_D20_competence_gate.md, "Superseded
+    in part"): the paper's Figure 6 has GPT at ~18.6% -- 1/d, i.e. chance -- and BST at
+    ~99.9%, so NextLat-vs-GPT cannot separate objective from task success and
+    NextLat-vs-BST can. Dropping the arm silently downgrades the primary contrast, and
+    nothing else in this repository would notice, so the arity is asserted here.
+    """
+    assert MODELS == ("gpt", "nextlat", "bst")
+    assert SEEDS == (1234, 1235, 1236)
+
     jobs = build_matrix(tmp_path / "r")
-    assert len(jobs) == 2 * 3 * 3          # 2 models x 3 seeds x (base, near, far)
+    base = [j for j in jobs if j.phase == "base"]
+    adapt = [j for j in jobs if j.phase == "adapt"]
+    assert len(base) == 9, "3 models x 3 seeds"
+    assert len(adapt) == 18, "3 models x 3 seeds x {near, far}"
+    assert len(jobs) == 27
+
+    assert {j.model for j in jobs} == {"gpt", "nextlat", "bst"}
+    for model in MODELS:
+        assert len([j for j in base if j.model == model]) == 3
+        assert len([j for j in adapt if j.model == model]) == 6
+        assert {j.seed for j in jobs if j.model == model} == set(SEEDS)
+
+
+def test_every_branch_gets_its_own_output_root(tmp_path):
+    """No two of the 27 jobs may share an output root, across arms as well as within one.
+
+    Upstream resolves `recovery_ckpt` / `latest_ckpt` at `trainer.out_dir`
+    (core_train.py:944-948, 970-974), one directory ABOVE the experiment directory, and
+    `init_from: resume` reads them from there. A shared root therefore lets whichever job
+    wrote last own the other's resume pointer -- and between a `near` and a `far` branch
+    that silently gives them one parent and empties the H3 contrast.
+    """
+    jobs = build_matrix(tmp_path / "r")
+    assert len(jobs) == 3 * 3 * 3          # 3 models x 3 seeds x (base, near, far)
     roots = [pathlib.Path(j.out_root).resolve() for j in jobs]
-    assert len(set(roots)) == len(roots)
-    near = next(j for j in jobs if j.job_id == "nextlat-s1234-adapt-near")
-    far = next(j for j in jobs if j.job_id == "nextlat-s1234-adapt-far")
-    base = next(j for j in jobs if j.job_id == "nextlat-s1234-base")
-    assert near.out_root != far.out_root != base.out_root
-    assert near.parent_job_id == far.parent_job_id == base.job_id
+    assert len(set(roots)) == len(roots) == 27
+    # and no root may nest inside another, which validate_matrix enforces for real
+    for i, a in enumerate(roots):
+        for b in roots[i + 1:]:
+            assert a not in b.parents and b not in a.parents
+
+    for model in MODELS:
+        for seed in SEEDS:
+            near = next(j for j in jobs if j.job_id == job_id(model, seed, "adapt", "near"))
+            far = next(j for j in jobs if j.job_id == job_id(model, seed, "adapt", "far"))
+            base = next(j for j in jobs if j.job_id == job_id(model, seed, "base"))
+            assert len({near.out_root, far.out_root, base.out_root}) == 3
+            assert near.parent_job_id == far.parent_job_id == base.job_id
 
 
 def test_shared_or_nested_output_roots_are_rejected(tmp_path):
@@ -425,6 +499,51 @@ def test_gpt_adaptation_flips_use_nextlat_off(tmp_path):
     assert "use_nextlat=false" in cmd
 
 
+def test_bst_adaptation_restates_its_whole_objective(tmp_path):
+    """The BST branch needs three overrides, not one, and the third is the easy one to miss.
+
+    `configs/adapt_*.yaml` is a copy of the NextLat G(5,5) YAML, which never mentions
+    `bst_pair_minimum_gap`, so the merge falls through to `defaults.yaml:98` = 1 while the
+    BST base parent was trained at 2 (`bst_stargraph_5_5.yaml:42`, read into BSTConfig at
+    `core_train.py:80`). Adapting a gap-2 parent under a gap-1 objective would change the
+    loss between base and adaptation in the BST arm alone -- a confound inside the arm that
+    exists to remove a confound.
+    """
+    jobs = {j.job_id: j for j in build_matrix(tmp_path / "r", seeds=(1234,))}
+    for cond in ("near", "far"):
+        ov = jobs[f"bst-s1234-adapt-{cond}"].overrides
+        assert "use_bst=true" in ov
+        assert "use_nextlat=false" in ov
+        assert "model.bst_pair_minimum_gap=2" in ov
+
+    cmd = FabricLauncher(tmp_path, dry_run=True).command(
+        ResumePlan(spec=jobs["bst-s1234-adapt-near"], fresh=True,
+                   parent_checkpoint="/d/p.pt", parent_steps=20000))
+    for override in ("use_bst=true", "use_nextlat=false", "model.bst_pair_minimum_gap=2"):
+        assert override in cmd
+    # base jobs need no flag overrides: each arm has its own copied upstream YAML
+    assert jobs["bst-s1234-base"].overrides == ()
+    assert default_overrides_for("bst", "base") == ()
+    with pytest.raises(ValueError, match="unknown model"):
+        default_overrides_for("llama", "adapt")
+
+
+def test_each_arm_gets_its_own_base_config(tmp_path):
+    """Three arms, three copied upstream YAMLs. A shared base file would erase the arm."""
+    assert default_config_for("bst", "base", None).endswith("configs/bst_lurestar.yaml")
+    assert default_config_for("gpt", "base", None).endswith("configs/gpt_lurestar.yaml")
+    assert default_config_for("nextlat", "base", None).endswith(
+        "configs/nextlat_lurestar.yaml")
+    with pytest.raises(ValueError, match="unknown model"):
+        default_config_for("llama", "base", None)
+
+    jobs = build_matrix(tmp_path / "r")
+    base_cfgs = {j.model: j.config for j in jobs if j.phase == "base"}
+    assert len(set(base_cfgs.values())) == 3
+    for cfg in base_cfgs.values():
+        assert pathlib.Path(cfg).is_file(), cfg
+
+
 def test_default_matrix_carries_the_dataset_manifests(tmp_path):
     """Spec section 9.3 item 4: a resume must preserve the manifests, so they must be wired."""
     for j in build_matrix(tmp_path / "r", models=("gpt",), seeds=(1234,)):
@@ -487,7 +606,8 @@ def test_runner_resumes_from_a_checkpoint_upstream_wrote(tmp_path):
     cfg = tmp_path / "cfg.yaml"
     cfg.write_text("trainer:\n  train_batches: 20000\n")
     out = tmp_path / "runs" / "gpt" / "1234" / "base"
-    exp = out / "gpt-s1234-base"
+    # D-18: train.py:98-99 appends "-seed1234" because "gpt-s1234-base" has no "seed" in it
+    exp = out / "gpt-s1234-base-seed1234"
     exp.mkdir(parents=True)
     save, _ = SER
     # exactly what core_train.py:961 and core_train.py:774-777 leave on disk
@@ -513,7 +633,7 @@ def test_a_torn_upstream_checkpoint_rolls_back_to_the_validation_checkpoint(tmp_
     cfg = tmp_path / "cfg.yaml"
     cfg.write_text("trainer:\n  train_batches: 20000\n")
     out = tmp_path / "runs" / "gpt" / "1234" / "base"
-    exp = out / "gpt-s1234-base"
+    exp = out / "gpt-s1234-base-seed1234"      # D-18
     exp.mkdir(parents=True)
     save, _ = SER
     for name, step in (("recovery_ckpt_iter_15000.pt", 15000),

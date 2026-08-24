@@ -363,12 +363,40 @@ def degree_sequence(edges: Iterable[Edge]) -> Tuple[Tuple[int, int], ...]:
     return tuple(sorted((out[n], inn[n]) for n in nodes))
 
 
-def check_quartet(record: Mapping, max_nodes: int = MAX_NODES) -> List[str]:
+#: Default cap on ``|E_far & E_base|``, mirroring ``QuartetConfig.far_max_edge_overlap``.
+#: It lives here as well as in the generator because the checker is what certifies a
+#: written manifest, and a checker that has never heard of the cap will certify a near
+#: lure relabelled as the far control.
+FAR_MAX_EDGE_OVERLAP = 2
+
+
+def _depth_of_head_node(solved: "SolvedGraph") -> Dict[int, int]:
+    """``node -> its 0-based position along its own arm`` for a solved graph.
+
+    The head of the depth-``d`` edge of an arm is the node at arm position ``d``, so this
+    is exactly "which suffix depth does the edge ending at this node sit at".  Derived
+    from the solver, never from generator bookkeeping.
+    """
+    out: Dict[int, int] = {}
+    for arm in solved.arms:
+        for d, node in enumerate(arm):
+            out[node] = d
+    return out
+
+
+def check_quartet(
+    record: Mapping,
+    max_nodes: int = MAX_NODES,
+    far_max_edge_overlap: int = FAR_MAX_EDGE_OVERLAP,
+) -> List[str]:
     """Re-derive every spec §5 matching requirement from a written quartet record.
 
     Returns a list of human-readable violations; empty means the quartet passes.  This
     reads only ``record["conditions"][*]["line"]`` and the recorded edit slots — never
-    the generator's internal graph objects.
+    the generator's internal graph objects, and never a stored hash or a stored answer:
+    ``graph_key``, ``prompt_sha256`` and ``answer`` are all recomputed from ``line``,
+    because the no-leakage gate consults ``graph_key`` and a gate that reads a
+    self-reported field is not a gate.
     """
     problems: List[str] = []
     cond = record["conditions"]
@@ -464,6 +492,43 @@ def check_quartet(record: Mapping, max_nodes: int = MAX_NODES) -> List[str]:
     if len(set(pc) | set(ps)) != 4:
         problems.append("critical and safe edits share a serialized slot")
 
+    # --- LS-0: the two near lures are swaps at ONE common suffix depth --------------
+    # Graph validity already forces the two edges *within* one swap to share a depth (a
+    # head transposition across unequal depths leaves an arm of the wrong length, which
+    # the solver rejects).  It does NOT force the safe swap and the critical swap to use
+    # the same depth, and depth is the magnitude of the manipulation: a depth-1 swap
+    # moves three nodes per arm, a depth-3 swap moves one.  Both are two-token prompt
+    # edits, so every token-level assertion above passes on a depth-mismatched pair.
+    derived_depths: Dict[str, List[int]] = {}
+    for c, anchor in NEAR_ANCHOR.items():
+        depth_of = _depth_of_head_node(solved[anchor])
+        anchor_edges = parsed[anchor].edges
+        ds: List[int] = []
+        for s in slots[c]:
+            if not 0 <= s < len(anchor_edges):
+                problems.append(f"{c}: edit slot {s} outside the edge list")
+                continue
+            head = anchor_edges[s][1]
+            if head not in depth_of:
+                problems.append(f"{c}: edited head {head} is not an arm node of {anchor}")
+                continue
+            ds.append(depth_of[head])
+        derived_depths[c] = ds
+        if len(set(ds)) != 1:
+            problems.append(f"{c}: edited edges sit at different suffix depths {ds}")
+        elif not 1 <= ds[0] <= ARM_LEN - 1:
+            problems.append(f"{c}: suffix depth {ds[0]} outside 1..{ARM_LEN - 1}")
+    flat = {d for ds in derived_depths.values() for d in ds}
+    if len(flat) > 1:
+        problems.append(
+            "LS-0 violated: the near lures are swaps at different suffix depths "
+            + str({c: sorted(set(ds)) for c, ds in derived_depths.items()})
+        )
+    elif "depth" in record and flat and record["depth"] != next(iter(flat)):
+        problems.append(
+            f"recorded depth {record['depth']} != re-derived depth {next(iter(flat))}"
+        )
+
     # --- far-critical is a low-overlap repartition of the same nodes ---------------
     overlap = len(set(parsed["far_critical"].edges) & set(base_p.edges))
     if overlap != record["far_edge_overlap"]:
@@ -471,4 +536,27 @@ def check_quartet(record: Mapping, max_nodes: int = MAX_NODES) -> List[str]:
             f"far_critical: recorded overlap {record['far_edge_overlap']} != "
             f"recomputed {overlap}"
         )
+    if overlap > far_max_edge_overlap:
+        problems.append(
+            f"far_critical: edge overlap {overlap} exceeds the cap "
+            f"{far_max_edge_overlap} — this is not a far control"
+        )
+
+    # --- stored identities must be recomputable from the line ----------------------
+    # generate.py's leakage gate and the leakage tests read ``graph_key`` and
+    # ``prompt_sha256`` off the record.  Recompute both here so a stale, tampered or
+    # buggy identity field is a violation instead of a silent pass.
+    for c in CONDITIONS:
+        entry = cond[c]
+        p = parsed[c]
+        if "graph_key" in entry:
+            want = canonical_graph_key(p.edges, p.source, p.goal)
+            if entry["graph_key"] != want:
+                problems.append(f"{c}: graph_key does not match its line")
+        if "prompt_sha256" in entry:
+            if entry["prompt_sha256"] != sha256_text(p.prompt):
+                problems.append(f"{c}: prompt_sha256 does not match its line")
+        if "answer" in entry:
+            if tuple(entry["answer"]) != p.answer:
+                problems.append(f"{c}: recorded answer does not match its line")
     return problems

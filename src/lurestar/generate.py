@@ -66,6 +66,7 @@ from .validate import (
     GraphError,
     TrainingIndex,
     canonical_graph_key,
+    canonical_key_from_line,
     check_quartet,
     edge_slot_token_positions,
     parse_line,
@@ -404,7 +405,7 @@ def make_quartet(
         for cond, slots in record["edit_slots"].items()
     }
     if cfg.self_check:
-        problems = check_quartet(record)
+        problems = check_quartet(record, far_max_edge_overlap=cfg.far_max_edge_overlap)
         if problems:
             raise GraphError(f"quartet {index} failed self-check: {problems}")
     return record
@@ -562,6 +563,26 @@ def read_jsonl(path) -> List[Dict]:
 # --------------------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------------------
+def leaked_quartet_ids(e_lure: Sequence[Dict], index: TrainingIndex) -> List[int]:
+    """Quartet ids with any condition present in the training corpus.
+
+    The membership test recomputes the canonical key and the prompt hash **from
+    ``c["line"]``**, never from the record's own ``graph_key`` / ``prompt_sha256``
+    fields.  A gate that consults a self-reported hash cannot see a record whose hash is
+    stale, tampered with, or produced by a buggy ``_condition_record`` — which is exactly
+    how this project's first leakage check managed to be vacuous.
+    ``validate.check_quartet`` separately cross-checks that the stored fields agree with
+    the line, so the two guards are independent.
+    """
+    return [
+        r["quartet_id"]
+        for r in e_lure
+        for c in r["conditions"].values()
+        if canonical_key_from_line(c["line"]) in index.graph_keys
+        or sha256_text(parse_line(c["line"]).prompt) in index.prompt_hashes
+    ]
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     root = pathlib.Path(__file__).resolve().parents[2]
     ap = argparse.ArgumentParser(description="Build the Lure-Star stimulus pools.")
@@ -588,12 +609,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if not a.skip_leakage_check:
         index = TrainingIndex.build(a.train_file)
-        leaked = [
-            r["quartet_id"]
-            for r in e_lure
-            for c in r["conditions"].values()
-            if c["graph_key"] in index.graph_keys
-        ]
+        leaked = leaked_quartet_ids(e_lure, index)
         if leaked:
             raise SystemExit(f"E_lure leaked into training: quartets {leaked[:10]}")
         a_keys = {r["graph_key"] for r in a_pair}

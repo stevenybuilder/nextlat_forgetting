@@ -23,7 +23,7 @@ spec itself makes: the H3 adaptation objective (section 6) and the HMM architect
 `data.test_generalization`, `train.py` died with an omegaconf `ConfigAttributeError` at the
 first validation, and the driver reported success anyway. The rule "copy the official
 configuration" earned its place there. `scripts/materialize_configs.py` enforces it
-mechanically and refuses to write a file if any of four invariants fails:
+mechanically and refuses to write a file if any of five invariants fails:
 
 | | invariant | what it prevents |
 |---|---|---|
@@ -31,6 +31,21 @@ mechanically and refuses to write a file if any of four invariants fails:
 | I2 | every key whose merged value differs from the merged upstream value must be a declared override — and a declared override that changes nothing is also an error | silent drift in either direction |
 | I3 | a key hoisted into an explicit block must carry the value it already resolved to | a "restatement" that is really a change |
 | I4 | a frozen key may move only where a config family carries a written spec authority | changing the science by changing a config |
+| I5 | every stargraph data path must name the pool its config family is allowed to read | a swapped or leaked item bank |
+
+**I5 was added after an adversarial review** (`docs/review/configs-and-launch.md`, findings 1
+and 2) which showed that the near and far adaptation banks could be swapped, and that an
+adaptation branch could be pointed at `E_lure`, with all 150 config tests still passing.
+`data/stargraph.py:187-190` parses only `split("_")[1]` and `[2]` out of a data path — the two
+`5`s — so upstream reads B_near, B_far and the 200,000-graph base corpus as the same kind of
+file, and no other check in this repository could see the difference. A swap negates spec
+section 6's primary outcome `erosion_near - erosion_far` exactly; a leak violates spec section
+5's "No `E_lure` graph or lure may enter base or adaptation training". I5 binds three things
+together: the branch name, the tag in the bank's basename (`bnear` / `bfar`), and the immutable
+directory a bank may live in (`{MANIFESTS}/adapt`); it also pins each base run to the frozen
+corpus and forbids any reserved pool name (`elure`, `a_pair`, `stimuli`) in a training or
+validation path. The same bindings are asserted directly on the emitted YAML in
+`tests/test_configs.py`, so they hold even if the generator is wrong.
 
 Run `.venv/bin/python scripts/materialize_configs.py --check` to confirm the on-disk configs
 are exactly what the generator produces from the pinned YAMLs; `tests/test_configs.py`
@@ -332,6 +347,19 @@ fresh random network on 5,000 items. The branch is therefore started by pre-seed
 `{out_dir}/latest_ckpt` with the frozen parent, which `scripts/launch_train.sh` does when
 `LURESTAR_PARENT_CKPT` is set, and refuses to launch without.
 
+`DRY_RUN=1` performs every check but **writes nothing** — it prints a `# would seed` line
+instead. It used to seed the pointer before the early exit, so a dry run silently decided the
+branch's parent (`docs/review/configs-and-launch.md`, finding 5).
+
+**Still unenforced, and the thing to close before the first H3 launch:** `launch_train.sh`
+does not verify that `LURESTAR_PARENT_CKPT` belongs to this branch's model and seed, or that
+it is step-rebased. A parent that is not rebased restores `self.step` to 20,000,
+`core_train.py:569` returns immediately, and the branch performs **zero** adaptation updates
+while still writing a checkpoint and a metrics.csv — `erosion_near - erosion_far` is then
+`0 - 0 = 0`, a manufactured clean null. `scripts/run_matrix.py` avoids this with the
+step-offset form; a manual pointer-seeded launch does not.
+(`docs/review/configs-and-launch.md`, finding 4.)
+
 There are two ways to attach a branch to its parent, and the pinned code supports both.
 `--checkpoint_path` takes precedence over `init_from` unconditionally
 (`train.py:262-264`, `core_train.py:130`), so `trainer.init_from: resume` in the YAML is inert
@@ -455,8 +483,15 @@ Peak VRAM, host-input wait and checkpoint write timing are only observable **ins
 training process**, so `fabric run` launches `scripts/profile_entry.py`, which installs three
 read-only probes and then executes the pinned `train.py` unchanged via `runpy`. `docs/RUNLOG.md`
 records why: the first profiling attempt read `torch.cuda.max_memory_allocated()` in the driver
-process that shelled out to `fabric run`, and silently reported 0.00 GB. A missing probe is now
-reported as missing rather than as zero, and a half-run gate exits non-zero.
+process that shelled out to `fabric run`, and silently reported 0.00 GB. A missing probe is
+reported as missing rather than as zero, **and it fails the gate**: `REQUIRED_MEASUREMENTS` in
+`scripts/profile_summarize.py` is spec section 11's "Record:" list, every job's
+`missing_required` field names the quantities it could not produce, and `main()` exits non-zero
+listing them. Before the adversarial review (`docs/review/configs-and-launch.md`, finding 3) a
+complete four-job gate whose probes never landed printed `-` in every VRAM row and exited 0 —
+which is the RUNLOG bug with a different presentation. GPU utilization is deliberately not in
+that list: `nvidia-smi` may legitimately be absent on a runtime, and `profile.sh` says so on
+stderr. A half-run gate (a skipped task) also exits non-zero.
 
 ## Regenerating and re-verifying
 

@@ -5,6 +5,7 @@ Frozen 2026-08-23, **before any confirmatory model exists**. Every claim is cite
 `upstream/NextLat` @ `3770be6009cea2b3c455a9ce7f2ca88b504bb955`.
 
 Implementation: `src/lurestar/representations.py`. Tests: `tests/test_representations.py`.
+Adversarial review and the two P0 corrections it forced: `docs/review/representations.md`.
 
 ---
 
@@ -121,13 +122,33 @@ The centering mean `m` is computed over the **full E_lure evaluation pool for on
 far-critical states pooled together, one mean vector per cell. It is never computed per
 condition, and never over only the pair being scored.
 
-This is enforced, not merely documented: `centered_cosine_distance(a, b, *, mean)` has a
-required keyword-only `mean` argument with no default and no "center over whatever you
-passed in" fallback. Centering per condition would subtract exactly the between-condition
-shift that PSI is trying to measure, which is a silent way to manufacture or erase an
-effect. `tests/test_representations.py` checks both halves of the resulting invariance:
-the distance is invariant to a translation of the whole pool, and is **not** invariant to
-translating one condition only.
+Centering per condition would subtract exactly the between-condition shift that PSI is
+trying to measure, which is a silent way to manufacture or erase an effect. Naming the
+argument is not enough to stop that — an adversarial review (`docs/review/representations.md`
+P0-1) showed that passing the scored triple inflated PSI by 29% and passing seven rows of
+noise erased it by 99.6%, both without a single test failing. So the pool is now a
+**constructed, checked object**, and `psi_distances_centered_cosine` refuses a bare array
+the same way `model_contrast_seed_level` refuses one:
+
+```python
+pool = CenteringPool.from_conditions(
+    base=..., repeat=..., near_safe=..., near_critical=..., far_critical=...
+)
+```
+
+* `from_conditions` raises unless **every** condition in `CENTERING_POOL_CONDITIONS` is
+  supplied or named in `declared_missing`, so a dropped condition is a recorded statement
+  carried into the serialized metric (`report()["declared_missing"]`, `["complete"]`),
+  never an omission;
+* `require_contains()` verifies by exact row bytes, per scored argument, that the states
+  being scored are rows of that pool — a pool from another `(model, seed, index)` cell is
+  rejected outright;
+* the pooled conditions are canonicalized to `CENTERING_POOL_CONDITIONS`, so the mean
+  cannot depend on keyword-argument order.
+
+`tests/test_representations.py` checks both halves of the resulting invariance — the
+distance is invariant to a translation of the whole pool, and is **not** invariant to
+translating one condition only — plus the five pool-construction tests above.
 
 **Declared robustness check: whitened Euclidean.** `||W(a - b)||` with `W @ W = Sigma^-1`,
 equal to the Mahalanobis distance under `Sigma` (asserted in the tests against an
@@ -141,7 +162,12 @@ Three properties are enforced by `representations.Whitener`:
   reported, and `Whitener.report()` carries the intensity, the pool size, the feature count
   and the condition number into every serialized metric;
 * `Whitener.distance(..., item_ids=...)` raises `LeakageError` if any scored item was in the
-  fitting pool. "Held out" is checked by item id rather than left as an honour system.
+  fitting pool, **and** if a whitener fit with ids is handed a batch with none — otherwise
+  "held out" is opt-in at the call site, which the review found it was. Ids are compared as
+  raw Python objects; the earlier `frozenset(np.asarray(list(ids)).tolist())` silently cast a
+  mixed id list to strings and let a genuinely leaked integer id through.
+  `psi_distances_whitened`, being a *reported* metric, refuses both an unchecked whitener and
+  a missing id list.
 
 ## 5. Inferential units
 

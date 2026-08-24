@@ -1080,6 +1080,25 @@ class _FakeTensor:
     def detach(self):
         return self
 
+    # --- the handful of ops the BST branch needs (model_bst.py:91-100, :806-810) ---
+
+    @property
+    def dtype(self):
+        return self.a.dtype
+
+    def new_full(self, shape, value):
+        return _FakeTensor(np.full(shape, value, dtype=self.a.dtype))
+
+    def expand(self, *sizes):
+        return _FakeTensor(np.broadcast_to(self.a, sizes))
+
+    def chunk(self, n, dim=-1):
+        return tuple(_FakeTensor(c) for c in np.split(self.a, n, axis=dim))
+
+    def __add__(self, other):
+        o = other.a if isinstance(other, _FakeTensor) else other
+        return _FakeTensor(self.a + o)
+
 
 def _install_stub_torch(monkeypatch):
     import contextlib
@@ -1096,6 +1115,15 @@ def _install_stub_torch(monkeypatch):
 
     stub.as_tensor = as_tensor
     stub.no_grad = contextlib.contextmanager(lambda: iter([None]))
+
+    def cat(tensors, dim=-1):
+        return _FakeTensor(np.concatenate([t.a for t in tensors], axis=dim))
+
+    def allclose(a, b, atol=1e-8, rtol=1e-5):
+        return bool(np.allclose(a.a, b.a, atol=atol, rtol=rtol))
+
+    stub.cat = cat
+    stub.allclose = allclose
     monkeypatch.setitem(sys.modules, "torch", stub)
     return stub
 
@@ -1215,10 +1243,11 @@ def test_layer_b_nextlat_applies_lm_head_and_never_returns_token_embeds(monkeypa
 
 def test_layer_b_architecture_name_is_validated_before_torch_is_touched():
     """Reachable on a host with no torch, which is the only way it is ever checked."""
-    with pytest.raises(ValueError, match="must be 'gpt' or 'nextlat'"):
-        R.forward_states_and_logits(object(), None, architecture="mamba")
-    with pytest.raises(ValueError, match="must be 'gpt' or 'nextlat'"):
-        R.forward_states_and_logits(object(), None, architecture="")
+    for bad in ("mamba", "", "belief_state_transformer"):
+        with pytest.raises(ValueError, match="must be 'gpt', 'nextlat' or 'bst'"):
+            R.forward_states_and_logits(object(), None, architecture=bad)
+    assert R.ARCHITECTURES == ("nextlat", "bst", "gpt")
+    assert set(R.STATE_SOURCE) == set(R.ARCHITECTURES) == set(R.HIDDEN_STATE_MODULE_PATH)
 
 
 def test_extract_positions_returns_both_frozen_indices_for_both_architectures(monkeypatch):

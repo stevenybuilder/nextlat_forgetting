@@ -11,17 +11,36 @@ The three things this module refuses to let a caller get wrong:
    through from :func:`lurestar.representations.centered_cosine_distance`.
 2. **The whitening pool** for the robustness check is held out, enforced by item id.
 3. **The inferential unit.**  Items are the unit for item-level intervals.  SEEDS are the
-   unit for the GPT-vs-NextLat contrast, and items never substitute for seeds
+   unit for every cross-model contrast, and items never substitute for seeds
    (spec §6/H3: "Items do not substitute for independent training seeds"; the same rule
    governs the H1 model contrast).  The two live in separately named functions with
    different argument types — item functions take arrays, the seed function takes a
    mapping keyed by seed id — so an array of 20,000 items cannot be passed where three
    seeds belong.
+
+**The design is three-armed** (spec §8, and `docs/DECISION_D20_competence_gate.md`
+"Superseded in part"): NextLat, BST and GPT, architecture-matched at 12L/6H/384 on
+G(5,5), differing only in objective.  BST is the competence-matched control — the paper's
+Figure 6 puts it at ~99.9% where GPT sits at ~18.6%, which is 1/d chance — so
+:data:`PREREGISTERED_CONTRASTS` fixes the priority order *before* any number exists:
+
+1. NextLat - BST   primary, competence-matched;
+2. NextLat - GPT   secondary, competence-confounded, reported with the confound attached;
+3. BST - GPT       reference, shows how much of any effect is competence alone.
+
+Every contrast is reported through :func:`contrast_with_mde`, which carries the estimate,
+the seed-level interval, the exact sign-flip p, **and** the smallest effect that this many
+seeds could have detected.  The last one is not decoration: with three seeds the exact
+randomization test cannot reach p <= 0.05 at any effect size (its floor is 2^-2 = 0.25),
+and the t-based minimum detectable effect is around three seed-level standard deviations.
+A writeup that reports the estimate without that number is claiming a null it never had
+the resolution to see.
 """
 
 from __future__ import annotations
 
 import itertools
+import math
 import warnings
 from dataclasses import dataclass, field
 from typing import Mapping, Optional, Sequence
@@ -42,6 +61,17 @@ from .representations import (
 )
 
 __all__ = [
+    "ARMS",
+    "ContrastSpec",
+    "PREREGISTERED_CONTRASTS",
+    "MDEResult",
+    "ContrastReport",
+    "ArmPSI",
+    "ThreeArmReport",
+    "minimum_detectable_effect",
+    "contrast_with_mde",
+    "psi_per_arm",
+    "three_arm_contrasts",
     "BootstrapCI",
     "PSIResult",
     "SeedContrast",
@@ -424,6 +454,464 @@ def model_contrast_seed_level(
         min_attainable_p=float(2.0 ** (1 - n)),
         n_seeds=n,
         underpowered=bool(n < MIN_SEEDS_FOR_INTERVAL),
+    )
+
+
+# =====================================================================================
+# THE THREE-ARM DESIGN — arms, preregistered contrasts, and what the design could not see
+# =====================================================================================
+
+#: The three architecture-matched arms of spec §8, in preregistered priority order.
+ARMS = ("nextlat", "bst", "gpt")
+
+
+@dataclass(frozen=True)
+class ContrastSpec:
+    """One preregistered cross-model contrast, with its interpretation fixed in advance."""
+
+    label_a: str
+    label_b: str
+    priority: int
+    role: str
+    reading: str
+
+    @property
+    def name(self) -> str:
+        return f"{self.label_a}_minus_{self.label_b}"
+
+    def as_dict(self) -> dict:
+        return {
+            "contrast": f"{self.label_a} - {self.label_b}",
+            "priority": self.priority,
+            "role": self.role,
+            "reading": self.reading,
+        }
+
+
+#: Frozen before any model exists.  The order is the claim; re-ordering it after seeing
+#: the numbers would convert a preregistered comparison into a selected one.
+PREREGISTERED_CONTRASTS = (
+    ContrastSpec(
+        label_a="nextlat",
+        label_b="bst",
+        priority=1,
+        role="primary (competence-matched)",
+        reading=(
+            "Both arms solve G(5,5) (paper Fig. 6: NextLat ~99.8%, BST ~99.9%) and differ "
+            "only in the objective, so a PSI gap here is attributable to the "
+            "latent-transition objective rather than to task success. This is the "
+            "contrast the project's claim rests on."
+        ),
+    ),
+    ContrastSpec(
+        label_a="nextlat",
+        label_b="gpt",
+        priority=2,
+        role="secondary (competence-confounded)",
+        reading=(
+            "GPT is at 1/d chance on G(5,5) (paper Fig. 6, ~18.6%), so any PSI gap admits "
+            "the trivial reading that NextLat organises the space because NextLat solved "
+            "the task. Report the number and the confound in the same breath; it cannot "
+            "carry the argument on its own."
+        ),
+    ),
+    ContrastSpec(
+        label_a="bst",
+        label_b="gpt",
+        priority=3,
+        role="reference (competence only)",
+        reading=(
+            "Neither arm has a latent-transition objective and only one solves the task, "
+            "so this is the size of the PSI effect that competence alone buys. It is the "
+            "yardstick the NextLat-vs-BST gap is read against, not a hypothesis test."
+        ),
+    ),
+)
+
+
+# ------------------------------------------------------------ minimum detectable effect ---
+
+
+def _solve_noncentrality(t_crit: float, df: int, power: float) -> float:
+    """Smallest noncentrality whose two-sided t-test power reaches ``power``."""
+
+    def attained(ncp: float) -> float:
+        return float(stats.nct.sf(t_crit, df, ncp) + stats.nct.cdf(-t_crit, df, ncp))
+
+    hi = max(1.0, t_crit)
+    for _ in range(80):
+        if attained(hi) >= power:
+            break
+        hi *= 2.0
+    else:  # pragma: no cover - power < 1 always solves long before this
+        return float("inf")
+    lo = 0.0
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if attained(mid) < power:
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < 1e-12 * max(1.0, hi):
+            break
+    return 0.5 * (lo + hi)
+
+
+@dataclass(frozen=True)
+class MDEResult:
+    """The smallest effect this many seeds could have detected, and the caveats."""
+
+    mde: float
+    sd_per_seed: float
+    n_seeds: int
+    alpha: float
+    power: float
+    mde_two_t_approximation: float
+    sign_flip_p_floor: float
+    randomization_test_can_reject: bool
+    method: str = (
+        "two-sided paired t on the per-seed differences; noncentral-t power solved exactly"
+    )
+
+    def as_dict(self) -> dict:
+        return {
+            "mde": self.mde,
+            "sd_per_seed": self.sd_per_seed,
+            "n_seeds": self.n_seeds,
+            "alpha": self.alpha,
+            "power": self.power,
+            "mde_two_t_approximation": self.mde_two_t_approximation,
+            "sign_flip_p_floor": self.sign_flip_p_floor,
+            "randomization_test_can_reject": self.randomization_test_can_reject,
+            "method": self.method,
+        }
+
+
+def minimum_detectable_effect(
+    sd_per_seed: float,
+    n_seeds: int,
+    *,
+    alpha: float = 0.05,
+    power: float = 0.80,
+) -> MDEResult:
+    """Smallest |effect| a paired ``n_seeds``-seed contrast could have detected.
+
+    ``sd_per_seed`` is the standard deviation of the *per-seed differences*, not of the
+    items.  With three confirmatory seeds this number comes out near three seed-level
+    SDs, which is the honest answer to "what could this design not have seen".
+
+    Two facts travel with it, both of which a reader needs and neither of which the point
+    estimate shows:
+
+    * ``sign_flip_p_floor`` = ``2^{1-n}``.  The exact randomization test used by
+      :func:`model_contrast_seed_level` cannot return a p below this at ANY effect size,
+      so with ``n = 3`` (floor 0.25) or ``n = 5`` (floor 0.0625) it can never reject at
+      ``alpha = 0.05``.  ``randomization_test_can_reject`` says so directly.
+    * with ``n`` this small the observed ``sd_per_seed`` is itself estimated from ``n-1``
+      degrees of freedom, so the MDE is a rough scale, not a precise threshold.
+    """
+    sd = float(sd_per_seed)
+    n = int(n_seeds)
+    if not np.isfinite(sd) or sd < 0.0:
+        raise ValueError(f"sd_per_seed must be finite and non-negative; got {sd_per_seed!r}")
+    if n < 2:
+        raise ValueError("need at least 2 seeds for a paired contrast")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in (0, 1)")
+    if not 0.0 < power < 1.0:
+        raise ValueError("power must be in (0, 1)")
+    df = n - 1
+    t_crit = float(stats.t.ppf(1.0 - alpha / 2.0, df))
+    ncp = _solve_noncentrality(t_crit, df, power)
+    scale = sd / math.sqrt(n)
+    floor = 2.0 ** (1 - n)
+    return MDEResult(
+        mde=float(ncp * scale),
+        sd_per_seed=sd,
+        n_seeds=n,
+        alpha=float(alpha),
+        power=float(power),
+        mde_two_t_approximation=float((t_crit + float(stats.t.ppf(power, df))) * scale),
+        sign_flip_p_floor=float(floor),
+        randomization_test_can_reject=bool(floor <= alpha),
+    )
+
+
+# ------------------------------------------------------------------ a reported contrast ---
+
+
+@dataclass(frozen=True)
+class ContrastReport:
+    """A seed-level contrast reported the only way it is allowed to be reported."""
+
+    spec: ContrastSpec
+    contrast: SeedContrast
+    mde: MDEResult
+    exceeds_mde: bool
+
+    @property
+    def estimate(self) -> float:
+        return self.contrast.estimate
+
+    def as_dict(self) -> dict:
+        return {
+            **self.spec.as_dict(),
+            **self.contrast.as_dict(),
+            "minimum_detectable_effect": self.mde.as_dict(),
+            "exceeds_mde": self.exceeds_mde,
+        }
+
+
+def contrast_with_mde(
+    value_by_seed_a: Mapping,
+    value_by_seed_b: Mapping,
+    *,
+    spec: Optional[ContrastSpec] = None,
+    label_a: Optional[str] = None,
+    label_b: Optional[str] = None,
+    rng: np.random.Generator,
+    n_boot: int = 10_000,
+    alpha: float = 0.05,
+    power: float = 0.80,
+) -> ContrastReport:
+    """Effect size, interval, sign-flip p, **and** what this many seeds could have seen.
+
+    Wraps :func:`model_contrast_seed_level` so that the three numbers a reader needs
+    always arrive together.  ``sd_per_seed`` for the MDE is the observed SD of the
+    per-seed differences (``ddof=1``) — a retrospective MDE, which is the right one for
+    "state what the design could not have detected" and the wrong one for planning a new
+    study.
+    """
+    if spec is None:
+        if label_a is None or label_b is None:
+            raise ValueError("pass either spec= or both label_a= and label_b=")
+        spec = ContrastSpec(
+            label_a=label_a,
+            label_b=label_b,
+            priority=0,
+            role="ad hoc (not preregistered)",
+            reading="not one of PREREGISTERED_CONTRASTS",
+        )
+    elif label_a is not None or label_b is not None:
+        raise ValueError("pass spec= or labels, not both")
+    contrast = model_contrast_seed_level(
+        value_by_seed_a,
+        value_by_seed_b,
+        label_a=spec.label_a,
+        label_b=spec.label_b,
+        rng=rng,
+        n_boot=n_boot,
+        alpha=alpha,
+    )
+    diffs = np.asarray(contrast.per_seed_difference, dtype=np.float64)
+    mde = minimum_detectable_effect(
+        float(diffs.std(ddof=1)), contrast.n_seeds, alpha=alpha, power=power
+    )
+    return ContrastReport(
+        spec=spec,
+        contrast=contrast,
+        mde=mde,
+        exceeds_mde=bool(abs(contrast.estimate) >= mde.mde),
+    )
+
+
+# ---------------------------------------------------------------------- PSI per arm ---
+
+
+@dataclass(frozen=True)
+class ArmPSI:
+    """Item-level PSI for one arm, one cell per seed, plus the seed-level summary."""
+
+    arm: str
+    seeds: tuple
+    per_seed: dict = field(repr=False)
+    psi_by_seed: dict = field(default_factory=dict)
+    seed_mean: float = 0.0
+
+    def as_dict(self) -> dict:
+        return {
+            "arm": self.arm,
+            "seeds": list(self.seeds),
+            "psi_by_seed": {s: self.psi_by_seed[s] for s in self.seeds},
+            "seed_mean": self.seed_mean,
+            "per_seed_item_level": {s: self.per_seed[s].as_dict() for s in self.seeds},
+        }
+
+
+def psi_per_arm(
+    distances_by_arm: Mapping[str, Mapping],
+    *,
+    rng: np.random.Generator,
+    n_boot: int = 10_000,
+    alpha: float = 0.05,
+    metric: str = "centered_cosine",
+    extraction_index: int = PSI_EXTRACTION_INDEX,
+    arms: Sequence[str] = ARMS,
+) -> dict:
+    """PSI for every (arm, seed) cell, with an ITEM-level paired bootstrap interval each.
+
+    ``distances_by_arm`` is ``{arm: {seed: (d_critical, d_safe)}}``, the two per-item
+    distance arrays of one cell as returned by
+    :func:`psi_distances_centered_cosine`.  Every arm must carry the same seed set,
+    because every cross-model contrast is paired within seed (spec §8: the same seed
+    trains all three arms).
+
+    The intervals here are **item-level**.  They describe precision inside one trained
+    model and say nothing about replication across seeds; the seed-level statement is
+    :func:`three_arm_contrasts`.  Both are returned so neither can be quoted as the other.
+    """
+    if not isinstance(distances_by_arm, Mapping):
+        raise TypeError("distances_by_arm must be a Mapping {arm: {seed: (d_crit, d_safe)}}")
+    wanted = tuple(arms)
+    missing = [a for a in wanted if a not in distances_by_arm]
+    if missing:
+        raise ValueError(
+            f"missing arm(s) {missing}; the design is three-armed (spec §8) and a dropped "
+            "arm must be a declared deviation, not an omission"
+        )
+    extra = [a for a in distances_by_arm if a not in wanted]
+    if extra:
+        raise ValueError(f"unknown arm(s) {extra}; expected {list(wanted)}")
+
+    seed_sets = {}
+    for arm in wanted:
+        cells = distances_by_arm[arm]
+        if not isinstance(cells, Mapping):
+            raise TypeError(
+                f"distances_by_arm[{arm!r}] must be a Mapping {{seed: (d_crit, d_safe)}} — "
+                "seeds are the inferential unit for every cross-model contrast and an "
+                "item-level array must not be passable here"
+            )
+        seed_sets[arm] = tuple(sorted(cells))
+    reference = seed_sets[wanted[0]]
+    for arm in wanted[1:]:
+        if seed_sets[arm] != reference:
+            raise ValueError(
+                f"seed sets differ between {wanted[0]!r} {list(reference)} and {arm!r} "
+                f"{list(seed_sets[arm])}; contrasts are paired within seed"
+            )
+
+    out = {}
+    for arm in wanted:
+        per_seed, psi_by_seed = {}, {}
+        for seed in reference:
+            pair = distances_by_arm[arm][seed]
+            if not isinstance(pair, (tuple, list)) or len(pair) != 2:
+                raise TypeError(
+                    f"distances_by_arm[{arm!r}][{seed!r}] must be (d_critical, d_safe)"
+                )
+            res = bootstrap_psi_items(
+                pair[0],
+                pair[1],
+                rng=rng,
+                n_boot=n_boot,
+                alpha=alpha,
+                metric=metric,
+                extraction_index=extraction_index,
+            )
+            per_seed[seed] = res
+            psi_by_seed[seed] = res.psi
+        out[arm] = ArmPSI(
+            arm=arm,
+            seeds=reference,
+            per_seed=per_seed,
+            psi_by_seed=psi_by_seed,
+            seed_mean=float(np.mean([psi_by_seed[s] for s in reference])),
+        )
+    return out
+
+
+# -------------------------------------------------------------- the three-way report ---
+
+
+@dataclass(frozen=True)
+class ThreeArmReport:
+    psi_by_seed: dict = field(repr=False)
+    contrasts: tuple = ()
+    arms: tuple = ARMS
+
+    def by_name(self, name: str) -> ContrastReport:
+        for c in self.contrasts:
+            if c.spec.name == name or f"{c.spec.label_a}-{c.spec.label_b}" == name:
+                return c
+        raise KeyError(f"no such contrast: {name!r}")
+
+    @property
+    def primary(self) -> ContrastReport:
+        return self.contrasts[0]
+
+    def as_dict(self) -> dict:
+        return {
+            "arms": list(self.arms),
+            "psi_by_seed": {a: dict(v) for a, v in self.psi_by_seed.items()},
+            "contrasts_in_preregistered_order": [c.as_dict() for c in self.contrasts],
+        }
+
+
+def _seed_values(arm_result) -> Mapping:
+    """Accept either an :class:`ArmPSI` or a plain ``{seed: statistic}`` mapping."""
+    if isinstance(arm_result, ArmPSI):
+        return arm_result.psi_by_seed
+    if isinstance(arm_result, Mapping):
+        return arm_result
+    raise TypeError(
+        "each arm must map {seed: statistic} (or be an ArmPSI); seeds are the "
+        "inferential unit and an item-level array is not a seed mapping"
+    )
+
+
+def three_arm_contrasts(
+    statistic_by_arm: Mapping[str, Mapping],
+    *,
+    rng: np.random.Generator,
+    n_boot: int = 10_000,
+    alpha: float = 0.05,
+    power: float = 0.80,
+    contrasts: Sequence[ContrastSpec] = PREREGISTERED_CONTRASTS,
+) -> ThreeArmReport:
+    """The three preregistered cross-model contrasts, in priority order, with MDEs.
+
+    ``statistic_by_arm`` is ``{arm: {seed: statistic}}`` — typically the item-mean PSI of
+    each (arm, seed) cell, i.e. the ``psi_by_seed`` field of :func:`psi_per_arm`'s output,
+    which is accepted directly.  A raw array is refused at every level: the unit of
+    inference for a cross-model statement is the training seed, and 20,000 quartets are
+    not 20,000 independent trainings.
+
+    Returned in the order of :data:`PREREGISTERED_CONTRASTS` and never re-sorted by
+    effect size or by p-value.
+    """
+    if not isinstance(statistic_by_arm, Mapping):
+        raise TypeError("statistic_by_arm must be a Mapping {arm: {seed: statistic}}")
+    needed = sorted({c.label_a for c in contrasts} | {c.label_b for c in contrasts})
+    missing = [a for a in needed if a not in statistic_by_arm]
+    if missing:
+        raise ValueError(
+            f"missing arm(s) {missing}; the preregistered contrasts need {needed}"
+        )
+    values = {arm: _seed_values(statistic_by_arm[arm]) for arm in needed}
+    reference = tuple(sorted(values[needed[0]]))
+    for arm in needed[1:]:
+        if tuple(sorted(values[arm])) != reference:
+            raise ValueError(
+                f"seed sets differ between {needed[0]!r} and {arm!r}; contrasts are "
+                "paired within seed (spec §8: the same seed trains all three arms)"
+            )
+    reports = tuple(
+        contrast_with_mde(
+            values[spec.label_a],
+            values[spec.label_b],
+            spec=spec,
+            rng=rng,
+            n_boot=n_boot,
+            alpha=alpha,
+            power=power,
+        )
+        for spec in sorted(contrasts, key=lambda c: c.priority)
+    )
+    return ThreeArmReport(
+        psi_by_seed={arm: dict(values[arm]) for arm in needed},
+        contrasts=reports,
+        arms=tuple(needed),
     )
 
 
