@@ -86,7 +86,7 @@ def pools(hmm: HMM) -> tuple[pb.Pool, pb.Pool]:
 def frozen(tmp_path_factory, hmm: HMM, pools) -> tuple[Path, pb.Thresholds]:
     calib, _ = pools
     path = tmp_path_factory.mktemp("thresholds") / "hmm_thresholds.json"
-    th = pb.fit_thresholds(calib, hmm, seed=7, n_pairs=120_000)
+    th = pb.fit_thresholds([calib], hmm, seed=7, n_pairs=120_000)
     pb.freeze_thresholds(th, path)
     return path, th
 
@@ -156,10 +156,10 @@ def test_levenshtein_batch_zero_and_identity() -> None:
 
 def test_thresholds_are_a_deterministic_function_of_the_calibration_pool(pools, hmm) -> None:
     calib, _ = pools
-    a = pb.fit_thresholds(calib, hmm, seed=7, n_pairs=120_000)
-    b = pb.fit_thresholds(calib, hmm, seed=7, n_pairs=120_000)
+    a = pb.fit_thresholds([calib], hmm, seed=7, n_pairs=120_000)
+    b = pb.fit_thresholds([calib], hmm, seed=7, n_pairs=120_000)
     assert a.sha256() == b.sha256()
-    c = pb.fit_thresholds(calib, hmm, seed=8, n_pairs=120_000)
+    c = pb.fit_thresholds([calib], hmm, seed=8, n_pairs=120_000)
     # A different fitting seed is a different sample of the same pool, so the payload differs --
     # which is precisely why the seed is recorded inside the frozen payload.
     assert c.fit_seed != a.fit_seed
@@ -168,7 +168,7 @@ def test_thresholds_are_a_deterministic_function_of_the_calibration_pool(pools, 
 def test_refreezing_the_same_thresholds_is_a_no_op(frozen, pools, hmm) -> None:
     path, th = frozen
     before = path.read_text()
-    pb.freeze_thresholds(pb.fit_thresholds(pools[0], hmm, seed=7, n_pairs=120_000), path)
+    pb.freeze_thresholds(pb.fit_thresholds([pools[0]], hmm, seed=7, n_pairs=120_000), path)
     assert path.read_text() == before
 
 
@@ -281,7 +281,8 @@ def test_equivalent_pairs_satisfy_the_frozen_thresholds(bank, frozen, hmm) -> No
     r = _recheck(pairs, hmm)
     assert r["belief_delta"].max() < 1e-12, "stored posteriors disagree with a fresh forward pass"
     assert r["js"].max() <= th.js_low_bits + 1e-12
-    assert r["lev"].min() >= th.edit_high
+    cut = np.array([th.edit_cut(t) for t in r["prefix_len"]])
+    assert (r["lev"] >= cut).all()
     # The thresholds must actually bind: an unfiltered sample of the same pool is far above them.
     assert r["js"].mean() < th.js_control_min_bits / 10
 
@@ -432,8 +433,14 @@ def test_shipped_thresholds_verify_and_match_the_frozen_hmm(shipped) -> None:
     hmm, th, _ = shipped
     assert th.verified
     assert th.hmm_sha256 == hmm.sha256()
-    assert 0.0 < th.js_low_bits < th.js_control_min_bits < th.js_high_bits <= 1.0
-    assert th.edit_low < th.edit_high
+    assert 0.0 < th.js_low_bits < th.js_high_bits <= 1.0
+    assert 0.0 < th.js_low_bits < th.js_control_min_bits <= 1.0
+    # A near-lure's two-symbol cut must sit far below the high-edit cut at every calibrated
+    # prefix length, or the two banks would not be contrasts.
+    lengths = sorted(int(k) for k in th.edit_high_by_length)
+    assert lengths == list(range(8, 33)) + list(range(33, 65))
+    for t in lengths:
+        assert th.edit_low < th.edit_cut(t) <= t
 
 
 @_artifacts
@@ -448,7 +455,8 @@ def test_shipped_test_pool_pairs_satisfy_the_frozen_thresholds(shipped) -> None:
         assert r_eq["belief_delta"].max() < 1e-12
         assert r_lu["belief_delta"].max() < 1e-12
         assert r_eq["js"].max() <= th.js_low_bits + 1e-12
-        assert r_eq["lev"].min() >= th.edit_high
+        cut = np.array([th.edit_cut(t) for t in r_eq["prefix_len"]])
+        assert (r_eq["lev"] >= cut).all()
         assert r_lu["js"].min() >= th.js_high_bits - 1e-12
         assert 1 <= r_lu["lev"].max() <= th.edit_low
 
@@ -471,18 +479,25 @@ def test_shipped_bank_does_not_leak_the_calibration_pool(shipped) -> None:
     from hmm_geometry.pair_bank import load_pools
 
     _, _, pairs = shipped
-    calib, test, lengen = load_pools()
-    calib_prefixes = calib.prefix_keys()
-    calib_indices = set(range(calib.offset, calib.offset + calib.n_sequences))
+    pools = load_pools()
+    calibration = [pools["calibration32"], pools["calibration64"]]
+    calib_prefixes = set().union(*(p.prefix_keys() for p in calibration))
+    calib_indices = {
+        (p.split, i)
+        for p in calibration
+        for i in range(p.offset, p.offset + p.n_sequences)
+    }
+    n_checked = 0
     for pair in pairs:
         for member in ("a", "b"):
             item = pair[member]
             prefix = np.array(item["prefix"], dtype=np.int8)
-            if item["source"] == "val":
-                assert item["seq_index"] not in calib_indices
-            if len(prefix) >= calib.prefix_min and len(prefix) <= calib.prefix_max:
-                key = bytes([len(prefix)]) + prefix.tobytes()
-                assert key not in calib_prefixes
+            split = item["source"].replace("lure_of:", "")
+            assert (split, item["seq_index"]) not in calib_indices
+            key = bytes([len(prefix)]) + prefix.tobytes()
+            assert key not in calib_prefixes
+            n_checked += 1
+    assert n_checked > 1000
 
 
 @_artifacts

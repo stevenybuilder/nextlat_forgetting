@@ -52,11 +52,24 @@ unchanged. That is enforced structurally, not by discipline:
 
 ## Pools
 
-The validation split is cut by sequence index: `[0, 5000)` is the calibration pool, `[5000, 10000)`
-is the test pool. No sequence is in both, and any test prefix whose observation string also occurs
-as a calibration prefix of the same length is dropped, so leakage is impossible at the prefix
-level as well as at the sequence level. The length-64 split provides a third pool, used with the
-same frozen thresholds over prefix lengths `33..64` -- lengths no training sequence ever reached.
+Both evaluation splits are cut by sequence index into a calibration half and a test half:
+`val[0:5000]` and `lengen[0:5000]` are calibration, `val[5000:10000]` and `lengen[5000:10000]` are
+test. No sequence is in both halves, and any test prefix whose observation string also occurs as a
+calibration prefix of the same length is dropped, so leakage is impossible at the prefix level as
+well as at the sequence level. The length-64 pools cover prefix lengths `33..64` -- lengths no
+training sequence ever reached.
+
+The high-edit-distance threshold is a **per-length quantile**, and that is a correction made
+before any model existed (see docs/RUNLOG.md). Two earlier forms were wrong in opposite
+directions. A single absolute count, fitted by pooling every prefix length, lands at 17 for this
+corpus, which no prefix shorter than 17 symbols can reach at all -- the bank silently contained no
+equivalent pairs below that length. A single *rate* is not length-free either: the Levenshtein
+rate between independent strings falls as they get longer (more opportunities for an alignment to
+absorb an edit), so a pooled rate of 0.74 asks for a 75th-percentile pair at length 12 and a
+90th-percentile pair at length 32, and is close to unreachable at length 64. "In the top quartile
+of surface distance for its own length" is the property the design actually wants, so that is what
+is frozen: one cut per prefix length, fitted on the calibration half of the band that length
+belongs to.
 """
 
 from __future__ import annotations
@@ -66,6 +79,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import Sequence
 
 import numpy as np
 
@@ -97,10 +111,13 @@ SEARCH_PAIRS = 1_500_000
 LURE_BASES = 60_000
 TARGET_PAIRS = 2_000
 
-# Preregistered quantile rule for the three fitted thresholds.
+# Preregistered quantile rule for the fitted thresholds.
 QUANTILE_RULE = {
     "js_low_bits": "1st percentile of posterior JS divergence over calibration same-length pairs",
-    "edit_high": "75th percentile of Levenshtein distance over the same calibration pairs",
+    "edit_high_by_length": (
+        "75th percentile of Levenshtein distance among calibration pairs OF THAT PREFIX LENGTH; "
+        "a pair qualifies when its distance is at least the cut frozen for its own length"
+    ),
     "js_control_min_bits": "50th percentile (median) of JS divergence over the same pairs",
     "js_high_bits": "90th percentile of JS divergence over calibration lure pairs",
     "edit_low": "fixed at 2 a priori; a near-lure differs by at most two symbols",
@@ -108,7 +125,8 @@ QUANTILE_RULE = {
 
 
 class ThresholdMismatch(RuntimeError):
-    """Raised when a refit would change an already-frozen threshold."""
+    """Raised when a refit would change an already-frozen threshold, or when a frozen artifact
+    fails to verify against the hash or the HMM it claims."""
 
 
 class UnverifiedThresholds(RuntimeError):
@@ -201,41 +219,49 @@ class Pool:
 
 def load_pools(
     data_dir: Path = DATA_DIR, calibration_end: int = 5000
-) -> tuple[Pool, Pool, Pool]:
-    """Calibration pool, test pool, and the length-64 pool, from the frozen corpus."""
+) -> dict[str, Pool]:
+    """The four pools, from the frozen corpus.
+
+    Both evaluation splits are cut in half by sequence index. The first half of each is a
+    *calibration* pool that thresholds are fitted from; the second half is the *test* pool those
+    frozen thresholds are applied to, unchanged.
+
+    The length-64 split is cut the same way for a specific reason. The high-edit-distance
+    threshold is a per-length quantile, and the length-64 band contains no length that the
+    length-32 band could have calibrated. Fitting the length-64 cuts from a length-64 calibration
+    half keeps the rule identical in kind across both bands and keeps every cut frozen before any
+    model exists, rather than extrapolating a length-32 rule into a range it was never measured
+    on.
+    """
     val = load_posteriors("val", data_dir)
     lengen = load_posteriors("lengen", data_dir)
-    calib = Pool(
-        name="calibration",
-        split="val",
-        offset=0,
-        obs=val["observations"][:calibration_end],
-        beliefs=val["beliefs"][:calibration_end],
-        next_obs=val["next_obs"][:calibration_end],
-        prefix_min=PREFIX_MIN,
-        prefix_max=PREFIX_MAX,
-    )
-    test = Pool(
-        name="test",
-        split="val",
-        offset=calibration_end,
-        obs=val["observations"][calibration_end:],
-        beliefs=val["beliefs"][calibration_end:],
-        next_obs=val["next_obs"][calibration_end:],
-        prefix_min=PREFIX_MIN,
-        prefix_max=PREFIX_MAX,
-    )
-    lengen_pool = Pool(
-        name="lengen",
-        split="lengen",
-        offset=0,
-        obs=lengen["observations"],
-        beliefs=lengen["beliefs"],
-        next_obs=lengen["next_obs"],
-        prefix_min=LENGEN_PREFIX_MIN,
-        prefix_max=LENGEN_PREFIX_MAX,
-    )
-    return calib, test, lengen_pool
+
+    def cut(src: dict, name: str, split: str, lo: int, hi: int, pmin: int, pmax: int) -> Pool:
+        return Pool(
+            name=name,
+            split=split,
+            offset=lo,
+            obs=src["observations"][lo:hi],
+            beliefs=src["beliefs"][lo:hi],
+            next_obs=src["next_obs"][lo:hi],
+            prefix_min=pmin,
+            prefix_max=pmax,
+        )
+
+    n_val = len(val["observations"])
+    n_lg = len(lengen["observations"])
+    return {
+        "calibration32": cut(val, "calibration32", "val", 0, calibration_end, PREFIX_MIN, PREFIX_MAX),
+        "test32": cut(val, "test32", "val", calibration_end, n_val, PREFIX_MIN, PREFIX_MAX),
+        "calibration64": cut(
+            lengen, "calibration64", "lengen", 0, calibration_end,
+            LENGEN_PREFIX_MIN, LENGEN_PREFIX_MAX,
+        ),
+        "test64": cut(
+            lengen, "test64", "lengen", calibration_end, n_lg,
+            LENGEN_PREFIX_MIN, LENGEN_PREFIX_MAX,
+        ),
+    }
 
 
 # --------------------------------------------------------------------------------------------
@@ -334,28 +360,25 @@ def make_lure_candidates(
 
 @dataclass(frozen=True)
 class Thresholds:
+    """The frozen decision rule. Every field is either a preregistered constant or a quantile of
+    the calibration pools; none of them can be influenced by a model."""
+
     js_low_bits: float
     js_high_bits: float
     js_control_min_bits: float
-    edit_high: int
+    edit_high_by_length: dict  # str(prefix length) -> minimum Levenshtein distance
     edit_low: int
-    prefix_min: int
-    prefix_max: int
     lure_edit_window: int
     lure_max_edits: int
     n_calibration_pairs: int
     n_calibration_lures: int
-    calibration_pool_sha256: str
+    calibration_pools: list  # [{name, sha256, prefix_min, prefix_max}, ...]
     hmm_sha256: str
     fit_seed: int
     verified: bool = field(default=False, compare=False)
 
     def payload(self) -> dict:
-        d = {
-            k: v
-            for k, v in self.__dict__.items()
-            if k != "verified"
-        }
+        d = {k: v for k, v in self.__dict__.items() if k != "verified"}
         d["quantile_rule"] = QUANTILE_RULE
         return d
 
@@ -364,36 +387,75 @@ class Thresholds:
             json.dumps(self.payload(), sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
 
+    def edit_cut(self, prefix_len: int) -> int:
+        """Minimum Levenshtein distance for an equivalent pair at this prefix length.
+
+        A missing length is an error, never a fallback. If a pool contains a prefix length that
+        was never calibrated, the honest answer is that no frozen threshold applies to it -- and
+        quietly substituting a neighbouring length's cut is exactly the kind of after-the-fact
+        adjustment the freezing machinery exists to prevent.
+        """
+        key = str(int(prefix_len))
+        if key not in self.edit_high_by_length:
+            raise ThresholdMismatch(
+                f"no frozen edit-distance cut for prefix length {prefix_len}; calibrated lengths "
+                f"are {min(self.edit_high_by_length, key=int)}..{max(self.edit_high_by_length, key=int)}"
+            )
+        return int(self.edit_high_by_length[key])
+
+    def calibration_hashes(self) -> set[str]:
+        return {p["sha256"] for p in self.calibration_pools}
+
 
 def fit_thresholds(
-    calibration: Pool, hmm: HMM, seed: int = 20260823, n_pairs: int = CALIBRATION_PAIRS
+    calibration_pools: Sequence[Pool],
+    hmm: HMM,
+    seed: int = 20260823,
+    n_pairs: int = CALIBRATION_PAIRS,
 ) -> Thresholds:
-    """Fit every threshold from the calibration pool alone, by the preregistered quantile rule.
+    """Fit every threshold from the calibration pools alone, by the preregistered quantile rule.
 
     No argument of this function is a target yield, a model state, or a downstream metric. It
-    cannot be steered.
+    cannot be steered. The JS quantiles are pooled across the calibration pools because a JS
+    divergence in bits means the same thing at any prefix length; the edit-distance cut is fitted
+    per length because an absolute count does not.
     """
     rng = np.random.default_rng(seed)
-    pairs = sample_same_length_pairs(calibration, n_pairs, rng)
-    jsd = np.concatenate([v["jsd"] for v in pairs.values()])
-    lev = np.concatenate([v["lev"] for v in pairs.values()])
+    jsd_parts, lure_parts = [], []
+    edit_cuts: dict[str, int] = {}
+    pools_meta = []
+    for pool in calibration_pools:
+        pairs = sample_same_length_pairs(pool, n_pairs, rng)
+        for t, v in pairs.items():
+            key = str(int(t))
+            if key in edit_cuts:
+                raise ValueError(f"prefix length {t} is calibrated by two pools")
+            edit_cuts[key] = int(np.percentile(v["lev"], 75))
+        jsd_parts.append(np.concatenate([v["jsd"] for v in pairs.values()]))
+        lures = make_lure_candidates(pool, hmm, CALIBRATION_LURE_BASES, rng)
+        lure_parts.append(np.concatenate([v["jsd"] for v in lures.values()]))
+        pools_meta.append(
+            {
+                "name": pool.name,
+                "sha256": pool.sha256(),
+                "prefix_min": pool.prefix_min,
+                "prefix_max": min(pool.prefix_max, pool.length),
+            }
+        )
 
-    lures = make_lure_candidates(calibration, hmm, CALIBRATION_LURE_BASES, rng)
-    lure_jsd = np.concatenate([v["jsd"] for v in lures.values()])
-
+    jsd = np.concatenate(jsd_parts)
+    lure_jsd = np.concatenate(lure_parts)
     return Thresholds(
         js_low_bits=float(np.percentile(jsd, 1)),
         js_high_bits=float(np.percentile(lure_jsd, 90)),
         js_control_min_bits=float(np.percentile(jsd, 50)),
-        edit_high=int(np.percentile(lev, 75)),
+        edit_high_by_length=dict(sorted(edit_cuts.items(), key=lambda kv: int(kv[0]))),
         edit_low=EDIT_LOW,
-        prefix_min=calibration.prefix_min,
-        prefix_max=calibration.prefix_max,
         lure_edit_window=LURE_EDIT_WINDOW,
         lure_max_edits=LURE_MAX_EDITS,
         n_calibration_pairs=int(jsd.size),
         n_calibration_lures=int(lure_jsd.size),
-        calibration_pool_sha256=calibration.sha256(),
+        calibration_pools=pools_meta,
         hmm_sha256=hmm.sha256(),
         fit_seed=seed,
     )
@@ -498,9 +560,9 @@ def build_bank(
         raise ThresholdMismatch(
             "thresholds were fitted under a different HMM than the one supplied"
         )
-    if thresholds.calibration_pool_sha256 == pool.sha256():
+    if pool.sha256() in thresholds.calibration_hashes():
         raise ThresholdMismatch(
-            "refusing to build a bank on the calibration pool the thresholds were fitted from"
+            "refusing to build a bank on a calibration pool the thresholds were fitted from"
         )
 
     rng = np.random.default_rng(seed)
@@ -525,7 +587,8 @@ def build_bank(
     per_length_target = max(1, target_pairs // len(pairs_by_len))
     for t in sorted(pairs_by_len):
         d = pairs_by_len[t]
-        qualifies = (d["jsd"] <= thresholds.js_low_bits) & (d["lev"] >= thresholds.edit_high)
+        cut = thresholds.edit_cut(t)
+        qualifies = (d["jsd"] <= thresholds.js_low_bits) & (d["lev"] >= cut)
         order = np.nonzero(qualifies)[0]  # sampling order, not sorted by any quality measure
         n_equiv_candidates += order.size
         taken = 0
@@ -614,6 +677,11 @@ def build_bank(
         "mean_equivalent_edit": float(
             np.mean([p["edit_distance"] for p in equivalent]) if equivalent else np.nan
         ),
+        "mean_equivalent_edit_rate": float(
+            np.mean([p["edit_distance"] / p["prefix_len"] for p in equivalent])
+            if equivalent
+            else np.nan
+        ),
         "mean_near_lure_js_bits": float(
             np.mean([p["js_divergence_bits"] for p in near_lures]) if near_lures else np.nan
         ),
@@ -675,23 +743,26 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     hmm, _ = load_frozen_hmm()
-    calib, test, lengen = load_pools(args.data_dir)
+    pools = load_pools(args.data_dir)
+    calibration = [pools["calibration32"], pools["calibration64"]]
+    test_pools = [pools["test32"], pools["test64"]]
 
     if args.command in ("fit", "all"):
-        th = fit_thresholds(calib, hmm, seed=args.seed)
+        th = fit_thresholds(calibration, hmm, seed=args.seed)
         payload = freeze_thresholds(th, args.thresholds)
         print(json.dumps(payload, indent=2))
 
     if args.command in ("build", "all"):
         th = load_thresholds(args.thresholds)
-        forbidden = calib.prefix_keys()
+        # Every calibration prefix, from both bands, is forbidden in every test bank.
+        forbidden = set().union(*(pool.prefix_keys() for pool in calibration))
         banks = []
-        for pool in (test, lengen):
+        for offset, pool in enumerate(test_pools):
             bank = build_bank(
                 pool,
                 hmm,
                 th,
-                seed=args.seed + (0 if pool.name == "test" else 1),
+                seed=args.seed + offset,
                 target_pairs=args.target_pairs,
                 forbidden_prefixes=forbidden,
             )
@@ -710,10 +781,11 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             js = np.array([p["js_divergence_bits"] for p in sel])
             ed = np.array([p["edit_distance"] for p in sel])
+            rate = np.array([p["edit_distance"] / p["prefix_len"] for p in sel])
             print(
                 f"{kind:16s} n={len(sel):5d}  JS bits mean {js.mean():.4f} "
                 f"[{js.min():.4f}, {js.max():.4f}]  edit mean {ed.mean():.2f} "
-                f"[{ed.min()}, {ed.max()}]"
+                f"[{ed.min()}, {ed.max()}]  edit rate mean {rate.mean():.3f}"
             )
     return 0
 

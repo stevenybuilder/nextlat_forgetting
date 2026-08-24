@@ -33,6 +33,8 @@ from .representations import (
     BRANCH_MARGIN_INDEX,
     PSI_EXTRACTION_INDEX,
     CENTERING_POOL_POLICY,
+    CenteringPool,
+    LeakageError,
     Whitener,
     branch_margin,
     centered_cosine_distance,
@@ -79,22 +81,48 @@ def psi_distances_centered_cosine(
     h_near_critical: np.ndarray,
     h_near_safe: np.ndarray,
     *,
-    centering_pool: np.ndarray,
+    centering_pool: CenteringPool,
 ) -> dict:
-    """Both PSI distances under the PRIMARY metric, from one explicit centering pool.
+    """Both PSI distances under the PRIMARY metric, from one CHECKED centering pool.
 
-    ``centering_pool`` must be the pool described by
-    :data:`lurestar.representations.CENTERING_POOL_POLICY` — all conditions of the
-    evaluation cell stacked together.  It is not derived from the three arrays passed in,
-    because centering over only the scored conditions is exactly the silent way to
-    manufacture (or erase) a PSI effect.
+    ``centering_pool`` must be a
+    :class:`lurestar.representations.CenteringPool`, built by
+    :meth:`~lurestar.representations.CenteringPool.from_conditions`.  A bare ndarray is
+    refused, for the same reason :func:`model_contrast_seed_level` refuses one: naming
+    the argument does not stop a caller passing the scored pair, and centering over only
+    the scored conditions is the silent way to manufacture (or erase) a PSI effect.  Three
+    things are enforced here rather than documented:
+
+    1. the pool object could only be built by accounting for every condition of
+       :data:`~lurestar.representations.CENTERING_POOL_CONDITIONS`, so a dropped
+       condition is a recorded ``declared_missing`` entry, never an omission;
+    2. ``base``, ``near_safe`` and ``near_critical`` must actually be among the pooled
+       conditions;
+    3. every scored state must be a row of the pool, so a pool from another
+       (model, seed, extraction_index) cell — or noise — is rejected outright.
+
+    The returned dict carries the pool's full report, so what was centred on travels with
+    the number.
     """
-    mean = centering_mean(centering_pool)
+    if not isinstance(centering_pool, CenteringPool):
+        raise TypeError(
+            "centering_pool must be a CenteringPool built with "
+            "CenteringPool.from_conditions(base=..., repeat=..., near_safe=..., "
+            "near_critical=..., far_critical=...). A raw array is refused because the "
+            "wrong pool is the easiest way to manufacture a PSI effect and it cannot be "
+            "detected after the fact; see CENTERING_POOL_POLICY."
+        )
+    centering_pool.require_conditions("base", "near_safe", "near_critical")
+    centering_pool.require_contains("h_base", h_base)
+    centering_pool.require_contains("h_near_critical", h_near_critical)
+    centering_pool.require_contains("h_near_safe", h_near_safe)
+    mean = centering_pool.mean
     return {
         "metric": "centered_cosine",
         "role": "primary (spec §6/H1)",
         "centering_pool_policy": CENTERING_POOL_POLICY,
-        "centering_pool_n": int(np.asarray(centering_pool).shape[0]),
+        "centering_pool_n": int(centering_pool.n),
+        "centering_pool": centering_pool.report(),
         "d_critical": centered_cosine_distance(h_base, h_near_critical, mean=mean),
         "d_safe": centered_cosine_distance(h_base, h_near_safe, mean=mean),
     }
@@ -108,7 +136,19 @@ def psi_distances_whitened(
     whitener: Whitener,
     item_ids: Optional[Sequence] = None,
 ) -> dict:
-    """Both PSI distances under the DECLARED ROBUSTNESS CHECK (whitened Euclidean)."""
+    """Both PSI distances under the DECLARED ROBUSTNESS CHECK (whitened Euclidean).
+
+    Both id sets are mandatory here even though :meth:`Whitener.distance` tolerates a
+    whitener fit without ids: this is a *reported* metric, and "the covariance came from
+    a held-out pool" is a claim that has to be checkable.
+    """
+    if not whitener.fit_item_ids:
+        raise LeakageError(
+            "the whitener was fit without item_ids, so its held-out claim cannot be "
+            "checked; refit with Whitener.fit(pool, item_ids=...)"
+        )
+    if item_ids is None:
+        raise LeakageError("item_ids is required for a reported whitened-distance metric")
     return {
         "metric": "whitened_euclidean",
         "role": "declared robustness check (spec §6/H1)",

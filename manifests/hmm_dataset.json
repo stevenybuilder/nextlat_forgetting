@@ -1,0 +1,49 @@
+{
+  "schema": "nextlat_forgetting/hmm_dataset/1",
+  "hmm_sha256": "83d24e7ffe9273b19db2bab4a8c3e373f2b2afd5fd17605b92ed719f1bc53389",
+  "hmm_manifest_sha256": "eee1ed1142e7797130e53387e115cc481c6963ba7f0bae649ff4cd1d32bcaa73",
+  "data_seed": 5963,
+  "seed_scheme": "numpy.random.SeedSequence(DATA_SEED).spawn(3) -> train, val, lengen",
+  "splits": {
+    "train": {
+      "n_sequences": 100000,
+      "length": 32,
+      "spawn_index": 0,
+      "observations_file": "data/hmm/hmm4x4_train_len32_100000.npy",
+      "observations_sha256": "1912e878d96fd264cb48f87f015b48c3772f58426d6d5289cdbdc5128fbe34b9",
+      "observations_dtype": "int8",
+      "seconds": 0.83
+    },
+    "val": {
+      "n_sequences": 10000,
+      "length": 32,
+      "spawn_index": 1,
+      "observations_file": "data/hmm/hmm4x4_val_len32_10000.npy",
+      "observations_sha256": "90b015525ecb13832c61301988a33c53774e833844c79199bb275270a7e78ff8",
+      "observations_dtype": "int8",
+      "posteriors_file": "data/hmm/hmm4x4_val_posteriors.npz",
+      "posteriors_sha256": "2d39f763b32c0f6ea66a2d925af51b90c8311724522a7873020c0cbabadb664c",
+      "mean_belief_entropy_bits": 1.1319569750437208,
+      "bayes_next_obs_accuracy": 0.41570625,
+      "mean_conditional_nll_nats": 1.2995416251877567,
+      "seconds": 0.57
+    },
+    "lengen": {
+      "n_sequences": 10000,
+      "length": 64,
+      "spawn_index": 2,
+      "observations_file": "data/hmm/hmm4x4_lengen_len64_10000.npy",
+      "observations_sha256": "00532b21d64f1336ef6316643fc329c644f6e5eed312b1e8f19011edb9f24f82",
+      "observations_dtype": "int8",
+      "posteriors_file": "data/hmm/hmm4x4_lengen_posteriors.npz",
+      "posteriors_sha256": "0c0c758bf95e0fb18cb19df541bbc9004f842e443ae278b673df51512b2c405b",
+      "mean_belief_entropy_bits": 1.1267893667633158,
+      "bayes_next_obs_accuracy": 0.4183765625,
+      "mean_conditional_nll_nats": 1.2975437597695012,
+      "seconds": 0.85
+    }
+  },
+  "pair_bank_split_rule": "the validation split is cut in half by sequence index: [0, 5000) is the pair-bank calibration pool that thresholds are frozen from, [5000, 10000) is the test pool those frozen thresholds are applied to. The lengen split is a third, length-64 pool.",
+  "train_posteriors": "not stored; recomputable exactly with forward_batch(load_frozen_hmm()[0], obs)",
+  "generated_at_unix": 1787531343
+}

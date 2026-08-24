@@ -61,6 +61,47 @@ PENDING, RUNNING, INTERRUPTED, FAILED, DONE, STALE = (
 
 DEFAULT_FINAL_ARTIFACTS = ("final_summary.json",)
 
+# Spec section 9: the immutable dataset/lure manifests and their SHA-256 are part of what a
+# resume must preserve. `main()` used to call `build_matrix` without them, so the manifest half
+# of the identity guard had no input at all.
+DEFAULT_MANIFESTS: dict[str, tuple[str, ...]] = {
+    "base": (str(_REPO / "manifests" / "corpus.sha256"),
+             str(_REPO / "manifests" / "corpus_provenance.json")),
+    "near": (str(_REPO / "manifests" / "corpus.sha256"),
+             str(_REPO / "manifests" / "corpus_provenance.json")),
+    "far": (str(_REPO / "manifests" / "corpus.sha256"),
+            str(_REPO / "manifests" / "corpus_provenance.json")),
+}
+
+
+def default_config_for(model: str, phase: str, condition: str | None) -> str:
+    """The six real deliverables in `configs/`, from `scripts/materialize_configs.py`.
+
+    There is no `{model}_lurestar_base.yaml` and no `{model}_lurestar_adapt.yaml`. And near
+    and far are SEPARATE files because they are the two arms of the H3 contrast; handing both
+    arms one config would collapse that contrast at the configuration layer.
+    """
+    if phase == "base":
+        return str(_REPO / "configs" / f"{model}_lurestar.yaml")
+    if condition not in CONDITIONS:
+        raise ValueError(
+            f"an adaptation job needs condition in {CONDITIONS}, got {condition!r}"
+        )
+    return str(_REPO / "configs" / f"adapt_{condition}.yaml")
+
+
+def default_overrides_for(model: str, phase: str) -> tuple[str, ...]:
+    """`configs/adapt_{near,far}.yaml` are derived from the NextLat G(5,5) YAML.
+
+    Its key set is a superset of the GPT one, so the GPT branch is the same file with the
+    model flag flipped -- `use_nextlat: true` at `configs/adapt_near.yaml:20`. Without this
+    override every GPT adaptation job trains a NextLat model. `scripts/launch_train.sh:78`
+    does the same thing for the same reason.
+    """
+    if phase == "adapt" and model == "gpt":
+        return ("use_nextlat=false",)
+    return ()
+
 
 # --------------------------------------------------------------------------------------
 # job identity
@@ -113,6 +154,7 @@ def build_matrix(
     base_steps: int = 20000,
     adapt_steps: int = 500,
     final_artifacts: t.Sequence[str] = DEFAULT_FINAL_ARTIFACTS,
+    require_configs: bool = True,
 ) -> list[JobSpec]:
     """One base job per (model, seed); one `near` and one `far` adaptation job hanging off it.
 
@@ -120,11 +162,10 @@ def build_matrix(
     """
     root = pathlib.Path(root)
     if config_for is None:
-        def config_for(model, phase, condition):  # noqa: ARG001
-            suffix = "base" if phase == "base" else "adapt"
-            return str(_REPO / "configs" / f"{model}_lurestar_{suffix}.yaml")
+        config_for = default_config_for
 
-    manifests = manifests or {}
+    if manifests is None:
+        manifests = DEFAULT_MANIFESTS
     jobs: list[JobSpec] = []
     for model in models:
         for seed in seeds:
@@ -136,6 +177,7 @@ def build_matrix(
                 manifests=tuple(manifests.get("base", ())),
                 train_batches=base_steps,
                 final_artifacts=tuple(final_artifacts),
+                overrides=default_overrides_for(model, "base"),
             ))
             for cond in CONDITIONS:
                 jobs.append(JobSpec(
@@ -147,8 +189,17 @@ def build_matrix(
                     parent_job_id=base_id,
                     train_batches=adapt_steps,
                     final_artifacts=tuple(final_artifacts),
+                    overrides=default_overrides_for(model, "adapt"),
                 ))
     validate_matrix(jobs)
+    if require_configs:
+        missing = sorted({j.config for j in jobs if not pathlib.Path(j.config).is_file()})
+        if missing:
+            raise FileNotFoundError(
+                "matrix references configs that do not exist: " + ", ".join(missing)
+                + ". A job cannot launch without its config, and a config recorded as absent "
+                "makes the identity guard vacuous (it would pin config_sha256=None)."
+            )
     return jobs
 
 
@@ -283,6 +334,7 @@ class ResumePlan:
     rolled_back_from: str | None = None
     parent_checkpoint: str | None = None
     parent_checkpoint_sha256: str | None = None
+    parent_steps: int | None = None
 
     @property
     def init_from(self) -> str:
@@ -332,18 +384,33 @@ class FabricLauncher:
             "--precision", self.precision,
             "train.py", "--config", spec.config,
         ]
+        if spec.parent_job_id is not None and plan.parent_steps is None:
+            raise ValueError(
+                f"{spec.job_id}: refusing to emit a branch command without the parent's step "
+                "count. --checkpoint_path restores training_steps (model_base.py:437), the "
+                "trainer seeds self.step from it (core_train.py:309), and the loop returns as "
+                "soon as self.step > trainer.train_batches (core_train.py:569). With a parent "
+                "at 20,000 steps and train_batches=500 the adaptation run performs ZERO "
+                "updates. See docs/UPSTREAM_REPORT.md section 3.4."
+            )
         if plan.parent_checkpoint and plan.fresh:
             # train.py:262-264; --checkpoint_path takes precedence over init_from
             # (core_train.py:130) and restores weights+optimizer+step, which is how an H3
             # branch starts from the frozen base parent.
             cmd += ["--checkpoint_path", plan.parent_checkpoint]
+        # The step counter of a branch is offset by the parent's, on the fresh launch (via
+        # --checkpoint_path) and on every later resume (the branch's own checkpoints carry the
+        # offset counter too), so train_batches has to carry the same offset or the loop
+        # returns immediately. `spec.train_batches` stays the number of ADAPTATION updates,
+        # which is the quantity PROGRAM.md freezes.
+        step_offset = plan.parent_steps or 0
         # Everything else is an OmegaConf dotlist override (train.py:265, train.py:349).
         cmd += [
             f"seed={spec.seed}",
             f"trainer.out_dir={pathlib.Path(spec.out_root).resolve()}",
             f"trainer.experiment_name={spec.experiment_name}",
             f"trainer.init_from={plan.init_from}",
-            f"trainer.train_batches={spec.train_batches}",
+            f"trainer.train_batches={step_offset + spec.train_batches}",
             "trainer.compile=false",          # spec section 8; README.md:117-122
             "trainer.log_to_wandb=false",
             "trainer.save_recovery_checkpoint=250",
@@ -390,25 +457,45 @@ class MatrixRunner:
 
     # ---- identity guard --------------------------------------------------------------
     def _identity(self, spec: JobSpec) -> dict:
-        """Config, seed, manifests and output root, hashed. Spec section 9.3 item 4."""
+        """Config, seed, manifests and output root, hashed. Spec section 9.3 item 4.
+
+        A missing config is refused here rather than recorded as `None`: an identity whose
+        `config_sha256` is `None` cannot be compared against anything, which turns the whole
+        guard into a no-op for the one key PROGRAM.md most needs it on.
+        """
         cfg = pathlib.Path(spec.config)
+        if not cfg.is_file():
+            raise FileNotFoundError(
+                f"{spec.job_id}: config {cfg} does not exist. A job cannot launch without it, "
+                "and recording config_sha256=None would make the identity guard vacuous."
+            )
+        missing_manifests = [m for m in spec.manifests if not pathlib.Path(m).is_file()]
+        if missing_manifests:
+            raise FileNotFoundError(
+                f"{spec.job_id}: manifests missing: {missing_manifests}. Spec section 9 "
+                "requires the dataset/lure manifests to be persisted before training."
+            )
         return {
             "seed": spec.seed,
             "out_root": str(pathlib.Path(spec.out_root).resolve()),
             "config": str(cfg),
-            "config_sha256": sha256_file(cfg) if cfg.is_file() else None,
-            "manifest_sha256": {
-                m: (sha256_file(m) if pathlib.Path(m).is_file() else None)
-                for m in spec.manifests
-            },
+            "config_sha256": sha256_file(cfg),
+            "manifest_sha256": {m: sha256_file(m) for m in spec.manifests},
         }
 
     def _check_identity(self, spec: JobSpec, prior: dict | None) -> None:
+        """Any recorded value that no longer matches is a refusal -- `None` included.
+
+        The `prior[key] is not None` clause this replaces meant that a job whose first ledger
+        entry was written while its config was absent would accept ANY config forever after.
+        """
         if not prior:
             return
         now = self._identity(spec)
         for key in ("seed", "out_root", "config_sha256", "manifest_sha256"):
-            if key in prior and prior[key] is not None and prior[key] != now[key]:
+            if key not in prior:
+                continue
+            if prior[key] != now[key]:
                 raise RuntimeError(
                     f"{spec.job_id}: {key} changed since the last ledger entry "
                     f"({prior[key]!r} -> {now[key]!r}). A resume must preserve config, seed, "
@@ -418,12 +505,16 @@ class MatrixRunner:
     # ---- planning ---------------------------------------------------------------------
     def plan(self, spec: JobSpec, states: t.Mapping[str, dict]) -> ResumePlan:
         ck = self.checkpointer(spec)
+        # Upstream writes its checkpoints with fabric.save (model_base.py:417) and knows
+        # nothing about our index, so without adoption the index is empty for every real job
+        # and this would plan `init_from=scratch` next to 274 MB of valid weights.
+        ck.adopt_existing()
         before = {r.path for r in ck.read_index()}
         rec = ck.resolve()
         after = {r.path for r in ck.read_index()}
         rolled_back = sorted(before - after)
 
-        parent_ckpt = parent_sha = None
+        parent_ckpt = parent_sha = parent_steps = None
         if spec.parent_job_id:
             parent = states.get(spec.parent_job_id)
             if not parent or parent.get("status") != DONE:
@@ -440,6 +531,12 @@ class MatrixRunner:
                     f"parent checkpoint {parent_ckpt} hash {str(got)[:12]} != recorded "
                     f"{parent_sha[:12]}; the H3 branches would not share a parent"
                 )
+            parent_steps = parent.get("step")
+            if parent_steps is None:
+                raise RuntimeError(
+                    f"parent {spec.parent_job_id} recorded no step count; without it the "
+                    "branch's trainer.train_batches cannot be offset (core_train.py:309,569)"
+                )
 
         return ResumePlan(
             spec=spec,
@@ -450,6 +547,7 @@ class MatrixRunner:
             rolled_back_from=rolled_back[0] if rolled_back else None,
             parent_checkpoint=parent_ckpt,
             parent_checkpoint_sha256=parent_sha,
+            parent_steps=int(parent_steps) if parent_steps is not None else None,
         )
 
     # ---- run ---------------------------------------------------------------------------
@@ -489,6 +587,7 @@ class MatrixRunner:
         result = self.launcher(plan)
 
         ck = self.checkpointer(spec)
+        ck.adopt_existing()     # the launched trainer wrote through upstream, not through us
         final = ck.resolve()
         if result.returncode != 0:
             entry = self.ledger.append({

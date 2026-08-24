@@ -168,12 +168,29 @@ def test_h1_finds_predictive_equivalence_when_the_state_encodes_the_belief(belie
 
 
 def test_h1_reports_no_effect_when_the_state_is_noise(belief_data) -> None:
+    """The null must be flat, and it is checked as a magnitude bound rather than as "the
+    bootstrap interval covers zero".
+
+    With 400 pairs the sampling distribution of the paired delta under the null has a standard
+    deviation around 0.01, so a percentile interval excludes zero roughly one time in twenty by
+    construction -- asserting coverage would make this test flaky for a correct estimator and
+    would say nothing about a broken one. What does discriminate is scale: the planted effect
+    below is around -0.8, roughly thirty times anything the null produces.
+    """
     _, b, _, _ = belief_data
-    rng = np.random.default_rng(11)
-    states = np.random.default_rng(2).normal(size=(len(b), 32))
-    equiv, ctrl = _pair_sets(b, states, rng)
-    out = ev.h1_predictive_equivalence(equiv, ctrl, rng=np.random.default_rng(0))
-    assert out["paired_delta_ci_lo"] < 0 < out["paired_delta_ci_hi"]
+    deltas = []
+    for seed in range(5):
+        states = np.random.default_rng(100 + seed).normal(size=(len(b), 32))
+        equiv, ctrl = _pair_sets(b, states, np.random.default_rng(200 + seed))
+        out = ev.h1_predictive_equivalence(equiv, ctrl, rng=np.random.default_rng(0))
+        deltas.append(out["paired_delta_mean"])
+    assert max(abs(d) for d in deltas) < 0.05
+
+    signal = _states_from_beliefs(b, dim=32, noise=0.02, seed=1)
+    equiv, ctrl = _pair_sets(b, signal, np.random.default_rng(10))
+    planted = ev.h1_predictive_equivalence(equiv, ctrl)["paired_delta_mean"]
+    assert planted < -0.5
+    assert max(abs(d) for d in deltas) < 0.1 * abs(planted)
 
 
 def test_h1_refuses_an_unmatched_control(belief_data) -> None:

@@ -546,10 +546,12 @@ def test_every_override_is_documented(audit) -> None:
 
 
 def test_gradient_accumulation_fallback_rule_is_written_down() -> None:
-    doc = (REPO / "docs" / "CONFIG_DEVIATIONS.md").read_text().lower()
-    for phrase in ["gradient accumulation", "effective batch size", "512",
-                   "optimizer-update count"]:
-        assert phrase.lower() in doc, phrase
+    # whitespace-normalized: the phrases must survive markdown line wrapping
+    doc = " ".join((REPO / "docs" / "CONFIG_DEVIATIONS.md").read_text().lower().split())
+    for phrase in ["gradient accumulation", "gradient_accum_steps", "execution fallback",
+                   "effective batch size", "512", "optimizer-update count",
+                   "documented as a deviation"]:
+        assert phrase in doc, phrase
 
 
 def test_audit_records_the_source_hashes(audit) -> None:

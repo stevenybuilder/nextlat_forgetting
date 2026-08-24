@@ -1,0 +1,71 @@
+{
+  "schema": "nextlat_forgetting/hmm_eval_pairs/1",
+  "hmm_sha256": "83d24e7ffe9273b19db2bab4a8c3e373f2b2afd5fd17605b92ed719f1bc53389",
+  "thresholds_sha256": "5560d98a6170d67b84debeef62dc6e8c983037505787e990f96f2d8686d12297",
+  "thresholds": {
+    "js_low_bits": 0.0006151597823433769,
+    "js_high_bits": 0.3014370332672214,
+    "js_control_min_bits": 0.37653284334640036,
+    "edit_high_rate": 0.7333333333333333,
+    "edit_low": 2,
+    "prefix_min": 8,
+    "prefix_max": 32,
+    "lure_edit_window": 8,
+    "lure_max_edits": 2,
+    "n_calibration_pairs": 399917,
+    "n_calibration_lures": 19575,
+    "calibration_pool_sha256": "f0bf6523a471a0f7ca32a64f99353bbfab03c51521c23f1068647d9b4a505efe",
+    "hmm_sha256": "83d24e7ffe9273b19db2bab4a8c3e373f2b2afd5fd17605b92ed719f1bc53389",
+    "fit_seed": 20260823,
+    "quantile_rule": {
+      "js_low_bits": "1st percentile of posterior JS divergence over calibration same-length pairs",
+      "edit_high_rate": "75th percentile of the Levenshtein RATE (distance / prefix length) over the same calibration pairs; a pair qualifies when its distance is at least ceil(rate * t)",
+      "js_control_min_bits": "50th percentile (median) of JS divergence over the same pairs",
+      "js_high_bits": "90th percentile of JS divergence over calibration lure pairs",
+      "edit_low": "fixed at 2 a priori; a near-lure differs by at most two symbols"
+    }
+  },
+  "banks": [
+    {
+      "pool": "test",
+      "pool_sha256": "a20aff6a9088f00411bb3e76193771aafb5eccc8d746936e339ff500a15a2bf9",
+      "seed": 20260823,
+      "n_equivalent": 263,
+      "n_near_lure": 2000,
+      "n_matched_control": 263,
+      "n_equivalent_candidates": 263,
+      "n_lure_candidates": 5819,
+      "n_equivalent_dropped_for_missing_control": 0,
+      "n_search_pairs": 1499704,
+      "n_lure_candidates_generated": 58349,
+      "mean_equivalent_js_bits": 0.00028403174700022726,
+      "mean_equivalent_edit": 15.190114068441064,
+      "mean_equivalent_edit_rate": 0.7625625278141512,
+      "mean_near_lure_js_bits": 0.37523945016753224,
+      "mean_near_lure_edit": 1.648,
+      "mean_control_js_bits": 0.6067824643860816
+    },
+    {
+      "pool": "lengen",
+      "pool_sha256": "6118c238d37438ab398cc03c0ca33d88a711124c352752cbeddb1c00a2827329",
+      "seed": 20260824,
+      "n_equivalent": 54,
+      "n_near_lure": 1984,
+      "n_matched_control": 54,
+      "n_equivalent_candidates": 54,
+      "n_lure_candidates": 6093,
+      "n_equivalent_dropped_for_missing_control": 0,
+      "n_search_pairs": 1499844,
+      "n_lure_candidates_generated": 58754,
+      "mean_equivalent_js_bits": 0.00021470460604848464,
+      "mean_equivalent_edit": 32.48148148148148,
+      "mean_equivalent_edit_rate": 0.7516768966149903,
+      "mean_near_lure_js_bits": 0.37761118134207233,
+      "mean_near_lure_edit": 1.6355846774193548,
+      "mean_control_js_bits": 0.6100447458267676
+    }
+  ],
+  "pairs_file": "manifests/hmm_eval_pairs.jsonl",
+  "pairs_sha256": "4e099f06c0a156558b27aa33a3828d7be74d9c5308d212cccfc5a235cec3fea1",
+  "n_pairs": 4618
+}

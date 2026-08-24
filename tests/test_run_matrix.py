@@ -336,6 +336,14 @@ def test_fabric_command_pins_the_single_gpu_paper_configuration(tmp_path):
 
 
 def test_fabric_command_resumes_and_branches_from_a_parent(tmp_path):
+    """A branch must ask for parent_steps + adapt_steps, not adapt_steps.
+
+    `--checkpoint_path` restores `training_steps` (`models/model_base.py:437`), the trainer
+    seeds `self.step` from it (`core_train.py:309`), and the loop returns as soon as
+    `self.step > trainer.train_batches` (`core_train.py:569`). Asking for
+    `trainer.train_batches=500` off a 20,000-step parent buys ZERO adaptation updates.
+    `docs/UPSTREAM_REPORT.md` section 3.4 names this trap explicitly.
+    """
     spec = JobSpec("gpt-s1235-adapt-near", "gpt", 1235, "adapt", "near",
                    "configs/gpt_adapt.yaml", str(tmp_path / "near"),
                    parent_job_id="gpt-s1235-base", train_batches=500,
@@ -343,14 +351,181 @@ def test_fabric_command_resumes_and_branches_from_a_parent(tmp_path):
     launcher = FabricLauncher(tmp_path, dry_run=True)
 
     fresh = launcher.command(ResumePlan(spec=spec, fresh=True,
-                                        parent_checkpoint="/d/base/final.pt"))
+                                        parent_checkpoint="/d/base/final.pt",
+                                        parent_steps=20000))
     assert "--checkpoint_path" in fresh
     assert fresh[fresh.index("--checkpoint_path") + 1] == "/d/base/final.pt"
-    assert "trainer.train_batches=500" in fresh
+    assert "trainer.train_batches=20500" in fresh
+    assert "trainer.train_batches=500" not in fresh, (
+        "500 off a 20,000-step parent returns at core_train.py:569 without one update"
+    )
     assert "model.lambda_mse=0.0" in fresh and "model.lambda_kl=0.0" in fresh
 
-    # once the branch has its own checkpoints, the parent must not be re-applied
-    resumed = launcher.command(ResumePlan(spec=spec, fresh=False, resume_step=250,
-                                          parent_checkpoint="/d/base/final.pt"))
+    # the offset survives the resume: the branch's OWN checkpoints also carry the offset
+    # counter, so dropping it on the second launch breaks the resume exactly the same way.
+    resumed = launcher.command(ResumePlan(spec=spec, fresh=False, resume_step=20250,
+                                          parent_checkpoint="/d/base/final.pt",
+                                          parent_steps=20000))
     assert "--checkpoint_path" not in resumed
     assert "trainer.init_from=resume" in resumed
+    assert "trainer.train_batches=20500" in resumed
+
+
+def test_branch_command_is_refused_without_the_parent_step_count(tmp_path):
+    """Unknown parent step count must be a refusal, never a silent `train_batches=500`."""
+    spec = JobSpec("gpt-s1235-adapt-far", "gpt", 1235, "adapt", "far",
+                   "configs/adapt_far.yaml", str(tmp_path / "far"),
+                   parent_job_id="gpt-s1235-base", train_batches=500)
+    with pytest.raises(ValueError, match="without the parent's step count"):
+        FabricLauncher(tmp_path, dry_run=True).command(
+            ResumePlan(spec=spec, fresh=True, parent_checkpoint="/d/base/final.pt"))
+
+
+def test_base_job_command_carries_no_offset(tmp_path):
+    spec = JobSpec("gpt-s1234-base", "gpt", 1234, "base", None,
+                   "configs/gpt_lurestar.yaml", str(tmp_path / "base"), train_batches=20000)
+    cmd = FabricLauncher(tmp_path, dry_run=True).command(ResumePlan(spec=spec, fresh=True))
+    assert "trainer.train_batches=20000" in cmd
+    assert "--checkpoint_path" not in cmd
+
+
+# --------------------------------------------------------------------------------------
+# the defaults the runner actually ships with
+# --------------------------------------------------------------------------------------
+
+def test_default_matrix_points_at_configs_that_exist(tmp_path):
+    """`configs/{model}_lurestar_base.yaml` never existed; a job cannot launch without one."""
+    jobs = build_matrix(tmp_path / "r")
+    for j in jobs:
+        assert pathlib.Path(j.config).is_file(), j.config
+    assert build_matrix(tmp_path / "r", require_configs=False)  # opt-out still available
+    with pytest.raises(FileNotFoundError, match="configs that do not exist"):
+        build_matrix(tmp_path / "r", config_for=lambda m, p, c: str(tmp_path / "nope.yaml"))
+
+
+def test_near_and_far_do_not_share_a_config(tmp_path):
+    """Handing both H3 arms one config collapses the contrast the out_root split protects."""
+    jobs = {j.job_id: j for j in build_matrix(tmp_path / "r", models=("gpt",), seeds=(1234,))}
+    near = jobs["gpt-s1234-adapt-near"]
+    far = jobs["gpt-s1234-adapt-far"]
+    assert near.config != far.config
+    assert pathlib.Path(near.config).name == "adapt_near.yaml"
+    assert pathlib.Path(far.config).name == "adapt_far.yaml"
+
+
+def test_gpt_adaptation_flips_use_nextlat_off(tmp_path):
+    """configs/adapt_*.yaml are derived from the NextLat YAML and set `use_nextlat: true`."""
+    jobs = {j.job_id: j for j in build_matrix(tmp_path / "r", seeds=(1234,))}
+    assert "use_nextlat=false" in jobs["gpt-s1234-adapt-near"].overrides
+    assert "use_nextlat=false" in jobs["gpt-s1234-adapt-far"].overrides
+    assert jobs["nextlat-s1234-adapt-near"].overrides == ()
+    cmd = FabricLauncher(tmp_path, dry_run=True).command(
+        ResumePlan(spec=jobs["gpt-s1234-adapt-near"], fresh=True,
+                   parent_checkpoint="/d/p.pt", parent_steps=20000))
+    assert "use_nextlat=false" in cmd
+
+
+def test_default_matrix_carries_the_dataset_manifests(tmp_path):
+    """Spec section 9.3 item 4: a resume must preserve the manifests, so they must be wired."""
+    for j in build_matrix(tmp_path / "r", models=("gpt",), seeds=(1234,)):
+        assert j.manifests, j.job_id
+        for m in j.manifests:
+            assert pathlib.Path(m).is_file(), m
+
+
+# --------------------------------------------------------------------------------------
+# the identity guard
+# --------------------------------------------------------------------------------------
+
+def test_identity_guard_refuses_a_config_that_was_absent_when_the_job_started(tmp_path):
+    """A recorded `None` used to disable the guard forever. It must be a refusal instead."""
+    cfg = tmp_path / "cfg.yaml"
+    spec = JobSpec("gpt-s1234-base", "gpt", 1234, "base", None, str(cfg), str(tmp_path / "o"))
+    runner = make_runner(tmp_path, FakeLauncher())
+
+    with pytest.raises(FileNotFoundError, match="does not exist"):
+        runner._identity(spec)                       # never record config_sha256=None
+
+    cfg.write_text("trainer:\n  train_batches: 50\n")
+    prior = dict(runner._identity(spec))
+    runner._check_identity(spec, prior)              # unchanged config is fine
+
+    cfg.write_text("trainer:\n  train_batches: 999999\n")
+    with pytest.raises(RuntimeError, match="config_sha256 changed"):
+        runner._check_identity(spec, prior)
+
+    # and a legacy ledger entry that pinned None is a refusal, not a free pass
+    legacy = dict(prior, config_sha256=None)
+    with pytest.raises(RuntimeError, match="config_sha256 changed"):
+        runner._check_identity(spec, legacy)
+
+
+def test_identity_guard_refuses_a_moved_manifest(tmp_path):
+    man = tmp_path / "corpus.sha256"
+    man.write_text("d13199b0  graph_5_5_sample_200000.txt\n")
+    cfg = tmp_path / "cfg.yaml"
+    cfg.write_text("trainer:\n  train_batches: 50\n")
+    spec = JobSpec("gpt-s1234-base", "gpt", 1234, "base", None, str(cfg),
+                   str(tmp_path / "o"), manifests=(str(man),))
+    runner = make_runner(tmp_path, FakeLauncher())
+    prior = dict(runner._identity(spec))
+    man.write_text("00000000  graph_5_5_sample_200000.txt\n")
+    with pytest.raises(RuntimeError, match="manifest_sha256 changed"):
+        runner._check_identity(spec, prior)
+
+
+# --------------------------------------------------------------------------------------
+# adoption of checkpoints upstream wrote
+# --------------------------------------------------------------------------------------
+
+def test_runner_resumes_from_a_checkpoint_upstream_wrote(tmp_path):
+    """The production launcher is upstream `train.py`; it writes through fabric.save, not us.
+
+    Without adoption the index is empty for every real job, `resolve()` returns None, and the
+    runner plans `init_from=scratch` on top of a valid 15,000-step checkpoint.
+    """
+    cfg = tmp_path / "cfg.yaml"
+    cfg.write_text("trainer:\n  train_batches: 20000\n")
+    out = tmp_path / "runs" / "gpt" / "1234" / "base"
+    exp = out / "gpt-s1234-base"
+    exp.mkdir(parents=True)
+    save, _ = SER
+    # exactly what core_train.py:961 and core_train.py:774-777 leave on disk
+    for name, step in (("recovery_ckpt_iter_15000.pt", 15000),
+                       ("ckpt_iter_14000_0.4412.pt", 14000)):
+        with open(exp / name, "wb") as fh:
+            save({"training_steps": step}, fh)
+    (out / "recovery_ckpt").write_text(str(exp / "recovery_ckpt_iter_15000.pt"))
+
+    spec = JobSpec("gpt-s1234-base", "gpt", 1234, "base", None, str(cfg), str(out),
+                   train_batches=20000)
+    runner = make_runner(tmp_path, FakeLauncher())
+    plan = runner.plan(spec, {})
+    assert not plan.fresh, "an upstream checkpoint on disk must not plan a scratch restart"
+    assert plan.init_from == "resume"
+    assert plan.resume_step == 15000
+    assert (out / "recovery_ckpt").is_file(), "the upstream pointer must survive planning"
+    # the float in upstream's validation-checkpoint name must not be read as the step
+    assert sorted(r.step for r in runner.checkpointer(spec).read_index()) == [14000, 15000]
+
+
+def test_a_torn_upstream_checkpoint_rolls_back_to_the_validation_checkpoint(tmp_path):
+    cfg = tmp_path / "cfg.yaml"
+    cfg.write_text("trainer:\n  train_batches: 20000\n")
+    out = tmp_path / "runs" / "gpt" / "1234" / "base"
+    exp = out / "gpt-s1234-base"
+    exp.mkdir(parents=True)
+    save, _ = SER
+    for name, step in (("recovery_ckpt_iter_15000.pt", 15000),
+                       ("ckpt_iter_14000_0.4412.pt", 14000)):
+        with open(exp / name, "wb") as fh:
+            save({"training_steps": step}, fh)
+    torn = exp / "recovery_ckpt_iter_15000.pt"
+    (out / "recovery_ckpt").write_text(str(torn))
+    with open(torn, "r+b") as fh:      # killed mid fabric.save: model_base.py:417 is not atomic
+        fh.truncate(7)
+
+    spec = JobSpec("gpt-s1234-base", "gpt", 1234, "base", None, str(cfg), str(out))
+    plan = make_runner(tmp_path, FakeLauncher()).plan(spec, {})
+    assert plan.resume_step == 14000
+    assert (out / "recovery_ckpt").read_text().strip() == str(exp / "ckpt_iter_14000_0.4412.pt")

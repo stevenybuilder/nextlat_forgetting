@@ -150,9 +150,13 @@ unmeasured** and must be captured on the first confirmatory run.
 `src/lurestar/durable_checkpoint.py`, `scripts/run_matrix.py`, `tests/test_resume.py`,
 `tests/test_run_matrix.py`. 35 tests, all passing on the CPU-only host in 12 s.
 
-**The mandatory recovery test passes bitwise.** 300 steps uninterrupted; then the same 300-step
-job, `SIGKILL`ed at step 150 (a real child process, `returncode == -9`, no `finally`, no flush),
-resumed from the newest verified checkpoint at step 125, finished at 300. Measured
+**The recovery test passes bitwise -- on a CPU surrogate, not on the real trainer.** The host has
+no GPU and no torch, so the trainer under test is `src/lurestar/toy_trainer.py`: a numpy MLP that
+owns the state upstream's checkpoint is missing (Adam moments with a real `t`, a scheduler with a
+real `last_epoch`, a shuffled data position, and the python + numpy RNG streams). 300 steps
+uninterrupted; then the same 300-step job, `SIGKILL`ed at step 150 (a real child process,
+`returncode == -9`, no `finally`, no flush), resumed from the newest verified checkpoint at step
+125, finished at 300. Measured
 `max |delta param| = 0.000e+00`, and step, both Adam moment buffers, `lr_scheduler_state`,
 data epoch/cursor/permutation and every `metrics/step_*.json` are equal. The stated tolerance is
 therefore exact zero, not a bound.
@@ -220,3 +224,106 @@ arrays, and `model_contrast_seed_level` takes a `Mapping {seed_id: statistic}` a
 `TypeError` on an array — so a 20,000-item array cannot be passed where three seeds belong. With
 three seeds the exact two-sided sign-flip p has a floor of 0.25, which is reported alongside the
 interval and every per-seed value.
+
+## Lure-Star stimuli — generated, solver-verified, and one impossibility documented
+
+`src/lurestar/generate.py` + `src/lurestar/validate.py` + `tests/test_lure_generator.py`.
+48 tests, all passing (`.venv/bin/python -m pytest tests/test_lure_generator.py`, 28.9 s).
+
+**Spec §5's matching requirement is not literally satisfiable, and the reason is structural.**
+The critical swap must edit the goal arm's depth-k edge; the safe swap must not. Those are
+different edges, one edge ordering gives distinct edges distinct slots, so no ordering makes
+the two edits land on the same absolute token positions of a shared base string. The proposed
+fix — one edge permutation per condition, chosen so both edits land at indices (i,j) — was
+refuted rather than adopted: relocating the safe pair displaces whatever occupied (i,j), so
+base→near-safe becomes a ten-token perturbation instead of a two-token one, which destroys the
+premise of a *near* lure and does not even make the two edit distances equal without further
+rejection sampling. Full argument, including the proof that no other two-token
+multiset-preserving edit yields a valid star, in `docs/STIMULUS_DESIGN.md`.
+
+What is enforced instead, both per item and both asserted on the written manifests:
+
+- **LS-1 (primary).** `near_safe` and `near_critical` are each an exact two-token edit of the
+  *same* base string, their slot pairs are disjoint with **identical gap**, and a fair coin
+  decides which pair each condition gets — so edit position is exchangeable between conditions
+  rather than confounded with them. This keeps the spec's PSI formula literally. It is weaker
+  than the spec text on exactly one dimension, absolute within-item edit position, and
+  §2 of `STIMULUS_DESIGN.md` says so in those words.
+- **LS-2 (declared robustness check).** A sixth condition, `near_safe_aligned`, is the same
+  safe swap applied to `repeat` — serialized so the safe pair sits exactly where the critical
+  pair sits in `base`. Its edit is at the *identical absolute token positions* as
+  `near_critical`'s. Anchor differs; position matches. LS-1 and LS-2 disagree on which nuisance
+  to absorb, both are generated, and the primary was fixed here, before any model exists.
+
+**Measured, on the shipped 2,000-quartet pool.** Every condition is 63 prompt tokens; both near
+lures change exactly 2 tokens, always edge *head* tokens; base/repeat/near-safe/near-safe-aligned
+answers identical; near-critical changes the first branch and the path while the goal *token* is
+byte-identical (the goal node moves to the other arm — asserted directly, not assumed);
+far-critical edge overlap with base is `{0: 288, 1: 820, 2: 892}` out of 20 edges (mean 1.28,
+cap 2 by rejection, 72% first-try acceptance) against 18/20 for the near lures. Pools:
+`E_lure` 2,000 quartets, `A_pair` 1,000 training items, `B_near` 5,000, `B_far` 15,000 candidates
+— all in `manifests/` with `.sha256` sidecars and `stimuli_provenance.json`.
+
+**A leakage positive control caught a real bug.** `TrainingIndex.build` canonicalized a graph by
+sorting edge *strings* while `canonical_graph_key` sorted edge *tuples* — "10,5" < "2,3" as text,
+the reverse as numbers. The two therefore never agreed, so the "no evaluation item is in the
+training corpus" check would have passed vacuously on every input, including a training line
+copied verbatim. The test that failed was the one asserting the index *does* flag a known
+training item. Without that positive control the leakage guarantee would have been decorative.
+Both sides now use the lexicographic form and the control is permanent.
+
+Round-trip fidelity to upstream is asserted, not assumed: `graph_from_line` → `serialize` is
+byte-identical on sampled lines of the real 200,000-line corpus, and our solver reproduces
+upstream's recorded answers from the edge list alone.
+
+**Correction, appended after adversarial review (`docs/review/durable-checkpoint.md`).** The
+paragraph above originally read "the mandatory recovery test passes bitwise" without naming the
+surrogate. Spec §9's mandatory recovery test, and spec §10's stop condition "interrupted training
+cannot resume reproducibly enough for the stated analysis", are about the 12L/6H/384 model on the
+real corpus. That test has **not** been run. `docs/FOUNDATIONS.md` D-23 conditions the
+`--strategy ddp --devices 1` sampler decision on exactly this check ("Verify empirically with the
+300 vs 150+150 test before trusting it"); it remains outstanding and is a blocker for the first
+confirmatory run, not for the durable layer.
+
+## Adversarial review of the durable-checkpoint track — five P0s, all fixed
+
+`docs/review/durable-checkpoint.md`. All 35 previously reported tests reproduced, and the durable
+primitive's own tests survived adversarial input (truncation, constant-length bit flips, hand-written
+`.partial` files, a serializer that writes garbage, and a same-length pointer-target corruption). The
+recovery test is falsifiable: `test_resume.py:183`'s `0 < resumed_from` is what would fail if the
+resume silently restarted from scratch, since a scratch restart would otherwise land bit-identically
+on the reference.
+
+What the tests did not cover was the seam to the trainer that will actually run. Every runner test
+drives a `FakeLauncher` that writes *through* `DurableCheckpointer`; production launches upstream
+`train.py`, which writes through `fabric.save` (`models/model_base.py:417`) and knows nothing about
+our index. Five P0s followed, each reproduced before it was fixed:
+
+1. `resolve()` deleted `{out_dir}/recovery_ckpt` whenever its own index was empty — i.e. on every
+   real job — destroying upstream's valid pointer (`core_train.py:968-974`). Now it clears the
+   pointer only when it has records that all failed, or when the pointer is dangling (the case
+   `core_train.py:148-150` hard-fails on).
+2. Nothing adopted upstream-written checkpoints, so every real resume planned `init_from=scratch`
+   on top of valid weights and no real job could ever reach `DONE`. Added
+   `DurableCheckpointer.adopt()` / `adopt_existing()` — hash, deserialize, sidecar, index, no
+   pruning of files we did not write — called from `MatrixRunner.plan()` and after each launch.
+3. `build_matrix`'s default configs (`{model}_lurestar_base.yaml`) never existed, and near and far
+   were handed the *same* config. Now `base -> configs/{model}_lurestar.yaml`,
+   `adapt -> configs/adapt_{condition}.yaml`, and a missing config is a refusal.
+4. The identity guard skipped any key recorded as `None`, which was `config_sha256` for every job.
+   A run could have resumed under a different `train_batches` unnoticed. `None` is now a mismatch
+   like any other, a missing config raises rather than being recorded, and the dataset manifests are
+   wired into the default matrix.
+5. The H3 branch command was arithmetically dead: `--checkpoint_path` restores `training_steps`
+   (`model_base.py:437`) → `self.step` (`core_train.py:309`) → the loop returns at
+   `core_train.py:569` with `train_batches=500` off a 20,000-step parent, i.e. **zero adaptation
+   updates**, a trap `UPSTREAM_REPORT` §3.4 names verbatim and `tests/test_run_matrix.py:349`
+   had pinned as the contract. The command now emits `parent_steps + adapt_steps` and refuses to
+   emit at all without the parent's step count. Same command also lacked `use_nextlat=false`, so
+   every GPT adaptation job would have trained a NextLat model (`configs/adapt_near.yaml:20`).
+
+After the fixes: **45 tests pass** (35 original, 10 new regression tests, one rewritten because it
+encoded P0-5). Seven P1s are recorded in the review and left open, the largest being that
+`scripts/run_matrix.py` and `scripts/launch_train.sh` are two contradictory launch paths for the
+same jobs — different `out_dir` layout, different experiment names, different `--strategy` default,
+different branching mechanism. They must converge before the first confirmatory run.

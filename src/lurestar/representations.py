@@ -61,6 +61,8 @@ __all__ = [
     "BRANCH_MARGIN_INDEX",
     "EXTRACTION_INDICES",
     "CENTERING_POOL_POLICY",
+    "CENTERING_POOL_CONDITIONS",
+    "CenteringPool",
     "LeakageError",
     "locate_prompt_delimiter",
     "resolve_extraction_indices",
@@ -135,6 +137,19 @@ CENTERING_POOL_POLICY = (
     "scored. Centering per condition would subtract exactly the between-condition shift "
     "that PSI is trying to measure, which is a silent way to manufacture (or erase) an "
     "effect. The pool is an explicit required argument everywhere in this module."
+)
+
+
+#: The five E_lure conditions of spec §5 that together make up the declared centering
+#: pool.  :meth:`CenteringPool.from_conditions` refuses to build a pool unless every one
+#: of these is either supplied or *explicitly* declared missing, so dropping a condition
+#: becomes a recorded statement rather than a silent substitution.
+CENTERING_POOL_CONDITIONS = (
+    "base",
+    "repeat",
+    "near_safe",
+    "near_critical",
+    "far_critical",
 )
 
 
@@ -230,7 +245,14 @@ def next_token_targets(tokens: np.ndarray, positions: Sequence[int]) -> np.ndarr
 
 
 def centering_mean(pool_states: np.ndarray) -> np.ndarray:
-    """Mean vector of the centering pool.  See :data:`CENTERING_POOL_POLICY`."""
+    """Mean vector of a raw stacked pool.  See :data:`CENTERING_POOL_POLICY`.
+
+    LOW-LEVEL.  This helper cannot tell whether the array it was handed is the declared
+    E_lure pool or the scored pair, so it must not be used to build the pool for a
+    reported PSI.  Use :meth:`CenteringPool.from_conditions`, which names the conditions
+    and checks them, and which :func:`lurestar.evaluate.psi_distances_centered_cosine`
+    now requires.
+    """
     pool = _as2d(pool_states, "pool_states")
     if pool.shape[0] < 2:
         raise ValueError("centering pool needs at least 2 states")
@@ -283,6 +305,122 @@ def centered_cosine_distance(
             "a state coincides with the centering mean; centered cosine is undefined"
         )
     return 1.0 - np.einsum("ij,ij->i", Ac, Bc) / (na * nb)
+
+
+def _row_keys(x: np.ndarray) -> frozenset:
+    """Exact byte keys for the rows of a float64 view of ``x``.
+
+    Used only for *containment*: the pool is built by stacking the very arrays that are
+    later scored, so the rows are bit-identical and an exact key is the right test.  It
+    is O(n) and never used for anything numeric.
+    """
+    a = np.ascontiguousarray(np.asarray(x, dtype=np.float64))
+    return frozenset(a[i].tobytes() for i in range(a.shape[0]))
+
+
+@dataclass(frozen=True)
+class CenteringPool:
+    """The centering pool for the PRIMARY distance, as a checked object.
+
+    Rationale.  ``centered_cosine_distance`` takes a bare mean vector, which makes the
+    pool the single easiest place to manufacture (or erase) a PSI effect: a caller who
+    passes the scored pair instead of the declared E_lure pool gets a plausible number
+    and no complaint.  Naming the argument is not enough — the *caller* is the mutant
+    that survives.  So the pool is constructed here, from named conditions, and
+
+    * every one of :data:`CENTERING_POOL_CONDITIONS` must be either supplied or listed
+      in ``declared_missing`` — dropping ``far_critical`` silently is impossible;
+    * :meth:`require_contains` checks that the states being scored are actually in the
+      pool, so a pool from a different cell (or pure noise) is rejected outright;
+    * :meth:`report` carries the condition list, the per-condition row counts and the
+      declared omissions into every serialized metric, so what was pooled is auditable
+      after the fact rather than taken on trust.
+    """
+
+    mean: np.ndarray
+    conditions: tuple
+    counts: tuple
+    declared_missing: tuple
+    n: int
+    n_features: int
+    row_keys: frozenset = field(default=frozenset(), repr=False)
+
+    @staticmethod
+    def from_conditions(
+        *,
+        declared_missing: Sequence[str] = (),
+        **states: np.ndarray,
+    ) -> "CenteringPool":
+        missing = tuple(declared_missing)
+        unknown = [c for c in list(states) + list(missing) if c not in CENTERING_POOL_CONDITIONS]
+        if unknown:
+            raise ValueError(
+                f"unknown centering-pool condition(s) {unknown}; the declared pool is "
+                f"{list(CENTERING_POOL_CONDITIONS)} (spec §5)"
+            )
+        both = set(states) & set(missing)
+        if both:
+            raise ValueError(f"condition(s) {sorted(both)} both supplied and declared missing")
+        unaccounted = [c for c in CENTERING_POOL_CONDITIONS if c not in states and c not in missing]
+        if unaccounted:
+            raise ValueError(
+                f"centering-pool condition(s) {unaccounted} were neither supplied nor "
+                "listed in declared_missing. The pool policy is a preregistered claim "
+                "about WHICH states were pooled; omitting one has to be stated, not "
+                "assumed. Pass the array, or pass "
+                f"declared_missing={tuple(unaccounted)!r} and say why in the run record."
+            )
+        if not states:
+            raise ValueError("a centering pool needs at least one condition")
+        order = [c for c in CENTERING_POOL_CONDITIONS if c in states]
+        arrays = [_as2d(states[c], c) for c in order]
+        widths = {a.shape[1] for a in arrays}
+        if len(widths) != 1:
+            raise ValueError(f"conditions disagree on n_features: {sorted(widths)}")
+        stacked = np.vstack(arrays)
+        if stacked.shape[0] < 2:
+            raise ValueError("centering pool needs at least 2 states")
+        return CenteringPool(
+            mean=stacked.mean(axis=0),
+            conditions=tuple(order),
+            counts=tuple(int(a.shape[0]) for a in arrays),
+            declared_missing=tuple(sorted(missing)),
+            n=int(stacked.shape[0]),
+            n_features=int(stacked.shape[1]),
+            row_keys=_row_keys(stacked),
+        )
+
+    def require_contains(self, name: str, states: np.ndarray) -> None:
+        """Raise unless every row of ``states`` is a row of the pool."""
+        keys = _row_keys(_as2d(states, name))
+        outside = keys - self.row_keys
+        if outside:
+            raise ValueError(
+                f"{len(outside)} distinct row(s) of `{name}` are not in the centering "
+                f"pool (pool n={self.n}, conditions={list(self.conditions)}). The "
+                "primary distance must be centred on the pool the scored states belong "
+                "to; a pool from another cell silently rescales PSI."
+            )
+
+    def require_conditions(self, *names: str) -> None:
+        absent = [c for c in names if c not in self.conditions]
+        if absent:
+            raise ValueError(
+                f"condition(s) {absent} are being scored but were not pooled "
+                f"(pool conditions {list(self.conditions)}, declared missing "
+                f"{list(self.declared_missing)})"
+            )
+
+    def report(self) -> dict:
+        return {
+            "policy": CENTERING_POOL_POLICY,
+            "conditions": list(self.conditions),
+            "counts": list(self.counts),
+            "declared_missing": list(self.declared_missing),
+            "n": self.n,
+            "n_features": self.n_features,
+            "complete": not self.declared_missing,
+        }
 
 
 # ------------------------------------------------------------------- whitening -------
@@ -352,7 +490,7 @@ class Whitener:
             alpha = float(shrinkage)
         if not 0.0 <= alpha <= 1.0:
             raise ValueError(f"shrinkage must be in [0, 1]; got {alpha}")
-        pass
+        alpha = max(alpha, float(min_shrinkage))
         mu = np.trace(S) / p
         Sig = (1.0 - alpha) * S + alpha * mu * np.eye(p)
         evals, evecs = np.linalg.eigh(Sig)
@@ -361,7 +499,10 @@ class Whitener:
                 "shrunk covariance is not positive definite; raise `shrinkage`"
             )
         W = (evecs * evals**-0.5) @ evecs.T
-        ids = frozenset() if item_ids is None else frozenset(np.asarray(list(item_ids)).tolist())
+        # NOTE: no numpy coercion here.  `frozenset(np.asarray(list(ids)).tolist())`
+        # silently casts a heterogeneous id list to strings, so a genuinely leaked
+        # integer id stops matching its own entry and the guard reports "clean".
+        ids = frozenset() if item_ids is None else frozenset(item_ids)
         if item_ids is not None and len(ids) != n:
             raise ValueError(
                 f"item_ids has {len(ids)} unique entries but the pool has {n} rows"
@@ -378,9 +519,17 @@ class Whitener:
         )
 
     def _check_ids(self, item_ids: Optional[Iterable]) -> None:
-        if item_ids is None or not self.fit_item_ids:
+        if not self.fit_item_ids:
+            # The whitener was fit without ids, so "held out" cannot be checked at all.
+            # `report()["pool_is_heldout"]` is False; the caller is responsible.
             return
-        overlap = self.fit_item_ids & frozenset(np.asarray(list(item_ids)).tolist())
+        if item_ids is None:
+            raise LeakageError(
+                "this Whitener was fit with item ids, so every scored batch must supply "
+                "item_ids too; omitting them turns the held-out guarantee back into an "
+                "honour system"
+            )
+        overlap = self.fit_item_ids & frozenset(item_ids)
         if overlap:
             raise LeakageError(
                 f"{len(overlap)} scored item(s) were in the whitening pool "
@@ -553,10 +702,10 @@ def forward_states_and_logits(inner_model, tokens, *, architecture: str, mask=No
     hidden state is exactly ``transformer.norm(x)`` (model_gpt.py:276 /
     model_nextlat.py:197), which is RMS-normalized because ``bias: false``.
     """
-    torch = _torch()
-    arch = architecture.lower()
+    arch = str(architecture).lower()
     if arch not in ("gpt", "nextlat"):
         raise ValueError(f"architecture must be 'gpt' or 'nextlat'; got {architecture!r}")
+    torch = _torch()
     kwargs = {"return_hidden_states": True}
     if mask is not None:
         kwargs["mask"] = mask

@@ -515,3 +515,105 @@ def test_resume_refuses_a_changed_dataset(tmp_path):
     b = ToyTrainer(tmp_path / "a", seed=99, total_steps=40, save_every=20, run_id="a")
     with pytest.raises(RuntimeError, match="dataset fingerprint changed"):
         b.resume_or_start()
+
+
+# --------------------------------------------------------------------------------------
+# checkpoints this layer did not write
+# --------------------------------------------------------------------------------------
+
+def _upstream_layout(tmp_path):
+    """Exactly what upstream leaves on disk: unsidecarred .pt files plus a plain pointer.
+
+    `core_train.py:961` writes `{out_dir}/{experiment_name}/recovery_ckpt_iter_{step}.pt`,
+    `core_train.py:774-777` writes `ckpt_iter_{step}_{val_loss:.4f}.pt` beside it, and
+    `core_train.py:968-974` writes the one-line `{out_dir}/recovery_ckpt` pointer.
+    """
+    out = tmp_path / "out"
+    exp = out / "exp"
+    exp.mkdir(parents=True)
+    save, _ = pickle_serializer()
+    for name, step in (("recovery_ckpt_iter_15000.pt", 15000),
+                       ("ckpt_iter_14000_0.4412.pt", 14000)):
+        with open(exp / name, "wb") as fh:
+            save({"training_steps": step}, fh)
+    (out / "recovery_ckpt").write_text(str(exp / "recovery_ckpt_iter_15000.pt"))
+    ck = DurableCheckpointer(out, "job-1", experiment_name="exp",
+                             serializer=pickle_serializer())
+    return out, exp, ck
+
+
+def test_resolve_does_not_delete_a_pointer_it_did_not_write(tmp_path):
+    """An empty index means "we have never checkpointed", not "this pointer is garbage".
+
+    Deleting upstream's `recovery_ckpt` turns a resumable 15,000-step run into a restart from
+    scratch -- the exact opposite of what this layer exists for.
+    """
+    out, exp, ck = _upstream_layout(tmp_path)
+    assert ck.read_index() == []
+    assert ck.resolve() is None                       # we still cannot vouch for it
+    assert (out / "recovery_ckpt").is_file(), "resolve() destroyed a valid upstream pointer"
+    assert (out / "recovery_ckpt").read_text().strip() == str(
+        exp / "recovery_ckpt_iter_15000.pt")
+
+
+def test_resolve_still_clears_a_dangling_pointer(tmp_path):
+    """The one pointer we ARE entitled to clear: upstream hard-fails on a missing target.
+
+    `core_train.py:145-150` reads the pointer and asserts the file exists, so a finished run
+    that left the pointer aimed at a deleted file kills the next resume outright.
+    """
+    out, exp, ck = _upstream_layout(tmp_path)
+    (exp / "recovery_ckpt_iter_15000.pt").unlink()
+    (exp / "ckpt_iter_14000_0.4412.pt").unlink()
+    assert ck.resolve() is None
+    assert not (out / "recovery_ckpt").exists()
+
+
+def test_adopt_brings_an_externally_written_checkpoint_under_verification(tmp_path):
+    out, exp, ck = _upstream_layout(tmp_path)
+    adopted = ck.adopt_existing()
+    assert sorted(r.step for r in adopted) == [14000, 15000]
+    rec = ck.resolve()
+    assert rec.step == 15000
+    assert rec.sha256 == sha256_file(exp / "recovery_ckpt_iter_15000.pt")
+    ok, why = verify_pointer(out)
+    assert ok, why
+    # adoption is idempotent: a second pass adopts nothing and changes no record
+    assert ck.adopt_existing() == []
+    assert [r.step for r in ck.read_index()] == [15000, 14000]
+
+
+def test_adopt_rolls_back_past_a_torn_upstream_checkpoint(tmp_path):
+    """`fabric.save` (model_base.py:417) is not atomic, so a kill leaves a truncated .pt."""
+    out, exp, ck = _upstream_layout(tmp_path)
+    with open(exp / "recovery_ckpt_iter_15000.pt", "r+b") as fh:
+        fh.truncate(7)
+    ck.adopt_existing()
+    assert [r.step for r in ck.read_index()] == [14000], "a torn file must not be adopted"
+    rec = ck.resolve()
+    assert rec.step == 14000
+    assert (out / "recovery_ckpt").read_text().strip() == str(exp / "ckpt_iter_14000_0.4412.pt")
+
+
+def test_adopt_refuses_partial_and_corrupt_files(tmp_path):
+    out, exp, ck = _upstream_layout(tmp_path)
+    partial = exp / "recovery_ckpt_iter_16000.pt.partial"
+    partial.write_bytes(b"torn")
+    with pytest.raises(CheckpointCorrupt, match="refusing to adopt"):
+        ck.adopt(partial)
+    with pytest.raises(CheckpointCorrupt, match="cannot adopt a missing file"):
+        ck.adopt(exp / "nope.pt")
+    ck.adopt_existing()
+    assert not any(r.path.endswith(".partial") for r in ck.read_index())
+
+
+def test_step_is_parsed_from_upstream_validation_checkpoint_names():
+    """`ckpt_iter_250_0.4412.pt` must read as step 250, not as the loss `0`."""
+    from lurestar.durable_checkpoint import _step_from_name
+
+    assert _step_from_name("ckpt_iter_250_0.4412.pt") == 250
+    assert _step_from_name("recovery_ckpt_iter_15000.pt") == 15000
+    assert _step_from_name("recovery_ckpt_iter_15000.pt.partial") == 15000
+    assert _step_from_name("recovery_ckpt_iter_15000.pt.meta.json") == 15000
+    assert _step_from_name("final_ckpt_iter_300.pt") == 300
+    assert _step_from_name("no_digits_here.pt") is None

@@ -250,8 +250,11 @@ def test_psi_recovers_a_known_value_on_an_analytic_geometry():
     # A global offset, to prove the recovery does not depend on the pool sitting at 0.
     offset = 5.0 * rng.standard_normal(dim)
     base, safe, crit = base + offset, safe + offset, crit + offset
-    pool = np.vstack([base, safe, crit])
-    assert np.allclose(R.centering_mean(pool), offset, atol=1e-12)
+    pool = R.CenteringPool.from_conditions(
+        base=base, near_safe=safe, near_critical=crit,
+        declared_missing=("repeat", "far_critical"),   # analytic geometry, not a real cell
+    )
+    assert np.allclose(pool.mean, offset, atol=1e-12)
 
     dist = E.psi_distances_centered_cosine(base, crit, safe, centering_pool=pool)
     per_item = E.psi_items(dist["d_critical"], dist["d_safe"])
@@ -268,7 +271,10 @@ def test_psi_recovers_a_known_value_on_an_analytic_geometry():
     # must drive the known PSI to exactly zero.
     s2 = math.cos(alpha_s) * e0 + math.sin(alpha_s) * e2
     crit_null = np.vstack([s2] * n_pairs + [-s2] * n_pairs) + offset
-    pool_null = np.vstack([base, safe, crit_null])
+    pool_null = R.CenteringPool.from_conditions(
+        base=base, near_safe=safe, near_critical=crit_null,
+        declared_missing=("repeat", "far_critical"),
+    )
     dnull = E.psi_distances_centered_cosine(base, crit_null, safe, centering_pool=pool_null)
     assert abs(float(E.psi_items(dnull["d_critical"], dnull["d_safe"]).mean())) < 1e-12
 
@@ -293,12 +299,17 @@ def test_psi_distances_center_on_the_DECLARED_pool_and_not_on_the_scored_pair():
     # and it is what pulls the declared mean away from the scored triple's own mean.
     far = base + 3.0 + 1.5 * rng.standard_normal((n, dim))
 
-    declared_pool = np.vstack([base, repeat, safe, crit, far])
+    declared_pool = R.CenteringPool.from_conditions(
+        base=base, repeat=repeat, near_safe=safe, near_critical=crit, far_critical=far
+    )
     out = E.psi_distances_centered_cosine(base, crit, safe, centering_pool=declared_pool)
 
     assert out["centering_pool_n"] == 5 * n
-    want_c = R.centered_cosine_distance(base, crit, mean=R.centering_mean(declared_pool))
-    want_s = R.centered_cosine_distance(base, safe, mean=R.centering_mean(declared_pool))
+    assert out["centering_pool"]["complete"] is True
+    assert out["centering_pool"]["conditions"] == list(R.CENTERING_POOL_CONDITIONS)
+    stacked = np.vstack([base, repeat, safe, crit, far])
+    want_c = R.centered_cosine_distance(base, crit, mean=R.centering_mean(stacked))
+    want_s = R.centered_cosine_distance(base, safe, mean=R.centering_mean(stacked))
     assert np.allclose(out["d_critical"], want_c, rtol=0, atol=1e-12)
     assert np.allclose(out["d_safe"], want_s, rtol=0, atol=1e-12)
 
@@ -613,7 +624,12 @@ def test_whitened_euclidean_equals_mahalanobis_under_the_same_covariance():
     a = rng.multivariate_normal(np.zeros(dim), true_cov, size=40)
     b = rng.multivariate_normal(np.zeros(dim), true_cov, size=40)
 
-    got = w.distance(a, b)
+    scored_ids = list(range(10_000, 10_040))          # disjoint from the fitting pool
+    got = w.distance(a, b, item_ids=scored_ids)
+    # A whitener fit WITH ids refuses to score a batch that supplies none: the held-out
+    # claim has to stay checkable, not become opt-in at the call site.
+    with pytest.raises(R.LeakageError, match="must supply"):
+        w.distance(a, b)
     diff = a - b
     want = np.sqrt(np.einsum("ij,ij->i", diff, np.linalg.solve(w.covariance, diff.T).T))
     assert np.allclose(got, want, rtol=0, atol=1e-9)
@@ -688,7 +704,10 @@ def test_psi_under_both_metrics_agrees_on_the_sign_of_a_planted_effect():
     base = rng.standard_normal((n, dim))
     safe = base + 0.20 * rng.standard_normal((n, dim))
     crit = base + 0.60 * rng.standard_normal((n, dim))
-    pool = np.vstack([base, safe, crit])
+    pool = R.CenteringPool.from_conditions(
+        base=base, near_safe=safe, near_critical=crit,
+        declared_missing=("repeat", "far_critical"),
+    )
 
     prim = E.psi_distances_centered_cosine(base, crit, safe, centering_pool=pool)
     psi_prim = E.psi_items(prim["d_critical"], prim["d_safe"]).mean()
@@ -811,3 +830,380 @@ def test_hidden_state_hook_stores_what_it_is_given():
 
     hook(None, None, _Fake())
     assert store["h"] == "detached-(B,T,384)"
+
+
+# =====================================================================================
+# 10. The centering pool is CONSTRUCTED AND CHECKED, not merely named
+#     (adversarial review, docs/review/representations.md findings 1 and 2)
+# =====================================================================================
+
+
+def _quartet_states(n=60, dim=12, seed=909):
+    rng = np.random.default_rng(seed)
+    base = rng.standard_normal((n, dim))
+    return {
+        "base": base,
+        "repeat": base + 0.05 * rng.standard_normal((n, dim)),
+        "near_safe": base + 0.25 * rng.standard_normal((n, dim)),
+        "near_critical": base + 0.55 * rng.standard_normal((n, dim)),
+        "far_critical": base + 3.0 + 1.5 * rng.standard_normal((n, dim)),
+    }
+
+
+def test_psi_refuses_a_bare_array_as_the_centering_pool():
+    """The mutation that used to survive was the CALLER, not the implementation.
+
+    Passing the scored triple as a raw ndarray produced a plausible number and no
+    complaint.  It is now a TypeError, so the wrong pool is inexpressible rather than
+    merely discouraged.
+    """
+    st = _quartet_states()
+    with pytest.raises(TypeError, match="CenteringPool.from_conditions"):
+        E.psi_distances_centered_cosine(
+            st["base"], st["near_critical"], st["near_safe"],
+            centering_pool=np.vstack([st["base"], st["near_critical"], st["near_safe"]]),
+        )
+
+
+def test_centering_pool_refuses_to_drop_a_condition_silently():
+    """Omitting far_critical must be a recorded statement, never an omission."""
+    st = _quartet_states()
+    with pytest.raises(ValueError, match="neither supplied nor listed in declared_missing"):
+        R.CenteringPool.from_conditions(
+            base=st["base"], near_safe=st["near_safe"], near_critical=st["near_critical"]
+        )
+    # Declared explicitly: allowed, and the omission travels with the number.
+    pool = R.CenteringPool.from_conditions(
+        base=st["base"], near_safe=st["near_safe"], near_critical=st["near_critical"],
+        declared_missing=("repeat", "far_critical"),
+    )
+    out = E.psi_distances_centered_cosine(
+        st["base"], st["near_critical"], st["near_safe"], centering_pool=pool
+    )
+    assert out["centering_pool"]["complete"] is False
+    assert out["centering_pool"]["declared_missing"] == ["far_critical", "repeat"]
+    # ...and it really is a different number from the complete pool, which is why the
+    # declaration has to be visible in the serialized metric.
+    full = R.CenteringPool.from_conditions(**st)
+    out_full = E.psi_distances_centered_cosine(
+        st["base"], st["near_critical"], st["near_safe"], centering_pool=full
+    )
+    assert out_full["centering_pool"]["complete"] is True
+    psi_part = float(E.psi_items(out["d_critical"], out["d_safe"]).mean())
+    psi_full = float(E.psi_items(out_full["d_critical"], out_full["d_safe"]).mean())
+    assert abs(psi_part - psi_full) > 1e-3, (
+        "if dropping far_critical did not move PSI here, this test could not detect the "
+        "substitution it exists to detect"
+    )
+
+
+def test_centering_pool_rejects_a_pool_from_a_different_cell():
+    """A pool of the right SHAPE but the wrong states must be rejected outright.
+
+    This is the probe that used to pass: seven rows of pure noise silently collapsed PSI
+    from 0.078 to 0.0004 with no error and a cheerful `centering_pool_n` of 7.
+    """
+    st = _quartet_states()
+    other = _quartet_states(seed=1010)          # a different (model, seed) cell
+    wrong = R.CenteringPool.from_conditions(**other)
+    with pytest.raises(ValueError, match="not in the centering pool"):
+        E.psi_distances_centered_cosine(
+            st["base"], st["near_critical"], st["near_safe"], centering_pool=wrong
+        )
+    # Only one condition swapped is still a leak of the wrong cell, and still caught.
+    mixed = R.CenteringPool.from_conditions(
+        base=st["base"], repeat=st["repeat"], near_safe=st["near_safe"],
+        near_critical=other["near_critical"], far_critical=st["far_critical"],
+    )
+    with pytest.raises(ValueError, match="`h_near_critical`"):
+        E.psi_distances_centered_cosine(
+            st["base"], st["near_critical"], st["near_safe"], centering_pool=mixed
+        )
+
+
+def test_centering_pool_rejects_unknown_and_double_declared_conditions():
+    st = _quartet_states()
+    with pytest.raises(ValueError, match="unknown centering-pool condition"):
+        R.CenteringPool.from_conditions(base=st["base"], nearsafe=st["near_safe"])
+    with pytest.raises(ValueError, match="both supplied and declared missing"):
+        R.CenteringPool.from_conditions(
+            **st, declared_missing=("far_critical",)
+        )
+    pool = R.CenteringPool.from_conditions(**st)
+    assert pool.n == 5 * 60
+    assert pool.counts == (60, 60, 60, 60, 60)
+    with pytest.raises(ValueError, match="were not pooled"):
+        R.CenteringPool.from_conditions(
+            base=st["base"], repeat=st["repeat"], near_critical=st["near_critical"],
+            far_critical=st["far_critical"], declared_missing=("near_safe",),
+        ).require_conditions("base", "near_safe", "near_critical")
+
+
+def test_pool_mean_equals_the_stacked_mean_and_ordering_is_canonical():
+    """Determinism: the mean must not depend on the order the kwargs were written in."""
+    st = _quartet_states()
+    a = R.CenteringPool.from_conditions(**st)
+    shuffled = {k: st[k] for k in ("far_critical", "near_safe", "base", "near_critical", "repeat")}
+    b = R.CenteringPool.from_conditions(**shuffled)
+    assert a.conditions == b.conditions == R.CENTERING_POOL_CONDITIONS
+    assert np.array_equal(a.mean, b.mean)
+    stacked = np.vstack([st[c] for c in R.CENTERING_POOL_CONDITIONS])
+    assert np.allclose(a.mean, stacked.mean(axis=0), rtol=0, atol=1e-15)
+
+
+# =====================================================================================
+# 11. The leakage guard survives heterogeneous item ids
+# =====================================================================================
+
+
+def test_leakage_guard_is_not_defeated_by_mixed_id_types():
+    """A leaked INTEGER id used to vanish when the batch also carried a string id.
+
+    `frozenset(np.asarray(list(ids)).tolist())` casts [3, "x"] to ["3", "x"], so the
+    integer 3 stopped matching the integer 3 in the fitting pool and the guard reported
+    clean.  The fitting pool ids here are exactly the ones in the module's own example.
+    """
+    rng = np.random.default_rng(4)
+    pool = rng.standard_normal((10, 4))
+    w = R.Whitener.fit(pool, item_ids=list(range(10)))
+    a, b = rng.standard_normal((2, 4)), rng.standard_normal((2, 4))
+    with pytest.raises(R.LeakageError):
+        w.distance(a, b, item_ids=[3, 4])
+    with pytest.raises(R.LeakageError):
+        w.distance(a, b, item_ids=[3, "an_unrelated_id"])
+    w.distance(a, b, item_ids=[900, "an_unrelated_id"])          # genuinely disjoint
+
+
+def test_reported_whitened_metric_demands_a_checkable_heldout_claim():
+    rng = np.random.default_rng(5)
+    st = _quartet_states(n=20, dim=4)
+    unchecked = R.Whitener.fit(rng.standard_normal((50, 4)))     # fit without ids
+    assert unchecked.report()["pool_is_heldout"] is False
+    with pytest.raises(R.LeakageError, match="fit without item_ids"):
+        E.psi_distances_whitened(
+            st["base"], st["near_critical"], st["near_safe"],
+            whitener=unchecked, item_ids=[f"q{i}" for i in range(20)],
+        )
+    checked = R.Whitener.fit(
+        rng.standard_normal((50, 4)), item_ids=[f"h{i}" for i in range(50)]
+    )
+    with pytest.raises(R.LeakageError, match="item_ids is required"):
+        E.psi_distances_whitened(
+            st["base"], st["near_critical"], st["near_safe"], whitener=checked
+        )
+    ok = E.psi_distances_whitened(
+        st["base"], st["near_critical"], st["near_safe"],
+        whitener=checked, item_ids=[f"q{i}" for i in range(20)],
+    )
+    assert ok["whitener"]["pool_is_heldout"] is True
+
+
+# =====================================================================================
+# 12. LAYER B: the GPT/NextLat asymmetry, made executable without a GPU
+#
+# `forward_states_and_logits` is the crux of this track: GPT returns (logits, h) while
+# NextLat early-returns (token_embeds, text_embd) BEFORE lm_head.  Getting it backwards
+# yields plausible-looking numbers and destroys every H1/H2/H3 result.  Until now the
+# whole of Layer B was untested — deleting the architecture check, or applying lm_head to
+# GPT's own logits, left the suite green.  These tests inject a numpy-backed stub `torch`
+# so both branches actually run on a CPU-only host.
+# =====================================================================================
+
+
+class _FakeTensor:
+    """Just enough tensor for Layer B: it does no arithmetic beyond what Layer B does."""
+
+    def __init__(self, a):
+        self.a = np.asarray(a)
+
+    @property
+    def ndim(self):
+        return self.a.ndim
+
+    @property
+    def shape(self):
+        return self.a.shape
+
+    @property
+    def device(self):
+        return "cpu"
+
+    def __getitem__(self, k):
+        return _FakeTensor(self.a[k])
+
+    def to(self, device):
+        return self
+
+    def index_select(self, dim, index):
+        return _FakeTensor(np.take(self.a, np.asarray(index.a), axis=dim))
+
+    def float(self):
+        return _FakeTensor(self.a.astype(np.float32))
+
+    def cpu(self):
+        return self
+
+    def numpy(self):
+        return self.a
+
+    def detach(self):
+        return self
+
+
+def _install_stub_torch(monkeypatch):
+    import contextlib
+    import sys
+    import types
+
+    stub = types.ModuleType("torch")
+    stub.long = np.int64
+
+    def as_tensor(x, dtype=None, device=None):
+        if isinstance(x, _FakeTensor):
+            return x
+        return _FakeTensor(np.asarray(x, dtype=dtype))
+
+    stub.as_tensor = as_tensor
+    stub.no_grad = contextlib.contextmanager(lambda: iter([None]))
+    monkeypatch.setitem(sys.modules, "torch", stub)
+    return stub
+
+
+# One fixed projection, so "logits" are a deterministic function of the state.
+_HEAD = np.arange(6 * 5, dtype=np.float64).reshape(6, 5) / 7.0 - 1.0
+
+
+def _embed(tokens):
+    """(B, T) ints -> (B, T, 6) 'token embeddings'.  NOT the post-norm state."""
+    t = np.asarray(tokens, dtype=np.float64)
+    return np.stack([t + k for k in range(6)], axis=-1)
+
+
+def _post_norm(tokens):
+    """(B, T) ints -> (B, T, 6) 'transformer.norm(x)'.  Deliberately != _embed."""
+    return np.tanh(_embed(tokens) * 0.3) + 0.5
+
+
+class _FakeGPT:
+    """Mimics upstream models/model_gpt.py:276-291 with targets=None."""
+
+    def __init__(self):
+        self.training = False
+        self.calls = 0
+
+    def eval(self):
+        pass
+
+    def lm_head(self, h):
+        return _FakeTensor(np.asarray(h.a) @ _HEAD)
+
+    def __call__(self, tokens, return_hidden_states=False, **kw):
+        self.calls += 1
+        h = _post_norm(tokens.a if isinstance(tokens, _FakeTensor) else tokens)
+        logits = h @ _HEAD                      # model_gpt.py:280  output = lm_head(x)
+        if return_hidden_states:
+            return _FakeTensor(logits), _FakeTensor(h)      # model_gpt.py:291
+        return _FakeTensor(logits)
+
+
+class _FakeNextLat:
+    """Mimics upstream models/model_nextlat.py:192-200 — the EARLY return."""
+
+    def __init__(self):
+        self.training = False
+        self.calls = 0
+
+    def eval(self):
+        pass
+
+    def lm_head(self, h):                        # model_nextlat.py:121
+        return _FakeTensor(np.asarray(h.a) @ _HEAD)
+
+    def __call__(self, tokens, return_hidden_states=False, **kw):
+        self.calls += 1
+        tok = tokens.a if isinstance(tokens, _FakeTensor) else tokens
+        token_embeds = _embed(tok)               # model_nextlat.py:193
+        text_embd = _post_norm(tok)              # model_nextlat.py:197
+        if return_hidden_states:
+            # model_nextlat.py:199-200 — returns BEFORE lm_head is ever applied.
+            return _FakeTensor(token_embeds), _FakeTensor(text_embd)
+        return _FakeTensor(text_embd @ _HEAD)
+
+
+_STUB_TOKENS = np.array(
+    [[3, 7, 2, 9, 4, 1], [5, 5, 8, 0, 6, 2], [1, 2, 3, 4, 5, 6]], dtype=np.int64
+)
+
+
+def test_layer_b_gpt_uses_the_returned_logits_and_does_not_reapply_the_head(monkeypatch):
+    _install_stub_torch(monkeypatch)
+    m = _FakeGPT()
+    h, logits = R.forward_states_and_logits(m, _FakeTensor(_STUB_TOKENS), architecture="gpt")
+    want_h = _post_norm(_STUB_TOKENS)
+    assert np.allclose(h.a, want_h)
+    assert np.allclose(logits.a, want_h @ _HEAD)
+    # Discrimination.  The state has 6 features and the head projects to a 5-token vocab,
+    # so the two returns are not interchangeable: swapping them (returning the logits as
+    # the hidden state, which is what dropping the GPT branch would do) changes the last
+    # dimension and is caught here rather than 20,000 items later.
+    assert h.a.shape == (3, 6, 6) and logits.a.shape == (3, 6, 5)
+    assert h.a.shape[-1] != logits.a.shape[-1]
+
+
+def test_layer_b_nextlat_applies_lm_head_and_never_returns_token_embeds(monkeypatch):
+    _install_stub_torch(monkeypatch)
+    m = _FakeNextLat()
+    h, logits = R.forward_states_and_logits(
+        m, _FakeTensor(_STUB_TOKENS), architecture="nextlat"
+    )
+    want_h = _post_norm(_STUB_TOKENS)
+    token_embeds = _embed(_STUB_TOKENS)
+    assert np.allclose(h.a, want_h), "the SECOND return value is the post-norm state"
+    assert not np.allclose(h.a, token_embeds), (
+        "returning token_embeds as the hidden state is the silent way to destroy every "
+        "geometry result; the two must be distinguishable here"
+    )
+    assert np.allclose(logits.a, want_h @ _HEAD), "lm_head must be applied by the caller"
+    # The GPT branch applied to NextLat would return `first` — the token embeddings — as
+    # the logits.  Those have the state's 6 features, not the vocabulary's 5.
+    assert logits.a.shape == (3, 6, 5) and token_embeds.shape == (3, 6, 6)
+    # And applying lm_head to token_embeds instead of to the post-norm state is a
+    # different array of the SAME shape, so shape alone would not have caught it.
+    assert (token_embeds @ _HEAD).shape == logits.a.shape
+    assert not np.allclose(logits.a, token_embeds @ _HEAD)
+
+
+def test_layer_b_architecture_name_is_validated_before_torch_is_touched():
+    """Reachable on a host with no torch, which is the only way it is ever checked."""
+    with pytest.raises(ValueError, match="must be 'gpt' or 'nextlat'"):
+        R.forward_states_and_logits(object(), None, architecture="mamba")
+    with pytest.raises(ValueError, match="must be 'gpt' or 'nextlat'"):
+        R.forward_states_and_logits(object(), None, architecture="")
+
+
+def test_extract_positions_returns_both_frozen_indices_for_both_architectures(monkeypatch):
+    _install_stub_torch(monkeypatch)
+    want_h = _post_norm(_STUB_TOKENS)
+    for arch, model in (("gpt", _FakeGPT()), ("nextlat", _FakeNextLat())):
+        out = R.extract_positions(
+            model, _STUB_TOKENS, architecture=arch, positions=(2, 3), batch_size=2
+        )
+        assert model.calls == 2, "batching must actually chunk"
+        assert out["positions"].tolist() == [2, 3]
+        assert out["hidden"].shape == (3, 2, 6)
+        assert out["logits"].shape == (3, 2, 5)
+        assert np.allclose(out["hidden"], want_h[:, [2, 3], :], atol=1e-6)
+        assert np.allclose(out["logits"], (want_h @ _HEAD)[:, [2, 3], :], atol=1e-5)
+        # Order matters: position 2 is not position 3.
+        assert not np.allclose(out["hidden"][:, 0], out["hidden"][:, 1])
+
+
+def test_extract_positions_defaults_to_the_frozen_pair_and_rejects_bad_positions(monkeypatch):
+    _install_stub_torch(monkeypatch)
+    tokens = np.tile(np.arange(69, dtype=np.int64), (2, 1))
+    out = R.extract_positions(_FakeGPT(), tokens, architecture="gpt", batch_size=8)
+    assert out["positions"].tolist() == [R.PSI_EXTRACTION_INDEX, R.BRANCH_MARGIN_INDEX] == [62, 63]
+    with pytest.raises(ValueError, match="outside the sequence"):
+        R.extract_positions(_FakeGPT(), tokens, architecture="gpt", positions=(62, 69))
+    with pytest.raises(ValueError, match="outside the sequence"):
+        R.extract_positions(_FakeGPT(), tokens, architecture="gpt", positions=(-1, 63))

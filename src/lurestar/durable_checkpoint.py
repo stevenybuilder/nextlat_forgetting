@@ -481,10 +481,16 @@ class DurableCheckpointer:
             self._write_index(survivors)
 
         if chosen is None:
-            # Nothing in the index survived. Clear the pointer so upstream's
-            # `assert os.path.isfile` (core_train.py:148-150) does not hard-fail the resume;
-            # with no pointer it falls through to a scratch init (core_train.py:164-168).
-            self.pointer_path.unlink(missing_ok=True)
+            # Nothing THIS LAYER indexed survived. Clear the pointer only when we are entitled
+            # to: either we had records of our own and they all failed, or the pointer on disk
+            # is dangling and would hard-fail upstream's `assert os.path.isfile`
+            # (core_train.py:148-150). An EMPTY index means we have simply never checkpointed
+            # this job -- the pointer there is upstream's own (core_train.py:968-974) and may
+            # be aimed at a perfectly good 15,000-step checkpoint. Deleting that would turn a
+            # resumable run into a restart from scratch, which is the opposite of this class's
+            # purpose. Adopt it with `adopt_existing()` instead.
+            if records or self._pointer_is_dangling():
+                self.pointer_path.unlink(missing_ok=True)
             return None
 
         # Reconcile the pointer: a kill between the index write and the pointer write leaves
@@ -494,6 +500,104 @@ class DurableCheckpointer:
         if current != target:
             atomic_write_text(self.pointer_path, target, fsync=self.fsync)
         return chosen
+
+    def _pointer_is_dangling(self) -> bool:
+        """True if the pointer exists but cannot resolve to a readable file.
+
+        `core_train.py:145-150` reads `recovery_ckpt` and then asserts the target is a file,
+        so a pointer at a deleted or half-written target hard-fails the whole resume. That one
+        we are entitled to clear even when the record is not ours.
+        """
+        if not self.pointer_path.is_file():
+            return False
+        try:
+            target = self.pointer_path.read_text().strip()
+        except OSError:
+            return True
+        if not target or target.endswith(PARTIAL_SUFFIX):
+            return True
+        return not pathlib.Path(target).is_file()
+
+    # ---- adoption --------------------------------------------------------------------
+    def adopt(
+        self,
+        path: os.PathLike | str,
+        *,
+        step: int | None = None,
+        kind: str = "adopted",
+        extra: dict | None = None,
+        update_pointer: bool = False,
+        prune: bool = False,
+    ) -> CheckpointRecord:
+        """Bring a checkpoint written by someone else under this layer's verification.
+
+        Upstream writes its checkpoints with `fabric.save` (`models/model_base.py:417`) and
+        knows nothing about our index, so without this the index is permanently empty for
+        every real job and `resolve()` reports "no checkpoint" next to 274 MB of valid
+        weights. Adoption applies the same gate a `save()` does -- size, sha256 and an actual
+        deserialization -- and only then writes the sidecar and indexes the record.
+
+        Retention is deliberately NOT applied to adopted files by default: upstream owns the
+        lifecycle of its `latest`/`best` checkpoints (`core_train.py:774-777`) and deleting
+        them is not ours to do.
+        """
+        p = pathlib.Path(path).resolve()
+        if p.name.endswith(PARTIAL_SUFFIX) or p.name.endswith(CORRUPT_SUFFIX):
+            raise CheckpointCorrupt(f"refusing to adopt {p.name}")
+        if not p.is_file():
+            raise CheckpointCorrupt(f"cannot adopt a missing file: {p}")
+        if step is None:
+            step = _step_from_name(p.name)
+            if step is None:
+                raise ValueError(f"cannot infer a step from {p.name}; pass step=")
+        try:
+            self.load_fn(p)
+        except Exception as exc:  # noqa: BLE001
+            raise CheckpointCorrupt(f"{p} did not deserialize: {exc!r}") from exc
+
+        rec = CheckpointRecord(
+            path=str(p), step=int(step), sha256=sha256_file(p),
+            size_bytes=p.stat().st_size, saved_at=self.clock(), kind=kind,
+            run_id=self.run_id, extra=dict(extra or {}),
+        )
+        atomic_write_json(
+            p.with_name(p.name + META_SUFFIX), rec.to_dict(), fsync=self.fsync
+        )
+        records = [r for r in self.read_index() if r.path != rec.path]
+        records.insert(0, rec)
+        records.sort(key=lambda r: (r.step, r.saved_at), reverse=True)
+        self._write_index(records)
+        if update_pointer:
+            self._write_pointer(rec)
+        if prune:
+            self.prune()
+        self._log(f"durable: adopted step {step} <- {p.name} sha {rec.sha256[:12]}")
+        return rec
+
+    def adopt_existing(self, *, update_pointer: bool = False) -> list[CheckpointRecord]:
+        """Adopt every not-yet-indexed `.pt` under the checkpoint directory.
+
+        Called by the runner before it plans a resume, so that a job launched through
+        upstream `train.py` -- which is every real job -- has an index to resolve against.
+        Files that fail verification are skipped, not quarantined: a torn file that upstream
+        is still mid-write on is not ours to rename.
+        """
+        known = {r.path for r in self.read_index()}
+        adopted: list[CheckpointRecord] = []
+        for p in sorted(self.ckpt_dir.glob("*.pt")):
+            rp = str(p.resolve())
+            if rp in known:
+                continue
+            try:
+                adopted.append(self.adopt(p))
+            except (CheckpointCorrupt, ValueError, OSError) as exc:
+                self._log(f"durable: not adopting {p.name}: {exc!r}")
+        if adopted and update_pointer:
+            newest = max(adopted, key=lambda r: (r.step, r.saved_at))
+            current = self.resolve(deep=False)
+            if current is not None and current.path == newest.path:
+                self._write_pointer(newest)
+        return adopted
 
     def _quarantine(self, rec: CheckpointRecord) -> None:
         p = pathlib.Path(rec.path)
@@ -624,8 +728,22 @@ class DurableCheckpointer:
 
 
 def _step_from_name(name: str) -> int | None:
-    stem = name.split(".")[0]
-    for token in reversed(stem.split("_")):
+    """Step number out of a checkpoint filename.
+
+    `name.split(".")[0]` is wrong for upstream's validation checkpoints: they are named
+    `ckpt_iter_{step}_{val_loss:.4f}.pt` (`core_train.py:774-777`), so splitting on the first
+    dot yields `ckpt_iter_250_0` and "the last numeric token" is the *loss*, not the step.
+    Strip known suffixes instead, and prefer the token immediately after `iter`.
+    """
+    stem = name
+    for suffix in (PARTIAL_SUFFIX, CORRUPT_SUFFIX, META_SUFFIX, ".pt"):
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+    tokens = stem.split("_")
+    for i, token in enumerate(tokens[:-1]):
+        if token == "iter" and tokens[i + 1].isdigit():
+            return int(tokens[i + 1])
+    for token in reversed(tokens):
         if token.isdigit():
             return int(token)
     return None
