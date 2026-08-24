@@ -910,6 +910,28 @@ def test_centering_pool_rejects_a_pool_from_a_different_cell():
         E.psi_distances_centered_cosine(
             st["base"], st["near_critical"], st["near_safe"], centering_pool=wrong
         )
+    # Each scored argument is checked on its own, so a pool that is right for two of the
+    # three still fails on the third.  Without a case per argument, dropping any single
+    # containment check would leave the suite green.
+    base_only_foreign = R.CenteringPool.from_conditions(
+        base=other["base"], repeat=st["repeat"], near_safe=st["near_safe"],
+        near_critical=st["near_critical"], far_critical=st["far_critical"],
+    )
+    with pytest.raises(ValueError, match="`h_base`"):
+        E.psi_distances_centered_cosine(
+            st["base"], st["near_critical"], st["near_safe"],
+            centering_pool=base_only_foreign,
+        )
+    safe_only_foreign = R.CenteringPool.from_conditions(
+        base=st["base"], repeat=st["repeat"], near_safe=other["near_safe"],
+        near_critical=st["near_critical"], far_critical=st["far_critical"],
+    )
+    with pytest.raises(ValueError, match="`h_near_safe`"):
+        E.psi_distances_centered_cosine(
+            st["base"], st["near_critical"], st["near_safe"],
+            centering_pool=safe_only_foreign,
+        )
+
     # Only one condition swapped is still a leak of the wrong cell, and still caught.
     mixed = R.CenteringPool.from_conditions(
         base=st["base"], repeat=st["repeat"], near_safe=st["near_safe"],
@@ -972,6 +994,15 @@ def test_leakage_guard_is_not_defeated_by_mixed_id_types():
     with pytest.raises(R.LeakageError):
         w.distance(a, b, item_ids=[3, "an_unrelated_id"])
     w.distance(a, b, item_ids=[900, "an_unrelated_id"])          # genuinely disjoint
+
+    # The same coercion at FIT time is just as fatal: the pool's own integer id 3 would
+    # be stored as the string "3" and would then never match the integer 3 being scored.
+    w_mixed = R.Whitener.fit(pool[:2], item_ids=[3, "a_string_id"])
+    assert w_mixed.fit_item_ids == frozenset({3, "a_string_id"})
+    with pytest.raises(R.LeakageError):
+        w_mixed.distance(a, b, item_ids=[3, 4])
+    with pytest.raises(R.LeakageError):
+        w_mixed.distance(a, b, item_ids=["a_string_id", 4])
 
 
 def test_reported_whitened_metric_demands_a_checkable_heldout_claim():
@@ -1094,8 +1125,14 @@ class _FakeGPT:
     def eval(self):
         pass
 
+    # Deliberately NOT the projection used inside __call__.  Upstream the two coincide
+    # (model_gpt.py:280 is literally `self.lm_head(x)`), but the contract is "use the
+    # value the model returned", not "recompute it from the state with whatever head
+    # attribute happens to be reachable" — a distinction that matters the moment a head
+    # is tied, fused or quantized.  Making them differ here turns that contract into a
+    # test instead of a comment.
     def lm_head(self, h):
-        return _FakeTensor(np.asarray(h.a) @ _HEAD)
+        return _FakeTensor(np.asarray(h.a) @ (_HEAD + 3.0))
 
     def __call__(self, tokens, return_hidden_states=False, **kw):
         self.calls += 1
@@ -1148,6 +1185,9 @@ def test_layer_b_gpt_uses_the_returned_logits_and_does_not_reapply_the_head(monk
     # dimension and is caught here rather than 20,000 items later.
     assert h.a.shape == (3, 6, 6) and logits.a.shape == (3, 6, 5)
     assert h.a.shape[-1] != logits.a.shape[-1]
+    # ...and the logits are the model's OWN first return, not a recomputation through a
+    # separately reachable head attribute.
+    assert not np.allclose(logits.a, m.lm_head(_FakeTensor(want_h)).a)
 
 
 def test_layer_b_nextlat_applies_lm_head_and_never_returns_token_embeds(monkeypatch):

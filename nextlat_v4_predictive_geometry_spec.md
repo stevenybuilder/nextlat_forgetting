@@ -7,7 +7,9 @@
 
 ## Instructions for Claude
 
-Treat this document as the sole project specification. Reuse the official NextLat implementation and its Path-Star task. Do not broaden the benchmark suite, rewrite NextLat, add large language models, or turn neuroscience analogies into biological claims.
+Treat this document as the working project specification. It is revisable: where a constraint below turns out to be wrong, impossible, or to cost more than it buys, revise it in writing with the reasoning and the compute consequence, rather than working around it silently.
+
+Reuse the official NextLat implementation. Path-Star is the confirmatory benchmark and the HMM supplies exact ground truth. Adding further benchmarks is a budget and wall-clock decision, not a matter of principle - price it before proposing it, and say what it displaces. Manhattan was priced and declined on cost; see section 14. Two constraints are not budget decisions and hold throughout: keep the neuroscience an explicitly-labelled computational analogy rather than a biological claim, and keep every claim at the evidence rung it can actually earn.
 
 Work in this order:
 
@@ -21,7 +23,9 @@ Work in this order:
 8. Train and evaluate the required HMM belief-geometry experiment.
 9. Attempt causal patching only if all required results are complete.
 
-Record exact commits, configs, seeds, commands, GPU type, runtime, peak VRAM, checkpoint lineage, artifact hashes, results, and failures. Do not push code, rent compute, or exceed the budget without explicit approval.
+Record exact commits, configs, seeds, commands, GPU type, runtime, peak VRAM, checkpoint lineage, artifact hashes, results, and failures.
+
+Publishing to a public GitHub repository is authorized, subject to no secrets, credentials, `.env` files, or service-account material leaving the machine. Renting paid compute outside the existing Colab balance, or exceeding an agreed compute budget, still needs explicit approval - price it and ask.
 
 ## 1. Executive decision
 
@@ -33,12 +37,12 @@ The weekend project asks two linked questions:
 
 This addresses a gap left by the paper: it measures compression and predictive performance but does not study the structure of the learned representation space.
 
-The scope is fixed:
+The scope, in priority order. Everything below the line competes for the same GPU budget, so the ordering is what matters:
 
 1. **Required experiment A:** Lure-Star geometry, planning behavior, and similarity-dependent interference.
 2. **Required experiment B:** HMM ground-truth Bayesian belief geometry.
-3. **Later ablation:** latent-dynamics bottleneck width.
-4. **Separate projects:** sparse autoencoders, attention-head/circuit reverse engineering, RL post-training, hierarchical latents, and speculative-decoding engineering.
+3. **Deferred, in order:** latent-dynamics bottleneck width; causal patching; the remaining two paper seeds; Manhattan geometry (priced at 3.2x the available compute balance - see section 14).
+4. **Out of scope for this project, because they are different research programs rather than missing pieces:** sparse autoencoders and monosemantic feature search, attention-head and circuit reverse engineering, RL post-training, hierarchical latent architectures, speculative-decoding engineering. If one of these turns out to be the cheapest way to answer a question actually raised here, price it and make the case; the point is that none of them is on the critical path.
 
 ## 2. What the paper establishes
 
@@ -99,7 +103,7 @@ Analyze the full hidden vector rather than searching for one neuron or attention
 
 Ask whether overlapping predictive states are more vulnerable to later learning. This makes geometry consequential rather than decorative.
 
-Do not claim a hippocampus, dentate gyrus, place cells, neural manifold homology, or brain-like circuits.
+Keep this an analogy and say so. Claims of a hippocampus, dentate gyrus, place cells, neural-manifold homology, or brain-like circuitry are not supported by anything measured here, and asserting them would be the fastest way to lose a reader who knows the neuroscience.
 
 ## 5. Core benchmark: Lure-Star
 
@@ -117,7 +121,7 @@ Use `G(5,5)` for the confirmatory Lure-Star experiment. Match the paper's full c
 - a 12-layer, 6-head, 384-dimensional transformer;
 - `mtp_horizon=3`, because `l-2=3`.
 
-Do not reduce the architecture, dataset, batch size, or training steps for reportable results. The paper used five seeds; this extension requires three preregistered confirmatory seeds and should run the remaining two paper seeds only if time permits. A tiny run may be used solely to test the data pipeline, checkpoint recovery, and metrics; it cannot contribute scientific results.
+Hold the architecture, dataset, batch size, and training steps at paper scale for the confirmatory Path-Star results; the profiling gate in section 11 exists to confirm that is affordable before launch, and it is (measured: 9.4 GPU-hours for Path-Star plus HMM). Where a benchmark cannot be afforded at paper scale, either run it at a stated reduced scale behind a competence gate and label every number with the scale it was produced at, or decline it on cost and record the price. Do not fake parity. The paper used five seeds; this extension requires three preregistered confirmatory seeds and should run the remaining two paper seeds only if time permits. A tiny run may be used solely to test the data pipeline, checkpoint recovery, and metrics; it cannot contribute scientific results.
 
 ### Exact matched stimuli
 
@@ -164,7 +168,7 @@ Create two disjoint pools before training:
 - `E_lure`: held-out quartets used only for H1/H2 behavior and geometry;
 - `A_pair/B_adapt`: fixed base-training items and their adaptation lures used only for H3.
 
-Use the same `A_pair` items for every model and seed. Do not select them based on model correctness. No `E_lure` graph or lure may enter base or adaptation training.
+Use the same `A_pair` items for every model and seed. Selecting them on model correctness would condition the stimulus set on the outcome being measured, which is the mechanism behind most irreproducible interference results. No `E_lure` graph or lure may enter base or adaptation training.
 
 ### Generator acceptance tests
 
@@ -178,7 +182,7 @@ For at least 1,000 quartets, verify automatically:
 - evaluation items are absent from training;
 - generation is deterministic under a recorded seed.
 
-If exact matching fails, stop and fix the generator. Do not regress away a stimulus-design error afterward.
+If exact matching fails, stop and fix the generator. A stimulus-design error cannot be regressed away afterward: the covariate you would adjust for is the thing the design was supposed to hold fixed, so the adjustment is unverifiable.
 
 ## 6. Preregistered hypotheses
 
@@ -238,7 +242,7 @@ Match near/far branches for:
 - optimizer and scheduler state;
 - learning rate and batch size.
 
-Generate a large `B_far` candidate bank before training. Use a separate, non-confirmatory pilot checkpoint to choose far items that match `B_near` loss quantiles, then freeze that mapping for every GPT/NextLat confirmatory seed. Do not select different far controls after inspecting each final model. Report any residual initial-loss imbalance and control for it in the item-level analysis.
+Generate a large `B_far` candidate bank before training. Use a separate, non-confirmatory pilot checkpoint to choose far items that match `B_near` loss quantiles, then freeze that mapping for every GPT/NextLat confirmatory seed. Choosing different far controls after inspecting each final model would make the near-versus-far contrast a function of the results it is meant to test. Report any residual initial-loss imbalance and control for it in the item-level analysis.
 
 Primary outcome:
 
@@ -259,7 +263,7 @@ Also report:
 
 Compute near-minus-far within each parent checkpoint, bootstrap paired items for 95% intervals, report every seed, and compare GPT versus NextLat using the model-by-distance difference-in-differences. Items do not substitute for independent training seeds.
 
-Path-Star has one consistent algorithm, so valid adaptation may produce little forgetting. Do not create contradictory labels or use an extreme learning rate to force a result. A clean null is acceptable.
+Path-Star has one consistent algorithm, so valid adaptation may produce little forgetting. Creating contradictory labels or reaching for an extreme learning rate would manufacture the interference rather than measure it. A clean null is a publishable outcome here and is reported as one.
 
 ## 7. Representation endpoint and optional causal test
 
@@ -277,7 +281,7 @@ Measure the change in correct-branch log odds. Controls:
 - random-graph patch;
 - norm-matched patch.
 
-Do not patch the final pre-logit state and call the resulting output change a discovered circuit; the output head consumes that state directly.
+Patching the final pre-logit state and calling the resulting output change a discovered circuit would be circular - the output head consumes that state directly, so the effect is guaranteed by construction.
 
 ## 8. Models and training
 
@@ -288,7 +292,7 @@ Do not patch the final pre-logit state and call the resulting output change a di
 
 ### Configuration authority
 
-At the pinned repository commit, copy the official Path-Star `G(5,5)` GPT and NextLat YAML configurations. Do not reconstruct an approximate configuration from this document. Permissible changes are limited to:
+At the pinned repository commit, copy the official Path-Star `G(5,5)` GPT and NextLat YAML configurations. Reconstructing an approximate configuration from this document silently drops keys the trainer requires - this already cost one failed run in this project, where a hand-written config died on a missing `test_generalization` key. Permissible changes are limited to:
 
 - the three preregistered confirmatory seeds;
 - output paths and experiment names;
@@ -296,7 +300,7 @@ At the pinned repository commit, copy the official Path-Star `G(5,5)` GPT and Ne
 - model-output hooks needed to save hidden states;
 - paths for the immutable lure and adaptation manifests.
 
-Do not change model width/depth, optimizer, learning-rate schedule, loss coefficients, effective batch size, base dataset size, or base training steps. The expected paper-scale values, which the materialized YAML must verify before launch, are:
+Hold model width/depth, optimizer, learning-rate schedule, loss coefficients, effective batch size, base dataset size, and base training steps fixed across the confirmatory runs. The reason is specific rather than ceremonial: this is a preregistered comparison, so a parameter tuned after seeing a result stops being a measurement. Changing one is permitted when it is written down in advance with its justification, applied identically to both models, and reported as a deviation. The expected paper-scale values, which the materialized YAML must verify before launch, are:
 
 ```yaml
 trainer:
@@ -336,7 +340,11 @@ Generate the paper's 200,000 fixed base-training graphs and 20,000 held-out grap
 
 Start H3 with 5,000 adaptation items and 500 updates. Change these only from a model-blind pilot, then freeze them across models, seeds, and near/far branches.
 
-Use the same fixed 20,000-step base schedule for GPT and NextLat. If either fails the base competence gate—initially 90% exact-path accuracy—debug data, configuration, numerical precision, and repository parity. Do not rescue the run by changing architecture, losses, step count, or graph topology.
+Use the same fixed 20,000-step base schedule for GPT and NextLat.
+
+The 90% exact-path competence gate applies to **NextLat only**. The paper's own Figure 6 puts GPT on `G(5,5)` at roughly 18.6%, which is 1/d chance: GPT failing Path-Star is the paper's headline result, not a bug to debug. Applying the gate to GPT would halt the project on a correct run. A GPT run materially *above* chance is the outcome that needs investigating. See `docs/DECISION_D20_competence_gate.md` for what this costs the cross-model contrast and how the analysis is reweighted in response.
+
+If NextLat misses its gate, debug data, configuration, numerical precision, and repository parity. Rescuing the run by changing architecture, losses, step count, or graph topology would convert a failed replication into an unfalsifiable one - the configuration is the hypothesis here.
 
 Set `compile:false`; the official README reports inconsistent Path-Star/A5 results with `torch.compile`, especially on Hopper GPUs.
 
@@ -348,7 +356,7 @@ fabric run --devices 1 --precision bf16-mixed train.py --config <config.yaml>
 
 Use `16-mixed` only when the assigned GPU lacks stable BF16 support. Run a 500-step profile before the sweep.
 
-Do not add MTP, LoRA, OP-Mix, replay, memory modules, or NextLat-depth sweeps. LoRA would add a known spectral/forgetting confound. If every required result finishes, repeat one NextLat seed with its auxiliary objective retained during adaptation; label it as an adaptation-objective follow-up.
+Leave MTP, LoRA, OP-Mix, replay, memory modules, and NextLat-depth sweeps out of the confirmatory path. LoRA in particular would add a known spectral/forgetting confound to the one analysis whose novelty depends on the forgetting being attributable to representation geometry. Any of them is a reasonable follow-up once the confirmatory results exist. If every required result finishes, repeat one NextLat seed with its auxiliary objective retained during adaptation; label it as an adaptation-objective follow-up.
 
 ## 9. Colab interruption and recovery contract
 
@@ -365,7 +373,7 @@ MyDrive/lurestar/
   run_ledger.json
 ```
 
-Use deterministic job IDs such as `nextlat-s1234-base` and `gpt-s1235-adapt-near`. Give every base/near/far job a separate output root; the official resume pointer lives at the output-root level and must never cross branches.
+Use deterministic job IDs such as `nextlat-s1234-base` and `gpt-s1235-adapt-near`. Give every base/near/far job a separate output root; the official resume pointer lives at the output-root level, and a pointer that crosses branches would silently make the near and far branches resume from each other, destroying H3 without any visible error.
 
 Before training, persist:
 
@@ -375,7 +383,7 @@ Before training, persist:
 - environment package list, PyTorch/CUDA versions, and GPU name;
 - immutable dataset/lure JSONL manifests and SHA-256 hashes.
 
-Never regenerate stimuli during resume.
+Regenerating stimuli during a resume would break the one guarantee the manifests exist to provide, namely that every seed and every branch saw byte-identical items.
 
 ### Atomic checkpoints
 
@@ -447,7 +455,7 @@ The strongest defensible claim is:
 
 > **NextLat does more than lower global representational rank: it preferentially organizes hidden states around distinctions that matter for future prediction, this organization predicts susceptibility to subsequent interference, and it better respects exact predictive-state relationships in a controlled HMM.**
 
-Do not claim biological pattern separation, minimal belief states, a unique manifold, or a solution to catastrophic forgetting.
+Four claims this design cannot support, whatever the numbers say: biological pattern separation, minimal belief states, a unique manifold, and a solution to catastrophic forgetting. The first is out of domain, the second and third are ruled out by the non-uniqueness of sufficient statistics, and the fourth is a scope claim no three-seed study earns.
 
 ### Stop conditions
 
@@ -469,7 +477,7 @@ Stop and document the result if:
 - Use CPU for generation, solver checks, bootstrapping, and plots.
 - Keep the confirmatory path on CUDA. The official implementation is PyTorch/Lightning, the paper's reported runs used NVIDIA GPUs, and moving to TPU would introduce a PyTorch/XLA or JAX port as an additional experimental variable.
 - Prefer an A100 40/80 GB, L40S, H100, A6000, or another reliable 24+ GB NVIDIA GPU. The paper reports runs on RTX A5000, H100 NVL, and B200 GPUs.
-- Treat free-Colab T4/L4 allocations as smoke-test or fallback resources unless the exact configuration passes memory and throughput profiling. Never silently reduce model scale to fit a runtime.
+- Treat free-Colab T4/L4 allocations as smoke-test or fallback resources unless the exact configuration passes memory and throughput profiling. Reducing model scale to fit a runtime is a scientific decision, not an operational one: if it happens, it is stated in the results table next to every number it produced.
 
 TPU is not the preferred Colab accelerator for this project. TPU availability does not remove Colab runtime limits, and the exact paper-scale Path-Star model fits on one suitable GPU without model or optimizer sharding. Do not spend the weekend reimplementing NextLat in JAX or validating PyTorch/XLA parity. Reconsider TPU only as a separate engineering follow-up after the CUDA experiment is complete.
 
@@ -482,7 +490,7 @@ Use [How to Scale Your Model](https://jax-ml.github.io/scaling-book/) as a conce
 - use the GPU chapter to reason about arithmetic intensity, batch size, and utilization;
 - use the profiling workflow's principle of measuring warm, steady-state execution rather than extrapolating from startup or compilation.
 
-Do not fork or import `jax-ml/scaling-book` into the experiment. Its repository contains the textbook source and embedded worked problems/quizzes, not a drop-in trainer for NextLat. Its JAX/XLA, TPU topology, FSDP, tensor-parallel, pipeline-parallel, multi-pod, LLaMA-70B, and large-scale inference exercises are outside scope. Our roughly tens-of-millions-parameter Path-Star transformer fits on one accelerator, so sharding would add communication and implementation risk without addressing a binding constraint.
+Use `jax-ml/scaling-book` as a reference, not a dependency - there is no reason to fork or import it. Its repository contains the textbook source and embedded worked problems/quizzes, not a drop-in trainer for NextLat. Its JAX/XLA, TPU topology, FSDP, tensor-parallel, pipeline-parallel, multi-pod, LLaMA-70B, and large-scale inference exercises are outside scope. Our roughly tens-of-millions-parameter Path-Star transformer fits on one accelerator, so sharding would add communication and implementation risk without addressing a binding constraint.
 
 ### Profiling gate
 
@@ -635,23 +643,32 @@ Ask whether capacity changes:
 - Path-Star accuracy;
 - effective rank.
 
-This directly addresses the paper's stated uncertainty about the dynamics MLP bottleneck. It is not part of the initial weekend.
+This directly addresses the paper's stated uncertainty about the dynamics MLP bottleneck - section 6 of the paper says outright that the width 'effectively acts as a bottleneck that constrains belief-state capacity' and that they did not study it. It is deferred behind experiments A, B and C only because ablating a bottleneck's effect on a geometry you have not yet measured is premature, not because it is out of scope.
 
-## 14. Explicit exclusions
+## 14. Deferred work, and why each is deferred
 
-- generic manifold discovery;
-- t-SNE/UMAP as evidence;
-- rank-only analysis;
-- sparse autoencoders and monosemantic feature search;
-- induction heads, IOI circuits, and attention-head reverse engineering;
-- deception/sycophancy feature detection;
-- RL post-training;
-- hierarchical latent architectures;
-- speculative-decoding optimization;
-- large dynamics-architecture or objective sweeps;
-- claims of hippocampal or neural-circuit equivalence.
+Nothing here is forbidden. Each is deferred because it costs GPU time or wall-clock that the
+confirmatory results need first, or because it answers a question that only becomes well-posed
+after those results exist. If one of them turns out to be the cheapest route to a question this
+project actually raises, price it and make the case.
 
-These are separate research programs, not missing pieces of Lure-Star.
+| Deferred | Why it waits |
+|---|---|
+| Bottleneck-width (`proj_factor`) sweep | Answers a stated open question in the paper's section 6. Waits until experiments A/B/C show there is a geometry to ablate. First in the queue. |
+| Causal patching of the penultimate state | Stretch goal in section 7. A correlational geometry result that replicates across three seeds is worth more than a causal one that does not. |
+| The remaining two paper seeds (1237, 1238) | Pure replication value. Run if wall-clock allows. |
+| **Manhattan taxi-trajectory geometry** | **Priced and declined on cost, 2026-08-23.** The strongest generalization test available - two histories reaching the same intersection with the same heading are predictively equivalent by construction, and it is where the paper's compression and effective-rank numbers come from, so a geometry result there would speak directly to their headline claim. But the config is 48 layers over 400,000 steps and roughly 26B tokens: measured against the profiled A100 rate that is 359 GPU-hours for a single seed pair (1,902 CU, 106% of the available balance) and 1,076 GPU-hours for three seeds (5,705 CU, 319%). No checkpoints were released, so there is no cheap path. A 15%-scale variant (60k steps, one seed pair) would cost 54 GPU-hours / 285 CU / 16%, and remains the fallback if the confirmatory results justify it. |
+| TinyStories geometry | The natural-language generalization step after Manhattan. The paper already ran future-token probes there, so the harness is partly built. |
+| Sparse autoencoders, monosemantic features | A different question: what individual directions mean, rather than how the space is organised. Large separate program. |
+| Attention-head / circuit reverse engineering, induction heads, IOI | Mechanistic rather than representational. Section 4 deliberately analyses the full population vector instead. |
+| RL post-training, hierarchical latents, speculative-decoding engineering | Method development, not representation analysis. |
+| Deception / sycophancy feature detection | Unrelated to predictive geometry. |
+
+Two things that are not deferred but *disqualified as evidence*, because they cannot support the
+claims being made rather than because they are off-limits: t-SNE and UMAP plots as evidence of
+structure (both distort global geometry by construction, and the claim here is about distances),
+and rank-only analysis (the paper already established lower effective rank; the open question is
+what got compressed together).
 
 ## 15. Deliverables
 

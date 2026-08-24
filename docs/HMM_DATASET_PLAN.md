@@ -168,8 +168,8 @@ accuracy threshold:
 
 ```
 optimal token cross-entropy = ( sum_{t=2..32} H(X_t | X_1:t-1) + H(EOS | x_1..x_32) ) / 32
-                            = ( 40.180 + 0 ) / 32
-                            = 1.2556 nats/token
+                            = ( 40.202 + 0 ) / 32
+                            = 1.2563 nats/token
 ```
 
 computed from the frozen matrices over the 10,000-sequence validation split (the EOS term is zero
@@ -177,17 +177,17 @@ because EOS is deterministic given position). Reference points on the same split
 
 | quantity | value |
 |---|---|
-| optimal `val/loss` as the trainer computes it | **1.2556 nats/token** |
+| optimal `val/loss` as the trainer computes it | **1.2563 nats/token** |
 | mean conditional NLL over all 32 positions | 1.2995 nats |
-| unigram (best constant) predictor | 1.3853 nats |
+| unigram (best constant) predictor | 1.3845 nats |
 | uniform predictor | 1.3863 nats |
 | Bayes-optimal next-observation accuracy | 0.4157 |
 | best constant predictor's accuracy | 0.2697 |
 
-The gate is therefore: **both models must reach a validation loss close to 1.2556 nats/token, and
+The gate is therefore: **both models must reach a validation loss close to 1.2563 nats/token, and
 neither may go below it** — a run reporting less than the Bayes optimum is a bug (leakage, an
 off-by-one in the target shift, or a mis-set `context_length`), not a discovery. The margin between
-the optimum and the unigram baseline is only `0.13` nats, so the loss axis must be read at three
+the optimum and the unigram baseline is only `0.128` nats, so the loss axis must be read at three
 decimals; that narrowness is a property of the process, and it is why accuracy is reported alongside
 rather than instead.
 

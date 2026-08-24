@@ -65,8 +65,8 @@ def _make_pool(hmm: HMM, name: str, split: str, offset: int, n: int, length: int
         obs=obs,
         beliefs=res.beliefs,
         next_obs=res.next_obs,
-        prefix_min=8,
-        prefix_max=20,
+        prefix_min=16,
+        prefix_max=24,
     )
 
 
@@ -352,8 +352,8 @@ def test_no_calibration_sequence_leaks_into_the_test_bank(bank, pools) -> None:
 
     # The leakage check is only meaningful if it could fire: a calibration prefix must be
     # detected by the same test.
-    leaked = np.array(calib.obs[3, :12], dtype=np.int8)
-    assert bytes([12]) + leaked.tobytes() in calib_prefixes
+    leaked = np.array(calib.obs[3, : calib.prefix_min], dtype=np.int8)
+    assert bytes([calib.prefix_min]) + leaked.tobytes() in calib_prefixes
 
 
 def test_bank_is_deterministic_in_its_seed(frozen, pools, hmm) -> None:
@@ -438,7 +438,7 @@ def test_shipped_thresholds_verify_and_match_the_frozen_hmm(shipped) -> None:
     # A near-lure's two-symbol cut must sit far below the high-edit cut at every calibrated
     # prefix length, or the two banks would not be contrasts.
     lengths = sorted(int(k) for k in th.edit_high_by_length)
-    assert lengths == list(range(8, 33)) + list(range(33, 65))
+    assert lengths == list(range(16, 65))
     for t in lengths:
         assert th.edit_low < th.edit_cut(t) <= t
 

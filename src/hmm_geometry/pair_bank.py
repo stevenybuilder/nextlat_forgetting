@@ -98,7 +98,7 @@ BANK_PATH = ROOT / "manifests" / "hmm_eval_pairs.jsonl"
 BANK_MANIFEST_PATH = ROOT / "manifests" / "hmm_eval_pairs.json"
 
 # Preregistered structural constants. These are design decisions, not fitted quantities.
-PREFIX_MIN = 8
+PREFIX_MIN = 16
 PREFIX_MAX = 32
 LENGEN_PREFIX_MIN = 33
 LENGEN_PREFIX_MAX = 64
@@ -207,6 +207,38 @@ class Pool:
         h.update(np.ascontiguousarray(self.obs, dtype=np.int8).tobytes())
         return h.hexdigest()
 
+    def eligible_indices(
+        self, forbidden: set[bytes] | None
+    ) -> tuple[dict[int, np.ndarray], dict[int, int]]:
+        """Per prefix length, the sequence indices whose prefix is not in ``forbidden``.
+
+        Used to make prefix-level disjointness from the calibration pools structural rather than
+        probable. At the band's shortest length the filter removes a negligible fraction (the
+        count is recorded in the bank stats), because 4^16 possible histories is far more than two
+        5,000-sequence pools can collide over -- which is exactly why `PREFIX_MIN` is 16 and not
+        8. At length 8 the alphabet forces collisions, any two pools drawn from this process share
+        most short prefixes, and filtering them out would delete the *most probable* histories and
+        leave an unrepresentative pool. Raising the floor is the honest fix; filtering a floor
+        that is too low is not.
+        """
+        lengths = range(self.prefix_min, min(self.prefix_max, self.length) + 1)
+        arr = np.ascontiguousarray(self.obs, dtype=np.int8)
+        eligible, dropped = {}, {}
+        for t in lengths:
+            if not forbidden:
+                eligible[t] = np.arange(self.n_sequences)
+                dropped[t] = 0
+                continue
+            head = bytes([t])
+            keep = np.fromiter(
+                (head + row.tobytes() not in forbidden for row in arr[:, :t]),
+                dtype=bool,
+                count=self.n_sequences,
+            )
+            eligible[t] = np.nonzero(keep)[0]
+            dropped[t] = int(self.n_sequences - keep.sum())
+        return eligible, dropped
+
     def prefix_keys(self) -> set[bytes]:
         """Every prefix in the band, as ``(length, bytes)`` keys, for leakage checks."""
         keys = set()
@@ -270,7 +302,10 @@ def load_pools(
 
 
 def sample_same_length_pairs(
-    pool: Pool, n_pairs: int, rng: np.random.Generator
+    pool: Pool,
+    n_pairs: int,
+    rng: np.random.Generator,
+    eligible: dict[int, np.ndarray] | None = None,
 ) -> dict[int, dict[str, np.ndarray]]:
     """Draw random pairs of distinct sequences at a shared prefix length.
 
@@ -283,8 +318,9 @@ def sample_same_length_pairs(
     per_length = max(1, n_pairs // len(lengths))
     out: dict[int, dict[str, np.ndarray]] = {}
     for t in lengths:
-        i = rng.integers(0, pool.n_sequences, size=per_length)
-        j = rng.integers(0, pool.n_sequences, size=per_length)
+        pick = eligible[t] if eligible is not None else np.arange(pool.n_sequences)
+        i = pick[rng.integers(0, len(pick), size=per_length)]
+        j = pick[rng.integers(0, len(pick), size=per_length)]
         keep = i != j
         i, j = i[keep], j[keep]
         jsd = js_divergence(pool.beliefs[i, t - 1], pool.beliefs[j, t - 1])
@@ -299,6 +335,7 @@ def make_lure_candidates(
     n_bases: int,
     rng: np.random.Generator,
     forbidden_prefixes: set[bytes] | None = None,
+    eligible: dict[int, np.ndarray] | None = None,
 ) -> dict[int, dict[str, np.ndarray]]:
     """Construct near-lures by substituting one or two symbols in a held-out prefix.
 
@@ -313,7 +350,8 @@ def make_lure_candidates(
     n_obs = hmm.n_obs
     out: dict[int, dict[str, np.ndarray]] = {}
     for t in lengths:
-        base_idx = rng.integers(0, pool.n_sequences, size=per_length)
+        pick = eligible[t] if eligible is not None else np.arange(pool.n_sequences)
+        base_idx = pick[rng.integers(0, len(pick), size=per_length)]
         base = pool.obs[base_idx, :t].astype(np.int32)
         lure = base.copy()
         window = min(LURE_EDIT_WINDOW, t)
@@ -566,9 +604,15 @@ def build_bank(
         )
 
     rng = np.random.default_rng(seed)
-    pairs_by_len = sample_same_length_pairs(pool, n_search_pairs, rng)
+    eligible, dropped = pool.eligible_indices(forbidden_prefixes)
+    pairs_by_len = sample_same_length_pairs(pool, n_search_pairs, rng, eligible=eligible)
     lures_by_len = make_lure_candidates(
-        pool, hmm, n_lure_bases, rng, forbidden_prefixes=forbidden_prefixes
+        pool,
+        hmm,
+        n_lure_bases,
+        rng,
+        forbidden_prefixes=forbidden_prefixes,
+        eligible=eligible,
     )
 
     # --- predictively equivalent pairs, and their history-distance-matched controls ----------
@@ -584,6 +628,12 @@ def build_bank(
     controls: list[dict] = []
     n_equiv_candidates = 0
     n_dropped_no_control = 0
+    n_dropped_duplicate = 0
+    # Random sampling with replacement can draw the same unordered pair twice. A duplicated pair
+    # is not a second observation of anything -- it would double-count one item in every paired
+    # statistic and break the one-control-per-pair matching -- so it is dropped here rather than
+    # deduplicated downstream.
+    seen_pairs: set[tuple[int, int, int]] = set()
     per_length_target = max(1, target_pairs // len(pairs_by_len))
     for t in sorted(pairs_by_len):
         d = pairs_by_len[t]
@@ -595,13 +645,27 @@ def build_bank(
         for k in order:
             if taken >= per_length_target:
                 break
+            i_, j_ = int(d["i"][k]), int(d["j"][k])
+            if (t, min(i_, j_), max(i_, j_)) in seen_pairs:
+                n_dropped_duplicate += 1
+                continue
             key = (t, int(d["lev"][k]))
             bucket = control_pool.get(key)
             if not bucket:
                 n_dropped_no_control += 1
                 continue
             ci, cj, cjsd = bucket.pop()
-            i, j = int(d["i"][k]), int(d["j"][k])
+            while (t, min(ci, cj), max(ci, cj)) in seen_pairs:
+                if not bucket:
+                    ci = cj = -1
+                    break
+                ci, cj, cjsd = bucket.pop()
+            if ci < 0:
+                n_dropped_no_control += 1
+                continue
+            i, j = i_, j_
+            seen_pairs.add((t, min(i, j), max(i, j)))
+            seen_pairs.add((t, min(ci, cj), max(ci, cj)))
             pair_id = f"{pool.name}-equiv-t{t}-{i}-{j}"
             equivalent.append(
                 {
@@ -638,8 +702,15 @@ def build_bank(
         qualifies = (d["jsd"] >= thresholds.js_high_bits) & (d["lev"] <= thresholds.edit_low)
         order = np.nonzero(qualifies)[0]
         n_lure_candidates += order.size
-        for k in order[:per_length_target]:
+        seen_lures: set[tuple[int, bytes]] = set()
+        for k in order:
+            if len(seen_lures) >= per_length_target:
+                break
             base = int(d["base_index"][k])
+            lure_key = (base, np.ascontiguousarray(d["lure_obs"][k], dtype=np.int8).tobytes())
+            if lure_key in seen_lures:
+                continue
+            seen_lures.add(lure_key)
             near_lures.append(
                 {
                     "pair_id": f"{pool.name}-lure-t{t}-{base}-{int(k)}",
@@ -669,7 +740,10 @@ def build_bank(
         "n_equivalent_candidates": int(n_equiv_candidates),
         "n_lure_candidates": int(n_lure_candidates),
         "n_equivalent_dropped_for_missing_control": int(n_dropped_no_control),
+        "n_equivalent_dropped_as_duplicate": int(n_dropped_duplicate),
         "n_search_pairs": int(sum(v["i"].size for v in pairs_by_len.values())),
+        "n_items_dropped_for_calibration_prefix_collision": int(sum(dropped.values())),
+        "max_items_dropped_at_one_length": int(max(dropped.values()) if dropped else 0),
         "n_lure_candidates_generated": int(sum(v["lev"].size for v in lures_by_len.values())),
         "mean_equivalent_js_bits": float(
             np.mean([p["js_divergence_bits"] for p in equivalent]) if equivalent else np.nan
