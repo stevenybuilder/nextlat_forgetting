@@ -32,10 +32,16 @@ Releasing T4 (gpu-t4-s-kkb-usw4a0-3a5zwq759t14l)...
 Released 1 runtime(s).
 ```
 
-Paid balance was byte-identical before and after (`1788.7765366264678`), so nothing was
-billed, but the lesson stands: **only `colab -h` / `colab --help` are safe. Never append
-`--help` to `start` or `exec`.** Any subcommand flag probing must be done knowing it may
-provision.
+**Only `colab -h` / `colab --help` are safe. Never append `--help` to `start` or `exec`.**
+Any subcommand flag probing must be done knowing it may provision.
+
+The accident turned out to be the most informative event of the recon, because it produced
+the only *measured* billing data on this account (§8.3). Immediately after `stop`, both
+`quota` and `status` reported no runtime and an unchanged balance — but that was **stale**.
+Several minutes later the same commands returned a live assignment and a real burn rate, and
+minutes after that returned to no-runtime with the balance now debited. See §8.3 and §4.6:
+`colab status`/`quota` are **eventually consistent**, and this changes how drop detection must
+be written.
 
 ---
 
@@ -80,6 +86,7 @@ provision.
 |---|---|---|
 | `colab` binary | `/Users/stevenyang/.local/bin/colab`, **v0.2.0**, Mach-O x86_64 (Go) | `colab -v`, `file` |
 | Free tier balance | `free_remaining: 0` — **there is no free fallback**; every runtime-second is paid CU | quota JSON |
+| Balance movement | `1788.7765366264678` → `1788.6077848662667` = **−0.16875 CU** over the accidental T4 (§0, §8.3) | two `quota --json` reads |
 | GCS bucket | `gs://nextlat-lurestar-project-flash-490419` exists, **US-CENTRAL1**, currently empty | `gcloud storage buckets describe` → `nextlat-lurestar-project-flash-490419  US-CENTRAL1` |
 | Local gcloud | Google Cloud SDK **562.0.0**, active account `<redacted-account>` | `gcloud version`, `gcloud auth list` |
 | Local ADC | `/Users/stevenyang/.config/gcloud/application_default_credentials.json`, 397 bytes, mode `0600`, `type=authorized_user`, `quota_project_id=project-flash-490419` | direct JSON parse |
@@ -386,9 +393,22 @@ A drop shows up as one of: the log tail ending in `failed to read frame header: 
 backgrounded `colab exec` exiting; or `colab status --json` returning `no_runtime`. All three
 are handled the same way, because **the exec exit code is never trusted** — `state.json` is.
 
+**Confirm before acting**: §8.3 showed `colab status` returning both false negatives (a live
+assignment reported as `no_runtime`) and a phantom positive (a stale record with
+`gpu: "Unknown"`, `memory_mb: 0`). So poll it **twice, 30 s apart, and require agreement**
+before concluding the runtime is gone. Starting a second runtime because of a stale
+`no_runtime` reading gives you two paid runtimes writing to the same `out_dir` — corrupt
+checkpoints, not just wasted CU.
+
 ```bash
+gone() {   # two agreeing reads, 30s apart
+  colab status --json | grep -q '"status":"no_runtime"' || return 1
+  sleep 30
+  colab status --json | grep -q '"status":"no_runtime"'
+}
+
 recover() {
-  colab status --json | grep -q '"status":"no_runtime"' && {
+  gone && {
       SESSION=$(colab start --gpu a100 | sed -n 's/^Session: //p')
       echo "$SESSION" > .colab_session
       colab upload --session "$SESSION" ~/.config/gcloud/application_default_credentials.json /content/adc.json
@@ -409,10 +429,15 @@ same absolute path** it had before (mandatory — see §6), then runs with
 
 ```bash
 colab stop
-colab quota --json      # record paid_balance delta into run_ledger.json
+sleep 60                # §8.3: the balance and the assignment list settle late
+colab quota --json      # MUST show active_runtimes: 0 and burn_rate_hourly: 0
+colab quota --json      # read twice; record paid_balance delta into run_ledger.json
 ```
 
-`colab stop` is the only thing standing between you and an idle A100 burning CU overnight.
+`colab stop` is the only thing standing between you and an idle A100 burning CU overnight, and
+because of §8.3's lag a *single* clean-looking poll right after `stop` proves nothing — the
+recon's first post-`stop` read showed no runtime and an unchanged balance while the runtime
+was in fact still assigned and billing. Verify late, and verify twice.
 Put it in a shell `trap`:
 
 ```bash
@@ -664,39 +689,78 @@ and record peak allocated/reserved either way.
 With `active_runtimes: 0`, `burn_rate_hourly` reads `0`.
 
 `burn_rate_hourly` is the authoritative per-GPU rate, and it is populated **only while a
-runtime is live**. So the table below has a measured column that is deliberately empty, and a
-one-command procedure to fill it:
-
-```bash
-for G in t4 l4 a100; do
-  S=$(colab start --gpu $G | sed -n 's/^Session: //p')
-  sleep 20
-  echo -n "$G  "; colab quota --json | python3 -c 'import json,sys;print(json.load(sys.stdin)["burn_rate_hourly"])'
-  colab stop
-done
-```
-
-Total cost of that calibration: under three minutes of runtime across three GPUs — round it
-up to 1 CU. **Run it before committing the sweep.** Also capture `paid_balance` immediately
-before and after each `colab stop` as an independent check.
+runtime is live**. One value — T4 — was captured during recon (§8.3); L4 and A100 still need
+measuring.
 
 ### 8.2 Rate table
 
-| GPU | `--gpu` value | CLI-selectable at v0.2.0 | CU/h — **prior, UNVERIFIED** | CU/h — measured | Peak bf16/fp16 dense | VRAM |
+| GPU | `--gpu` value | CLI-selectable at v0.2.0 | CU/h — prior (unverified) | CU/h — **measured here** | Peak bf16/fp16 dense | VRAM |
 |---|---|---|---|---|---|---|
-| T4 | `t4` | yes (default) | ~1.76 | *(pending)* | 65 TFLOP/s (fp16; **no bf16** — Turing) | 16 GB |
-| L4 | `l4` | yes | ~4.82 | *(pending)* | 121 TFLOP/s | 24 GB |
-| A100 | `a100` | yes | ~11.77 | *(pending)* | 312 TFLOP/s | 40/80 GB |
+| T4 | `t4` | yes (default) | ~1.76 | **1.54** ✅ | 65 TFLOP/s (fp16; **no bf16** — Turing) | 16 GB |
+| L4 | `l4` | yes | ~4.82 | *(pending)* → ~4.2 if scaled by T4 ratio | 121 TFLOP/s | 24 GB |
+| A100 | `a100` | yes | ~11.77 | *(pending)* → ~10.3 if scaled by T4 ratio | 312 TFLOP/s | 40/80 GB |
 | H100 | — | **no** (help lists t4\|l4\|a100 only) | unknown | *(pending, §2)* | 990 TFLOP/s | 80 GB |
 | G4 | — | **no** | unknown | — | — | — |
 
-The CU/h priors are the commonly published Colab rates. **They are not derived from this
-host's output** and must be replaced by the measured column before any spend decision. The
-recommendation in §10 is deliberately built to survive being wrong about them by 3–4×.
+The **T4 rate is measured on this account**: `burn_rate_hourly: 1.54` was returned by
+`colab quota --json` while a T4 assignment was live (§8.3). It lands 13% *below* the published
+1.76 prior, which is a useful validation that the priors are the right shape. The L4 and A100
+"scaled" figures apply that same 0.875 ratio and are shown only as a plausibility check —
+**they are still inferences, not measurements.** The §9 budget deliberately uses the higher,
+unscaled priors, so measured rates should only make the run cheaper.
 
-The 40-second T4 from §0 produced **no measurable balance change**, so it yields no usable
-rate. Sub-minute sessions are not a viable measurement instrument; use ≥20 s of *live* runtime
-and read `burn_rate_hourly`, not the balance delta.
+### 8.3 The one real billing measurement, and what it implies
+
+The accidental T4 (§0) is the only billed event on this account during recon. Sequence, all
+from real command output:
+
+| When | `paid_balance` | `active_runtimes` | `burn_rate_hourly` | `status` |
+|---|---|---|---|---|
+| before `start` | 1788.7765366264678 | 0 | 0 | `no_runtime` |
+| ~40 s after `start`, right after `stop` | 1788.7765366264678 | 0 | 0 | `no_runtime` |
+| several minutes later | 1788.6077848662667 | **1** | **1.54** | `connected: true`, `gpu: "Unknown"`, `memory_mb: 0`, `idle_seconds: 52891` |
+| minutes after that | 1788.6077848662667 | 0 | 0 | `no_runtime` |
+
+Three findings, each with direct design consequences:
+
+1. **T4 = 1.54 CU/h, measured.** Recorded above.
+2. **Short sessions carry a billing floor.** The debit was **0.16875 CU** for a runtime that
+   was live for well under a minute. At 1.54 CU/h that is ~6.6 minutes of billing — i.e. a
+   provisioning/minimum-increment floor of roughly **0.17 CU per assignment**, regardless of
+   how briefly you use it. This sharpens gotcha (iv): 30 crash-loop iterations cost ~5 CU,
+   which is trivial against 1788 — **so the reason to abort a crash loop is destroyed
+   wall-clock and lost session continuity, not CU burn.** The circuit breaker is a schedule
+   protection, not a cost protection. It is still mandatory.
+3. **`quota` and `status` are eventually consistent, and `status` can return a phantom.** The
+   third row is a stale record: `gpu: "Unknown"`, `memory_mb: 0`, and `idle_seconds: 52891`
+   (14.7 h — impossible for a runtime created one minute earlier). A single reading of either
+   command is not authoritative in either direction. This is why §4.6's drop detection and
+   §3(iv)'s circuit breaker are both defined against `state.json` in GCS and never against
+   `colab status`; and why teardown must be **`colab stop` plus a re-check**, not a single
+   status poll.
+
+### 8.4 Calibration procedure for the two remaining rates
+
+Run this before committing the sweep. Each iteration is one assignment, so §8.3's ~0.17 CU
+floor applies: total cost ~0.5 CU. Note the `sleep 60` and the re-read — §8.3 finding 3 means
+a single immediate poll can return a stale zero.
+
+```bash
+for G in l4 a100; do
+  colab start --gpu $G >/dev/null
+  sleep 60
+  echo -n "$G  "
+  colab quota --json | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d["burn_rate_hourly"], d["active_runtimes"], d["paid_balance"])'
+  colab stop >/dev/null
+  sleep 60
+  echo -n "$G settled  "
+  colab quota --json | python3 -c 'import json,sys;print(json.load(sys.stdin)["paid_balance"])'
+done
+```
+
+Fold the results into §8.2 and recompute §9.3 before spending. Also record, for each: the GPU
+name from `colab exec -c "import torch;print(torch.cuda.get_device_name(0))"` — `colab status`
+reported `gpu: "Unknown"` during recon and cannot be relied on to identify the device.
 
 ---
 
@@ -735,9 +799,9 @@ Assumptions, each of which the §11 profiling gate exists to replace:
 
 | GPU | GPT s/step | NextLat s/step | Base h | Adapt h | HMM h | Ckpt h | **Total h** | **+20%** | **CU at prior rate** | % of 1788.78 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **T4** | 0.577 | 0.924 | 25.02 | 1.25 | 0.20 | 0.64 | 27.10 | **32.5** | ~57 | 3.2% |
-| **L4** | 0.310 | 0.496 | 13.44 | 0.67 | 0.20 | 0.64 | 14.95 | **17.9** | ~86 | 4.8% |
-| **A100** | 0.180 | 0.289 | 7.82 | 0.39 | 0.20 | 0.64 | 9.04 | **10.9** | ~128 | 7.1% |
+| **T4** | 0.577 | 0.924 | 25.02 | 1.25 | 0.20 | 0.64 | 27.10 | **32.5** | **50** (measured 1.54 CU/h) | 2.8% |
+| **L4** | 0.310 | 0.496 | 13.44 | 0.67 | 0.20 | 0.64 | 14.95 | **17.9** | ~86 (prior) | 4.8% |
+| **A100** | 0.180 | 0.289 | 7.82 | 0.39 | 0.20 | 0.64 | 9.04 | **10.9** | ~128 (prior) | 7.1% |
 | *H100 (not selectable)* | *0.091* | *0.146* | *3.94* | *0.20* | *0.20* | *0.64* | *4.97* | ***6.0*** | *unknown* | — |
 
 ### 9.4 Feasibility — CU is not the binding constraint; wall-clock is
@@ -779,8 +843,9 @@ wall-clock and interruption exposure**, because those are what actually threaten
 
 Gate the spend in this order, and do not skip a gate:
 
-1. **Calibrate rates** (§8.1). ~1 CU, three minutes. Replace every prior in §8.2 with a
-   measured `burn_rate_hourly`.
+1. **Calibrate the L4 and A100 rates** (§8.4). ~0.5 CU. T4 is already measured at
+   **1.54 CU/h** (§8.3); replace the remaining two priors with measured `burn_rate_hourly`
+   before spending.
 2. **Probe A100 and confirm bf16** — `colab exec --gpu a100 -c "import torch;
    print(torch.cuda.get_device_name(0), torch.cuda.is_bf16_supported())"`.
 3. **Run the mandatory recovery test on T4** (spec §9): 300 steps clean, then 150 + kill +
@@ -817,6 +882,9 @@ and `parent_checkpoint_sha256`.
 | `--cred-file` rejects authorized_user | `gcloud auth login --help`: accepts workload-identity config or service-account key JSON only |
 | bucket exists, region | `gcloud storage buckets describe` → `nextlat-lurestar-project-flash-490419  US-CENTRAL1` |
 | T=69, vocab=106, 21.24 M params | upstream `Tokenizer` (`data/stargraph.py:9-57`) replayed on a G(5,5) line built by `data/stargraph/prepare.py:8-35`; param count from `config/stargraph/5_5/gpt_stargraph_5_5.yaml:33-38` |
+| T4 burn rate = 1.54 CU/h | `colab quota --json` while a T4 assignment was live |
+| short-session billing floor ≈ 0.17 CU | balance `1788.7765366264678` → `1788.6077848662667` across one sub-minute T4 |
+| `quota`/`status` eventually consistent; `status` can return a phantom | four successive polls with disagreeing `active_runtimes`, and one record with `gpu:"Unknown"`, `memory_mb:0`, `idle_seconds:52891` |
 | resume pointer semantics | `core_train.py:140-167`, `:931-948`, `:952-979` |
 | silent scratch-init on missing pointer | `core_train.py:165-168` |
 | unsafe recovery rotation | `core_train.py:970-979` (non-atomic pointer write, then unconditional delete of the previous recovery checkpoint) |

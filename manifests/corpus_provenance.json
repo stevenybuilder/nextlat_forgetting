@@ -1,0 +1,12 @@
+{
+  "generator": "scripts/generate_corpus.py",
+  "upstream_function": "upstream/NextLat/data/stargraph/prepare.py::star_or_sink_graph_maker",
+  "upstream_commit": "3770be6009cea2b3c455a9ce7f2ca88b504bb955",
+  "params": {"num_paths": 5, "path_len": 5, "max_nodes": 100,
+             "num_samples": 200000, "num_test_samples": 20000,
+             "shuffle_edge_lists": true, "reverse": false},
+  "seed_scheme": "global random.seed(i), i from 0; test split continues the same counter",
+  "parallel_equals_serial_verified_lines": 2000,
+  "node_id_range": "0..99 (spec says 1..100; upstream uses range(max_nodes))",
+  "generated_at_unix": 1787529730
+}
