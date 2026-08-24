@@ -49,6 +49,7 @@ def run(repo: Path, root: Path, *args: str, **env_extra) -> subprocess.Completed
 @pytest.mark.parametrize("config,model,tail", [
     ("gpt_lurestar.yaml", "gpt", "runs/gpt/seed1234/base"),
     ("nextlat_lurestar.yaml", "nextlat", "runs/nextlat/seed1234/base"),
+    ("bst_lurestar.yaml", "bst", "runs/bst/seed1234/base"),
     ("gpt_hmm.yaml", "gpt", "runs/hmm/gpt/seed1234/base"),
     ("nextlat_hmm.yaml", "nextlat", "runs/hmm/nextlat/seed1234/base"),
 ])

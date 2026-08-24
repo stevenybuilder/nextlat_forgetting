@@ -4,7 +4,7 @@
 document is generated from `results/live_numbers.json`, so a claim cannot quietly outrun its
 artifact.*
 
-![Final-state PSI for GPT and NextLat across three seeds. Higher means the model pushes apart histories whose futures differ, relative to equally-perturbed histories whose futures agree.](results/figures/fig2_psi.png)
+![Final-state PSI for the three arms - NextLat, BST and GPT. Higher means the model pushes apart histories whose futures differ, relative to equally-perturbed histories whose futures agree. Not measured yet: at the time of writing no checkpoint exists, so this panel is empty and every number below it is `[pending]`.](results/figures/fig2_psi.png)
 
 Code and manifests: `github.com/<pending>/nextlat-lurestar`. Everything here runs on one GPU.
 
@@ -31,6 +31,27 @@ So the interesting question is not whether NextLat compresses - the paper alread
 effective latent rank of 52.7 against GPT's 160.1 on Manhattan, and reproducing that would be
 reproducing their result. The question is *what gets compressed together and what gets pushed
 apart*, and whether that geometry has downstream consequences.
+
+## The control that makes the comparison mean anything
+
+There is an obvious way to get a geometry difference for free. The paper's Figure 6 puts GPT on
+`G(5,5)` at roughly 18.6% exact-path accuracy, which is `1/d`, chance - against NextLat at roughly
+99.8%. That is their result and not mine, and it is why Path-Star is in their paper at all. So any
+NextLat-versus-GPT geometry gap admits a trivial reading: NextLat organises the space because
+NextLat solved the task, and GPT learned no task structure to organise. (The paper prints no
+Path-Star accuracy table - those two numbers are digitized off the Figure 6 vector graphic and
+carry about ±0.5 pp.)
+
+The fix was already sitting in the pinned repository. BST solves `G(5,5)` at roughly 99.9% with no
+latent-transition objective at all, and its config differs from the GPT config by exactly two keys.
+So the confirmatory design is three arms - NextLat, BST, GPT - matched on layer definition, width,
+depth, optimiser, schedule, batch size, corpus and step budget, with the priority order fixed
+before any number exists: NextLat versus BST is primary and competence-matched, NextLat versus GPT
+is secondary and reported with the confound stated in the same breath, and BST versus GPT is the
+yardstick for how much of any effect competence alone buys. BST is not parameter-matched - its
+objective needs a second encoder stack and a text head, so it carries 47.3M parameters against
+NextLat's 21.9M and GPT's 21.3M - and that asymmetry stays attached to the primary contrast rather
+than being filed as a footnote.
 
 ## The bottom line, before the evidence
 

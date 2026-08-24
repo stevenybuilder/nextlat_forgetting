@@ -56,7 +56,6 @@ from config_lib import (  # noqa: E402
     CONFIGS_DIR,
     DEFAULTS_YAML,
     OFFICIAL_BST_5_5,
-    OFFICIAL_BST_5_5,
     OFFICIAL_GPT_5_5,
     OFFICIAL_NEXTLAT_5_5,
     UPSTREAM,
@@ -189,11 +188,6 @@ FROZEN_KEYS = [
     "model.gpt_mode",
     "model.mtp_horizon",
     "model.proj_factor",
-    # The BST objective's one scientific knob, the counterpart of mtp_horizon for NextLat.
-    # core_train.py:80 feeds it into BSTConfig; upstream sets it to 2 in the shipped 5_5 BST
-    # YAML and to 1 in defaults.yaml:98, so an arm that loses the explicit value silently
-    # trains a different objective. Inert for every non-BST config (both sides resolve to 1).
-    "model.bst_pair_minimum_gap",
     "model.lambda_mse",
     "model.lambda_kl",
     "model.lambda_ce",
@@ -372,52 +366,6 @@ def build_nextlat_lurestar(seed: int = DEFAULT_SEED) -> Dict[str, Any]:
             Hoist("model.lambda_ce",
                   "defaults.yaml:116 is 0.0 and the paper's Path-Star setting is 0.0. "
                   "Restated because it is a loss coefficient on the frozen surface."),
-        ],
-        "drops": [],
-        "family": "lurestar",
-    }
-
-
-def build_bst_lurestar(seed: int = DEFAULT_SEED) -> Dict[str, Any]:
-    """Condition 3: the competence-matched control.
-
-    `docs/DECISION_D20_competence_gate.md`, "Superseded in part": the paper's Figure 6 puts
-    GPT on G(5,5) at ~18.6% (= 1/d, chance) and BST at ~99.9%. A NextLat-versus-GPT geometry
-    gap is therefore confounded with task success; a NextLat-versus-BST gap is not, because
-    both arms solve the task and only the objective differs. The official BST YAML is the
-    GPT YAML plus `use_bst: true` and `model.bst_pair_minimum_gap: 2`, so the arm is
-    architecture-matched by construction (12 layers / 6 heads / 384 dim) rather than by
-    assertion.
-    """
-    cfg = build_gpt_lurestar(seed)
-    return {
-        "source": OFFICIAL_BST_5_5,
-        "overrides": _common_lurestar("bst", seed) + _provenance(
-            OFFICIAL_BST_5_5,
-            "Condition 3 of spec sec.8: the architecture-matched transformer trained with "
-            "the official Belief State Transformer objective on G(5,5). This is the "
-            "COMPETENCE-MATCHED control -- it solves Path-Star (~99.9%, paper Fig.6) "
-            "without a latent-transition objective, which is what makes the primary "
-            "NextLat-vs-BST geometry contrast identifiable. See "
-            "docs/DECISION_D20_competence_gate.md.",
-        ),
-        "hoists": cfg["hoists"] + [
-            Hoist("use_nextlat",
-                  "defaults.yaml:3 false. The shipped BST YAML omits the key entirely "
-                  "(unlike the GPT YAML, which states it), so restating it makes this file "
-                  "a complete model-selection statement instead of relying on the ordering "
-                  "of the if-chain at core_train.py:38-46, where use_bst is merely tested "
-                  "first."),
-            Hoist("model.bst_pair_maximum_gap",
-                  "defaults.yaml:99 is -1 (no maximum). Read unconditionally at "
-                  "core_train.py:81 for every BST run; pinned next to the minimum gap so "
-                  "the objective's surface is fully stated in the file."),
-            Hoist("model.bst_pair_subsample_rate",
-                  "defaults.yaml:102 is 1.0 (all pairs). core_train.py:82."),
-            Hoist("model.bst_single_gap_prediction_mode",
-                  "defaults.yaml:104 is 'eos'. core_train.py:41-43 asserts membership in "
-                  "['next_token', 'eos'] before the model is built, so an absent or drifted "
-                  "value fails the run at construction."),
         ],
         "drops": [],
         "family": "lurestar",

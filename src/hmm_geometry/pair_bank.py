@@ -49,6 +49,16 @@ unchanged. That is enforced structurally, not by discipline:
 * `build_bank` also refuses if the thresholds' recorded HMM hash is not the hash of the HMM it was
   handed, so a bank can never be built against different matrices than the thresholds were fitted
   under, and refuses if the pool it is given is the calibration pool the thresholds came from.
+* `write_bank` freezes the *selection*, not just the rule. Which pairs survive is a function of
+  `seed`, `n_search_pairs` and `n_lure_bases`, all free arguments, and re-rolling the seed yields a
+  near-disjoint bank -- so a rewrite that would change the file raises `BankMismatch` unless
+  `force=True`, exactly as `freeze_matrices` and `freeze_thresholds` do. Spec section 10's
+  preregistered check 7 covers thresholds *and pair selection*; guarding only the thresholds left
+  the second half open.
+* None of the above makes a manifest tamper-proof -- a hash the file carries about itself can
+  always be recomputed after an edit. The hashes are tripwires against accident and drift; the
+  anchors against deliberate substitution are the constants recorded in `docs/RUNLOG.md`, which
+  `tests/test_hmm_pairs.py` asserts against the shipped artifacts.
 
 ## Pools
 
@@ -131,6 +141,15 @@ class ThresholdMismatch(RuntimeError):
 
 class UnverifiedThresholds(RuntimeError):
     """Raised when thresholds reach a bank builder without passing through `load_thresholds`."""
+
+
+class BankMismatch(RuntimeError):
+    """Raised when writing a pair bank would change an already-frozen one.
+
+    Separate from `ThresholdMismatch` because it is a different freeze being violated: the
+    thresholds are the decision *rule*, the bank is the *item set* that rule selected. Both are on
+    the frozen surface and each has to be able to refuse independently.
+    """
 
 
 # --------------------------------------------------------------------------------------------
@@ -769,29 +788,82 @@ def build_bank(
     return Bank(pairs=equivalent + near_lures + controls, stats=stats)
 
 
+def _relative_to_root(path: Path) -> str:
+    """Repo-relative path when the artifact lives under ROOT, absolute otherwise.
+
+    `Path.relative_to` raises for anything outside ROOT, which used to make `write_bank`
+    unusable with a `--bank` outside the repo -- and, worse, untestable against a `tmp_path`.
+    """
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def serialise_bank(banks: Sequence[Bank]) -> str:
+    """The exact bytes of the pair file, built in memory so they can be compared before writing."""
+    lines = []
+    for bank in banks:
+        for pair in bank.pairs:
+            lines.append(json.dumps(pair, sort_keys=True, separators=(",", ":")))
+    return "".join(line + "\n" for line in lines)
+
+
 def write_bank(
     banks: list[Bank],
     thresholds: Thresholds,
     hmm: HMM,
     bank_path: Path = BANK_PATH,
     manifest_path: Path = BANK_MANIFEST_PATH,
+    force: bool = False,
 ) -> dict:
+    """Persist the pair bank, refusing to change an existing freeze.
+
+    The *pair selection* is on the frozen surface, not only the thresholds that produced it.
+    Spec section 10's preregistered check 7 reads "HMM thresholds **and pair selection** frozen
+    without inspecting model representations", and PROGRAM.md's frozen surface names the item set
+    itself. That matters here because selection is a function of `seed`, `n_search_pairs` and
+    `n_lure_bases`, all of which are free CLI arguments: re-running `pair_bank.py build --seed N`
+    with a different N yields a bank sharing almost no pairs with this one (measured: 5 of 3,583
+    `pair_id`s), so an unguarded rewrite is a live retuning path once model states exist.
+
+    So this mirrors `freeze_matrices` and `freeze_thresholds`: a rewrite that would change the
+    bytes raises `BankMismatch`, an identical rewrite is a no-op that returns the existing
+    manifest, and `force=True` is reserved for correcting a recorded error with a superseding
+    `docs/RUNLOG.md` entry.
+    """
+    body = serialise_bank(banks)
+    digest = hashlib.sha256(body.encode()).hexdigest()
+
+    if bank_path.exists():
+        existing_digest = hashlib.sha256(bank_path.read_bytes()).hexdigest()
+        if existing_digest == digest:
+            if manifest_path.exists():
+                return json.loads(manifest_path.read_text())
+        elif not force:
+            raise BankMismatch(
+                f"{bank_path} already freezes a different pair bank "
+                f"({existing_digest[:12]} vs {digest[:12]}). The pair selection is on the frozen "
+                "surface (PROGRAM.md, 'every threshold frozen into a manifest'; spec sec.10 check "
+                "7 names thresholds AND pair selection). Selection depends on `seed`, "
+                "`n_search_pairs` and `n_lure_bases`, so rewriting it after any model state has "
+                "been seen is retuning. Pass force=True only to correct a recorded error, and "
+                "append a superseding entry to docs/RUNLOG.md."
+            )
+
     bank_path.parent.mkdir(parents=True, exist_ok=True)
-    with bank_path.open("w") as f:
-        for bank in banks:
-            for pair in bank.pairs:
-                f.write(json.dumps(pair, sort_keys=True, separators=(",", ":")) + "\n")
-    digest = hashlib.sha256(bank_path.read_bytes()).hexdigest()
+    bank_path.write_text(body)
     manifest = {
         "schema": "nextlat_forgetting/hmm_eval_pairs/1",
         "hmm_sha256": hmm.sha256(),
         "thresholds_sha256": thresholds.sha256(),
         "thresholds": thresholds.payload(),
         "banks": [b.stats for b in banks],
-        "pairs_file": str(bank_path.relative_to(ROOT)),
+        "pairs_file": _relative_to_root(bank_path),
         "pairs_sha256": digest,
         "n_pairs": sum(len(b.pairs) for b in banks),
     }
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     return manifest
 
@@ -814,6 +886,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--bank", type=Path, default=BANK_PATH)
     ap.add_argument("--seed", type=int, default=20260823)
     ap.add_argument("--target-pairs", type=int, default=TARGET_PAIRS)
+    ap.add_argument(
+        "--force-rewrite",
+        action="store_true",
+        help=(
+            "overwrite an existing, different frozen pair bank. Only to correct a recorded "
+            "error, and only with a superseding docs/RUNLOG.md entry."
+        ),
+    )
     args = ap.parse_args(argv)
 
     hmm, _ = load_frozen_hmm()
@@ -842,7 +922,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             banks.append(bank)
             print(json.dumps(bank.stats, indent=2))
-        manifest = write_bank(banks, th, hmm, args.bank)
+        manifest = write_bank(banks, th, hmm, args.bank, force=args.force_rewrite)
         print(f"wrote {manifest['n_pairs']} pairs -> {args.bank}")
 
     if args.command == "report":

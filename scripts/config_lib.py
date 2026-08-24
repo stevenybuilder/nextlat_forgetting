@@ -70,7 +70,6 @@ OFFICIAL_NEXTLAT_5_5 = os.path.join(
 # official BST G(5,5) YAML differs from the GPT one by exactly two scientific keys --
 # `use_bst: true` and `model.bst_pair_minimum_gap: 2` -- plus `experiment_name`.
 OFFICIAL_BST_5_5 = os.path.join(UPSTREAM, "config/stargraph/5_5/bst_stargraph_5_5.yaml")
-OFFICIAL_BST_5_5 = os.path.join(UPSTREAM, "config/stargraph/5_5/bst_stargraph_5_5.yaml")
 
 CONFIGS_DIR = os.path.join(REPO_ROOT, "configs")
 

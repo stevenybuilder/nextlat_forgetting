@@ -9,6 +9,7 @@ is rejected.  A test that cannot reject the mutant is not a test.
 from __future__ import annotations
 
 import math
+import warnings
 
 import numpy as np
 import pytest
@@ -1080,7 +1081,7 @@ class _FakeTensor:
     def detach(self):
         return self
 
-    # --- the handful of ops the BST branch needs (model_bst.py:91-100, :806-810) ---
+    # --- the handful of ops the BST branch needs (model_bst.py:92-100, :803-809) ---
 
     @property
     def dtype(self):
@@ -1114,7 +1115,15 @@ def _install_stub_torch(monkeypatch):
         return _FakeTensor(np.asarray(x, dtype=dtype))
 
     stub.as_tensor = as_tensor
-    stub.no_grad = contextlib.contextmanager(lambda: iter([None]))
+
+    # A real generator, not `iter([None])`: Layer B raises inside `with torch.no_grad()`
+    # for several of its guard clauses, and a fake context manager that cannot take a
+    # throw() turns every one of those ValueErrors into an unrelated AttributeError.
+    @contextlib.contextmanager
+    def no_grad():
+        yield None
+
+    stub.no_grad = no_grad
 
     def cat(tensors, dim=-1):
         return _FakeTensor(np.concatenate([t.a for t in tensors], axis=dim))
@@ -1276,3 +1285,527 @@ def test_extract_positions_defaults_to_the_frozen_pair_and_rejects_bad_positions
         R.extract_positions(_FakeGPT(), tokens, architecture="gpt", positions=(62, 69))
     with pytest.raises(ValueError, match="outside the sequence"):
         R.extract_positions(_FakeGPT(), tokens, architecture="gpt", positions=(-1, 63))
+
+
+# =====================================================================================
+# 13. LAYER B: BST — the third arm, whose "final post-norm state" is a CHOICE
+#
+# BST is the only arm where the final post-normalization state and the immediate
+# pre-logit state are different tensors, and where a second, answer-contaminated state
+# exists a single attribute away.  The whole argument of docs/EXTRACTION.md §3 is made
+# executable here:
+#
+#   * `hidden` is the FORWARD encoder's post-norm state (model_bst.py:287), never the
+#     backward one (model_bst.py:313) and never the TextHead's chunk;
+#   * the backward encoder genuinely sees the future, so mistaking it for the analogue
+#     would put the answer inside PSI — the fake below is reverse-causal precisely so
+#     that this is a failing assertion rather than a paragraph of prose;
+#   * `logits` come from TextHead (model_bst.py:83-110) with the lone-EOS backward
+#     embedding of BST.generate (model_bst.py:803-809), never from lm_head(hidden).
+# =====================================================================================
+
+
+# TextHead's internal 2D->2D MLP and the shared D->V projection.  _HEAD is reused so the
+# BST head is a genuinely different function of `hidden` than GPT's head is.
+_BST_MLP = np.cos(np.arange(12 * 12, dtype=np.float64).reshape(12, 12) / 5.0) / 3.0
+
+
+def _bwd_post_norm(tokens):
+    """(B, T) ints -> (B, T, 6) 'transformer_b.norm(bwd)'.
+
+    Deliberately REVERSE-CAUSAL: position i is a function of tokens i..T-1, mirroring the
+    triu document mask at model_bst.py:215-217.  Two consequences the tests below rely on:
+    the state at the final position depends on that token alone (so it equals the lone-EOS
+    embedding, exactly as upstream's terminal EOS does under the same mask), and the state
+    at index i changes when the SUFFIX changes — which is what makes it unusable for PSI.
+    """
+    t = np.asarray(tokens, dtype=np.float64)
+    n = t.shape[1]
+    rev_mean = np.cumsum(t[:, ::-1], axis=1)[:, ::-1] / np.arange(n, 0, -1)
+    # 0.01, not 0.3: token ids run to 104, and a 0.3 scale saturates tanh so that every
+    # backward state collapses to 1.0 and the suffix-sensitivity this fake exists to
+    # demonstrate would vanish into floating-point noise.
+    return np.tanh(np.stack([rev_mean + k for k in range(6)], axis=-1) * 0.01) - 0.25
+
+
+class _FakeBSTEncoder:
+    """Mimics models/model_bst.py:245-315 — two stacks, two norms, one call."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, batch, compute_forward=True, compute_backward=True):
+        tok = batch.a if isinstance(batch, _FakeTensor) else batch
+        self.calls.append((tuple(np.shape(tok)), compute_forward, compute_backward))
+        fwd = _FakeTensor(_post_norm(tok)) if compute_forward else None   # :287
+        bwd = _FakeTensor(_bwd_post_norm(tok)) if compute_backward else None  # :313
+        return fwd, bwd
+
+
+class _FakeBSTTextHead:
+    """Mimics models/model_bst.py:83-110 with targets=None."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def mlp(self, x):                                    # model_bst.py:64-68
+        return _FakeTensor(np.tanh(x.a @ _BST_MLP))
+
+    def norm(self, x):                                   # model_bst.py:69 (2*n_embd)
+        a = x.a
+        return _FakeTensor(a / np.sqrt((a**2).mean(axis=-1, keepdims=True) + 1e-5))
+
+    def lm_head(self, h):                                # model_bst.py:70
+        return _FakeTensor(np.asarray(h.a) @ _HEAD)
+
+    def __call__(self, forward_embedding, backward_embedding, **kw):
+        self.calls += 1
+        x = _FakeTensor(np.concatenate([forward_embedding.a, backward_embedding.a], -1))
+        x = x + self.mlp(x)                              # model_bst.py:95
+        x = self.norm(x)                                 # model_bst.py:96
+        x_next, x_prev = x.chunk(2, dim=-1)              # model_bst.py:100
+        stacked = np.stack(
+            [self.lm_head(x_next).a, self.lm_head(x_prev).a], axis=1
+        )                                                # model_bst.py:109
+        return _FakeTensor(stacked)
+
+
+class _FakeBST:
+    """Mimics the BST wrapper (models/model_bst.py:327-340): .encoder and .text_head."""
+
+    def __init__(self):
+        self.training = False
+        self.encoder = _FakeBSTEncoder()
+        self.text_head = _FakeBSTTextHead()
+
+    def eval(self):
+        pass
+
+
+# Two sequences with an IDENTICAL prefix (positions 0..3) and different suffixes, plus a
+# terminal EOS.  This is the shape of a Lure-Star quartet: the manipulation lives before
+# the extraction index, the answer lives after it.
+_BST_TOKENS = np.array(
+    [[3, 7, 2, 9, 11, 4, R.EOS_TOKEN_ID], [3, 7, 2, 9, 88, 62, R.EOS_TOKEN_ID]],
+    dtype=np.int64,
+)
+
+
+def _bst_expected(tokens):
+    """Independent recomputation of what Layer B must return for BST."""
+    tok = np.asarray(tokens)
+    b, t = tok.shape
+    fwd = _post_norm(tok)
+    eos = np.full((b, 1), R.EOS_TOKEN_ID, dtype=tok.dtype)
+    bwd = np.broadcast_to(_bwd_post_norm(eos), (b, t, 6))
+    head = _FakeBSTTextHead()
+    logits = head(_FakeTensor(fwd), _FakeTensor(bwd)).a[:, 0]
+    x = np.concatenate([fwd, bwd], -1)
+    x = x + np.tanh(x @ _BST_MLP)
+    x = x / np.sqrt((x**2).mean(axis=-1, keepdims=True) + 1e-5)
+    x_next = np.split(x, 2, axis=-1)[0]
+    return fwd, bwd, logits, x_next
+
+
+def test_layer_b_bst_returns_the_forward_state_and_never_the_backward_one(monkeypatch):
+    _install_stub_torch(monkeypatch)
+    m = _FakeBST()
+    out = R.forward_all_states(m, _FakeTensor(_BST_TOKENS), architecture="bst")
+    want_fwd, _want_bwd, want_logits, want_xnext = _bst_expected(_BST_TOKENS)
+
+    assert np.allclose(out["hidden"].a, want_fwd), "hidden is transformer_f.norm (:287)"
+    assert np.allclose(out["logits"].a, want_logits)
+    assert np.allclose(out["hidden_texthead"].a, want_xnext)
+
+    # Discrimination 1: the backward post-norm state has the same shape as the forward
+    # one, so shape alone can never catch a swap.  It must differ numerically.
+    bwd_full = _bwd_post_norm(_BST_TOKENS)
+    assert bwd_full.shape == want_fwd.shape
+    assert not np.allclose(out["hidden"].a, bwd_full)
+
+    # Discrimination 2: the TextHead pre-logit state is ALSO (B, T, 6).  Returning it as
+    # `hidden` is the other silent substitution, and it is caught here.
+    assert out["hidden_texthead"].a.shape == out["hidden"].a.shape
+    assert not np.allclose(out["hidden"].a, out["hidden_texthead"].a)
+
+    # Discrimination 3: BST logits are NOT lm_head(hidden).  That call is type-compatible
+    # — 6 features in, 5 vocab out — and semantically wrong, because lm_head is trained on
+    # the post-MLP, post-norm, chunked half (model_bst.py:100-105).
+    naive = m.text_head.lm_head(_FakeTensor(want_fwd)).a
+    assert naive.shape == out["logits"].a.shape
+    assert not np.allclose(out["logits"].a, naive)
+
+
+def test_bst_backward_state_sees_the_answer_which_is_why_it_is_excluded(monkeypatch):
+    """The concrete reason docs/EXTRACTION.md §3 excludes the backward encoder.
+
+    Two items share tokens 0..3 and differ at 4..5.  The forward state at index 3 is
+    identical between them — it is a function of the prefix, like GPT's and NextLat's.
+    The backward state at the SAME index is not, because under the reverse-causal mask it
+    has already read the suffix.  Centering, whitening and PSI would all faithfully report
+    that difference, and it would be a difference in the answer, not in the history.
+    """
+    _install_stub_torch(monkeypatch)
+    m = _FakeBST()
+    out = R.forward_all_states(m, _FakeTensor(_BST_TOKENS), architecture="bst")
+    idx = 3
+    assert np.allclose(out["hidden"].a[0, idx], out["hidden"].a[1, idx], atol=1e-12), (
+        "the forward state at a shared-prefix index must be identical across the two "
+        "items; if it is not, the fake encoder is not causal and this test is vacuous"
+    )
+    bwd = _bwd_post_norm(_BST_TOKENS)
+    assert not np.allclose(bwd[0, idx], bwd[1, idx], atol=1e-6)
+    assert float(np.abs(bwd[0, idx] - bwd[1, idx]).max()) > 1e-3
+    assert "EXCLUDED" in R.BST_STATE_ROLES["excluded_backward"]
+
+
+def test_bst_backward_input_is_the_lone_eos_of_BST_generate(monkeypatch):
+    """model_bst.py:803-809: the inference backward embedding is a single EOS token.
+
+    Two properties are asserted, and both are load-bearing.  It is ITEM-INDEPENDENT, so
+    every item-to-item difference in BST's logits is driven by the forward state alone.
+    And it equals the backward state of the sequence's own terminal EOS, which is what
+    makes it a trained endpoint rather than an off-distribution stand-in — under the
+    reverse-causal document mask the last token attends only itself.
+    """
+    _install_stub_torch(monkeypatch)
+    m = _FakeBST()
+    bwd = R.bst_backward_eos_state(m.encoder, _FakeTensor(_BST_TOKENS))
+    assert bwd.a.shape == (2, 1, 6)
+    assert np.allclose(bwd.a[0], bwd.a[1], atol=1e-12), "item-independent by construction"
+    terminal = _bwd_post_norm(_BST_TOKENS)[:, -1]
+    assert np.allclose(bwd.a[:, 0], terminal, atol=1e-12)
+    # The encoder was asked for the backward stack only — running the forward stack on a
+    # 1-token EOS batch would be wasted work and is what upstream avoids.
+    assert m.encoder.calls[-1] == ((2, 1), False, True)
+
+
+def test_bst_texthead_reimplementation_is_checked_against_the_head_itself(monkeypatch):
+    """`bst_texthead_prelogit` duplicates model_bst.py:92-100; the copy must be verified.
+
+    Layer B asserts that lm_head applied to our re-derived x_next reproduces the head's
+    OWN returned next-token logits.  Break the head and the assertion must fire, or the
+    duplication is a silent fork of upstream.
+    """
+    _install_stub_torch(monkeypatch)
+    m = _FakeBST()
+    R.forward_all_states(m, _FakeTensor(_BST_TOKENS), architecture="bst")  # passes
+
+    class _DriftedHead(_FakeBSTTextHead):
+        def __call__(self, fwd, bwd, **kw):
+            out = super().__call__(fwd, bwd, **kw)
+            return _FakeTensor(out.a + 1.0)          # upstream changed under us
+
+    m.text_head = _DriftedHead()
+    with pytest.raises(RuntimeError, match="no longer reproduces TextHead"):
+        R.forward_all_states(m, _FakeTensor(_BST_TOKENS), architecture="bst")
+    # ...and the check is skippable only by asking for it explicitly.
+    R.forward_all_states(
+        m, _FakeTensor(_BST_TOKENS), architecture="bst", verify_texthead=False
+    )
+
+
+def test_bst_demands_the_wrapper_and_refuses_an_external_mask(monkeypatch):
+    """The argument asymmetry BST forces, made into two named errors."""
+    _install_stub_torch(monkeypatch)
+
+    class _JustAnEncoder:                      # what wrapper.model would give you
+        pass
+
+    with pytest.raises(ValueError, match=r"\.encoder and \.text_head"):
+        R.forward_all_states(
+            _JustAnEncoder(), _FakeTensor(_BST_TOKENS), architecture="bst"
+        )
+    with pytest.raises(ValueError, match="builds its own forward/backward document masks"):
+        R.forward_all_states(
+            _FakeBST(), _FakeTensor(_BST_TOKENS), architecture="bst", mask=object()
+        )
+
+
+def test_extract_positions_carries_bst_secondary_state_and_only_for_bst(monkeypatch):
+    _install_stub_torch(monkeypatch)
+    tokens = np.tile(np.arange(69, dtype=np.int64), (4, 1))
+    tokens[:, -1] = R.EOS_TOKEN_ID
+
+    bst = R.extract_positions(_FakeBST(), tokens, architecture="bst", batch_size=2)
+    assert bst["architecture"] == "bst"
+    assert bst["state_source"].startswith("models/model_bst.py:287")
+    assert bst["positions"].tolist() == [62, 63]
+    assert bst["hidden"].shape == (4, 2, 6)
+    assert bst["logits"].shape == (4, 2, 5)
+    assert bst["hidden_texthead"].shape == (4, 2, 6)
+    assert np.allclose(bst["hidden"], _post_norm(tokens)[:, [62, 63], :], atol=1e-6)
+    # Batching must not change the lone-EOS backward embedding, which is built per chunk.
+    assert np.allclose(bst["hidden_texthead"][0], bst["hidden_texthead"][3], atol=1e-6)
+
+    for arch, model in (("gpt", _FakeGPT()), ("nextlat", _FakeNextLat())):
+        out = R.extract_positions(model, tokens, architecture=arch, batch_size=2)
+        assert "hidden_texthead" not in out, (
+            "only BST has a second candidate state; inventing one for the other arms "
+            "would make the three-arm extraction look symmetric when it is not"
+        )
+        assert out["architecture"] == arch
+        assert out["state_source"] == R.STATE_SOURCE[arch]
+
+
+# =====================================================================================
+# 14. THE THREE-ARM DESIGN
+#
+# Three things have to hold before any of these numbers may appear in a writeup.
+#   (a) PSI is recovered per arm and the RANKING between arms survives the pipeline;
+#   (b) the cross-model contrast is a statement about SEEDS and cannot quietly become a
+#       statement about items, which would be ~80x too precise while estimating something
+#       else entirely;
+#   (c) the "what could three seeds not have seen" number behaves like a power curve —
+#       monotone in n — rather than like a constant someone typed in.
+# =====================================================================================
+
+
+def _mirrored_cell(alpha_s, alpha_c, *, dim, n_pairs, rng):
+    """One (arm, seed) cell whose PSI is exactly ``cos(alpha_s) - cos(alpha_c)``.
+
+    Same construction as section 3: mirrored item pairs put the pool mean exactly at the
+    cell's own offset, so centered cosine reduces to raw cosine and the PSI is analytic
+    rather than approximate.  Each cell gets its own random basis and its own offset, so
+    an implementation that pooled the centering mean ACROSS arms or across seeds — which
+    is a real and easy mistake once three arms exist — would not reproduce these values.
+    """
+    e0, e1, e2 = orthonormal_basis(dim, 3, rng)
+    a = e0
+    s = math.cos(alpha_s) * e0 + math.sin(alpha_s) * e1
+    c = math.cos(alpha_c) * e0 + math.sin(alpha_c) * e2
+    offset = 4.0 * rng.standard_normal(dim)
+    base = np.vstack([a] * n_pairs + [-a] * n_pairs) + offset
+    safe = np.vstack([s] * n_pairs + [-s] * n_pairs) + offset
+    crit = np.vstack([c] * n_pairs + [-c] * n_pairs) + offset
+    pool = R.CenteringPool.from_conditions(
+        base=base, near_safe=safe, near_critical=crit,
+        declared_missing=("repeat", "far_critical"),
+    )
+    out = E.psi_distances_centered_cosine(base, crit, safe, centering_pool=pool)
+    return (out["d_critical"], out["d_safe"]), math.cos(alpha_s) - math.cos(alpha_c)
+
+
+def test_three_arm_geometry_recovers_known_psi_and_the_arm_ranking():
+    """A synthetic three-arm geometry with an exactly known PSI per (arm, seed) cell.
+
+    Angles are chosen so the three arms are separated by construction:
+
+        nextlat  base->critical opens to ~1.10 rad   PSI ~ 0.50
+        bst      ...to ~0.75 rad                     PSI ~ 0.23
+        gpt      ...to ~0.40 rad                     PSI ~ 0.03
+
+    Each seed perturbs the critical angle slightly, so the seed-to-seed spread is real and
+    the contrast has something to be paired over, while every cell's PSI stays analytic.
+    """
+    rng = np.random.default_rng(20260823)
+    dim, n_pairs = 24, 30
+    alpha_s = 0.30
+    alpha_c = {"nextlat": 1.10, "bst": 0.75, "gpt": 0.40}
+    seeds = (1234, 1235, 1236)
+    jitter = {1234: -0.02, 1235: 0.0, 1236: +0.02}
+
+    distances, known = {}, {}
+    for arm in E.ARMS:
+        distances[arm], known[arm] = {}, {}
+        for seed in seeds:
+            cell, psi = _mirrored_cell(
+                alpha_s, alpha_c[arm] + jitter[seed], dim=dim, n_pairs=n_pairs, rng=rng
+            )
+            distances[arm][seed] = cell
+            known[arm][seed] = psi
+
+    per_arm = E.psi_per_arm(distances, rng=np.random.default_rng(7), n_boot=2000)
+
+    # (a) every cell's PSI is the analytic value, to machine precision.
+    for arm in E.ARMS:
+        for seed in seeds:
+            assert per_arm[arm].psi_by_seed[seed] == pytest.approx(
+                known[arm][seed], abs=1e-12
+            )
+            ci = per_arm[arm].per_seed[seed].ci
+            assert ci.unit == "item (quartet)" and ci.n_units == 2 * n_pairs
+        assert per_arm[arm].seed_mean == pytest.approx(
+            float(np.mean([known[arm][s] for s in seeds])), abs=1e-12
+        )
+
+    # (b) the ranking survives, and it is a ranking with real gaps rather than ties.
+    order = sorted(E.ARMS, key=lambda a: per_arm[a].seed_mean, reverse=True)
+    assert order == ["nextlat", "bst", "gpt"]
+    assert per_arm["nextlat"].seed_mean - per_arm["bst"].seed_mean > 0.2
+    assert per_arm["bst"].seed_mean - per_arm["gpt"].seed_mean > 0.15
+    assert per_arm["nextlat"].seed_mean == pytest.approx(0.502, abs=0.01)
+    assert per_arm["bst"].seed_mean == pytest.approx(0.226, abs=0.01)
+    assert per_arm["gpt"].seed_mean == pytest.approx(0.034, abs=0.01)
+
+    # (c) the contrasts are the differences of those arm means, in the PREREGISTERED
+    #     order — which is NOT the order of effect size.  nextlat-gpt is the largest gap
+    #     here and it still comes second, because the primary contrast is the
+    #     competence-matched one, fixed before any number existed.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")          # 3 seeds < MIN_SEEDS_FOR_INTERVAL
+        report = E.three_arm_contrasts(per_arm, rng=np.random.default_rng(11), n_boot=2000)
+    names = [c.spec.name for c in report.contrasts]
+    assert names == ["nextlat_minus_bst", "nextlat_minus_gpt", "bst_minus_gpt"]
+    assert [c.spec.priority for c in report.contrasts] == [1, 2, 3]
+    assert report.primary.spec.role.startswith("primary")
+    biggest = max(report.contrasts, key=lambda c: abs(c.estimate))
+    assert biggest.spec.name == "nextlat_minus_gpt" and names[0] != biggest.spec.name
+
+    for c in report.contrasts:
+        want = per_arm[c.spec.label_a].seed_mean - per_arm[c.spec.label_b].seed_mean
+        assert c.estimate == pytest.approx(want, abs=1e-12)
+        assert c.contrast.ci.unit == "training seed"
+
+    # (d) the confound is carried in the object, not left to the writeup to remember.
+    assert "chance" in report.by_name("nextlat_minus_gpt").spec.reading
+    assert "competence-matched" in report.by_name("nextlat_minus_bst").spec.role
+    assert "competence alone" in report.by_name("bst_minus_gpt").spec.reading
+
+    # (e) a dropped arm is an error, not a two-arm report that looks complete.
+    with pytest.raises(ValueError, match="missing arm"):
+        E.psi_per_arm(
+            {k: v for k, v in distances.items() if k != "bst"},
+            rng=np.random.default_rng(7),
+            n_boot=50,
+        )
+
+
+def test_seed_level_contrast_does_not_collapse_to_an_item_level_one():
+    """Items must not be smuggled in where seeds belong — in TYPE and in WIDTH.
+
+    The geometry is built so the two answers genuinely disagree.  Pooled over items the
+    NextLat-minus-BST difference is a clean positive effect with a tight interval that
+    excludes zero.  Across the three trainings it is +0.30, -0.25, +0.02: the sign does
+    not replicate, the seed-level interval straddles zero, and the effect is far below
+    what three seeds could have detected.  An analysis that quoted the item-level number
+    as the cross-model result would report a confident effect that the seeds do not show.
+    """
+    rng = np.random.default_rng(4321)
+    seeds = (1234, 1235, 1236)
+    seed_shift = {1234: +0.30, 1235: -0.25, 1236: +0.02}
+    n_items = 4000
+
+    nextlat_items, bst_items = {}, {}
+    for s in seeds:
+        base = 0.20 + 0.02 * rng.standard_normal(n_items)
+        bst_items[s] = base
+        nextlat_items[s] = base + seed_shift[s] + 0.02 * rng.standard_normal(n_items)
+
+    # --- the item-level answer: pooled quartets, very tight, excludes zero -------------
+    pooled = np.concatenate([nextlat_items[s] - bst_items[s] for s in seeds])
+    item_ci = E.paired_bootstrap_mean(
+        pooled, unit="item (quartet)", rng=np.random.default_rng(1), n_boot=4000
+    )
+    assert item_ci.n_units == 3 * n_items
+    assert item_ci.ci_low > 0.0, "item-level pooling calls this a positive effect"
+
+    # --- the seed-level answer: three trainings, wide, straddles zero -----------------
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        report = E.three_arm_contrasts(
+            {
+                "nextlat": {s: float(nextlat_items[s].mean()) for s in seeds},
+                "bst": {s: float(bst_items[s].mean()) for s in seeds},
+                "gpt": {s: 0.0 for s in seeds},
+            },
+            rng=np.random.default_rng(2),
+            n_boot=4000,
+        )
+    primary = report.primary
+    assert primary.contrast.ci.unit == "training seed"
+    assert primary.contrast.ci.n_units == 3, "three trainings, not 12,000 quartets"
+    assert primary.contrast.n_seeds == 3 and primary.contrast.underpowered
+
+    seed_width = primary.contrast.ci.ci_high - primary.contrast.ci.ci_low
+    item_width = item_ci.ci_high - item_ci.ci_low
+    assert seed_width > 20 * item_width, (
+        f"seed-level width {seed_width:.4f} vs item-level {item_width:.4f}: if these "
+        "were comparable, the two units would be interchangeable and they are not"
+    )
+    assert primary.contrast.ci.ci_low < 0.0 < primary.contrast.ci.ci_high
+    assert not primary.exceeds_mde, "and the design could not have resolved this effect"
+    assert primary.contrast.sign_flip_p == 1.0 or primary.contrast.sign_flip_p >= 0.25
+
+    # --- and the type wall: an item array is refused at every entry point --------------
+    item_arrays = {arm: np.zeros(n_items) for arm in E.ARMS}
+    with pytest.raises(TypeError, match="seeds are the inferential unit"):
+        E.three_arm_contrasts(item_arrays, rng=np.random.default_rng(3))
+    with pytest.raises(TypeError, match="seeds are the inferential unit"):
+        E.psi_per_arm(
+            {arm: (np.zeros(10), np.zeros(10)) for arm in E.ARMS},
+            rng=np.random.default_rng(3),
+            n_boot=50,
+        )
+    # Concatenating the items of all three seeds into one "seed" is the other way to
+    # collapse the unit; the seed-set check catches it because the arms stop matching.
+    with pytest.raises(ValueError, match="seed sets differ"):
+        E.three_arm_contrasts(
+            {
+                "nextlat": {"all_seeds_pooled": 0.5},
+                "bst": {s: 0.2 for s in seeds},
+                "gpt": {s: 0.0 for s in seeds},
+            },
+            rng=np.random.default_rng(3),
+        )
+
+
+def test_minimum_detectable_effect_is_monotone_in_the_number_of_seeds():
+    """The MDE must behave like a power curve, and say what three seeds cannot do."""
+    sd = 0.037
+    mdes = [E.minimum_detectable_effect(sd, n).mde for n in range(2, 31)]
+    assert all(b < a for a, b in zip(mdes, mdes[1:])), (
+        "strictly decreasing in n: more seeds can only ever detect a smaller effect"
+    )
+    assert mdes[0] > mdes[-1] * 5
+
+    # Scale-free in the right way: the MDE is a multiple of the per-seed SD.
+    for n in (3, 5, 8):
+        one = E.minimum_detectable_effect(1.0, n).mde
+        assert E.minimum_detectable_effect(sd, n).mde == pytest.approx(sd * one, rel=1e-9)
+    # ...and larger for a stricter alpha or a higher power target, at fixed n.
+    assert (
+        E.minimum_detectable_effect(sd, 3, alpha=0.01).mde
+        > E.minimum_detectable_effect(sd, 3, alpha=0.05).mde
+    )
+    assert (
+        E.minimum_detectable_effect(sd, 3, power=0.95).mde
+        > E.minimum_detectable_effect(sd, 3, power=0.80).mde
+    )
+
+    # The confirmatory design, stated plainly.  Three seeds resolve nothing under ~3.2
+    # seed-level SDs, and the exact sign-flip test cannot reach 0.05 at ANY effect size
+    # because its floor is 2^-2 = 0.25.  Five seeds do not fix that either (floor
+    # 0.0625); six is the first n that can.
+    three = E.minimum_detectable_effect(1.0, 3)
+    assert three.mde == pytest.approx(3.26, abs=0.05)
+    assert three.sign_flip_p_floor == 0.25
+    assert three.randomization_test_can_reject is False
+    assert E.minimum_detectable_effect(1.0, 5).randomization_test_can_reject is False
+    assert E.minimum_detectable_effect(1.0, 6).randomization_test_can_reject is True
+    # The floor reported here must be the SAME number the contrast itself reports, or a
+    # reader could reconcile two different accounts of what three seeds can show.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        contrast = E.model_contrast_seed_level(
+            {1: 1.0, 2: 2.0, 3: 3.0},
+            {1: 0.0, 2: 0.0, 3: 0.0},
+            label_a="a",
+            label_b="b",
+            rng=np.random.default_rng(0),
+            n_boot=200,
+        )
+    assert contrast.min_attainable_p == three.sign_flip_p_floor == 0.25
+
+    # The two-t approximation is reported alongside and agrees once df is not tiny.
+    for n in (6, 10, 20):
+        r = E.minimum_detectable_effect(1.0, n)
+        assert r.mde_two_t_approximation == pytest.approx(r.mde, rel=0.02)
+
+    for bad in ({"sd_per_seed": -1.0, "n_seeds": 3}, {"sd_per_seed": 1.0, "n_seeds": 1}):
+        with pytest.raises(ValueError):
+            E.minimum_detectable_effect(**bad)
+    with pytest.raises(ValueError):
+        E.minimum_detectable_effect(1.0, 3, power=1.0)
+    with pytest.raises(ValueError):
+        E.minimum_detectable_effect(1.0, 3, alpha=0.0)

@@ -6,7 +6,8 @@ reconstructed from the spec document.
 
 - Pinned upstream: `JaydenTeoh/NextLat` @ `3770be6009cea2b3c455a9ce7f2ca88b504bb955`
 - Sources: `config/stargraph/5_5/gpt_stargraph_5_5.yaml`,
-  `config/stargraph/5_5/nextlat_stargraph_5_5.yaml`, merged over `defaults.yaml`
+  `config/stargraph/5_5/nextlat_stargraph_5_5.yaml`,
+  `config/stargraph/5_5/bst_stargraph_5_5.yaml`, merged over `defaults.yaml`
 - Generator: `scripts/materialize_configs.py` (machine-readable record: `configs/overrides.json`)
 - Verification: `tests/test_configs.py` (150 checks), `tests/test_profile_tooling.py`
 
@@ -59,7 +60,7 @@ All five shipped `config/stargraph/5_5/*.yaml` set `compile: true`
 (`gpt_stargraph_5_5.yaml:17`, `nextlat_stargraph_5_5.yaml:16`), contradicting the repository's
 own `README.md:117-122`: *"We observe that `torch.compile()` produces inconsistent results on
 numerically sensitive benchmarks like Path-Star and A5 ... we recommend setting
-`trainer: compile: false`."* Spec section 8 requires `false`. Applied to all six configs.
+`trainer: compile: false`."* Spec section 8 requires `false`. Applied to all seven configs.
 
 Second-order benefit: with `compile: true` the trunk becomes an `OptimizedModule` and every
 submodule path gains an `_orig_mod` level, which would break the read-only forward hook on
@@ -109,6 +110,148 @@ Hoisted, value-preserving: `trainer.save_last_checkpoint`, `trainer.save_best_ch
 
 Same override table as `gpt_lurestar.yaml` with `gpt` -> `nextlat` in `trainer.out_dir` and
 `trainer.experiment_name`. Additional hoists: **`model.proj_factor`** and `model.lambda_ce`.
+
+### `configs/bst_lurestar.yaml` — from `config/stargraph/5_5/bst_stargraph_5_5.yaml`
+
+The third architecture-matched arm of spec section 8, added on 2026-08-23 as the
+**competence-matched control** (`docs/DECISION_D20_competence_gate.md`, "Superseded in
+part"). The paper's Figure 6 puts BST at ~99.9% exact-path accuracy on `G(5,5)` against
+GPT at ~18.6%, which is `1/d`, chance. BST therefore solves Path-Star *without* a
+latent-transition objective, so a NextLat-versus-BST PSI gap is attributable to the
+objective rather than to task success. Primary contrast: NextLat vs BST. Secondary and
+competence-confounded: NextLat vs GPT. Competence alone: BST vs GPT.
+
+Same override table as `gpt_lurestar.yaml` with `gpt` -> `bst` in `trainer.out_dir` and
+`trainer.experiment_name`:
+
+| key | value | category | authority |
+|---|---|---|---|
+| `seed` | `1234` | SEED | spec 8 |
+| `trainer.compile` | `false` | CORRECTION | spec 8 + RUNLOG |
+| `trainer.out_dir` | `/content/lurestar/runs/bst/seed1234/base` | OUTPUT | spec 9 |
+| `trainer.experiment_name` | `bst-seed1234-base` | OUTPUT | spec 9 |
+| `trainer.save_recovery_checkpoint` | `250` | CKPT | spec 9 |
+| `trainer.log_to_wandb` | `false` | EXEC | — |
+| `data.stargraph_train_data_path` | `/content/lurestar/data/stargraph/graph_5_5_sample_200000.txt` | MANIFEST | spec 8 |
+| `data.stargraph_test_data_path` | `/content/lurestar/data/stargraph/graph_5_5_test_20000.txt` | MANIFEST | spec 8 |
+
+Hoisted, value-preserving: `trainer.save_last_checkpoint`, `trainer.save_best_checkpoint`,
+`trainer.log_to_file`, `trainer.init_from`, `model.compute_hidden_state_rank`,
+`use_nextlat`, **`model.bst_pair_maximum_gap`**, **`model.bst_pair_subsample_rate`**,
+**`model.bst_single_gap_prediction_mode`**, **`data.pair_batch_size`**.
+
+Nothing is dropped. No frozen key moves, so the BST arm claims no frozen-surface exemption.
+
+#### How the official BST YAML differs from the official GPT YAML
+
+Ignoring `trainer.experiment_name` (a label) and the `sweep:` block, the two pinned files
+differ in exactly three flattened keys, and only two of them are settings:
+
+| key | GPT YAML | BST YAML | effect |
+|---|---|---|---|
+| `use_bst` | `false` | **`true`** | selects `BST`/`BSTConfig` at `core_train.py:38-40` |
+| `model.bst_pair_minimum_gap` | *(absent -> `defaults.yaml:98` = 1)* | **`2`** | minimum `(t, t+k)` gap BST trains on |
+| `use_nextlat` | `false` | *(absent -> `defaults.yaml:3` = false)* | none; resolves false either way |
+
+`tests/test_configs.py::test_bst_config_differs_from_the_official_gpt_config_by_two_keys_only`
+asserts that set exactly against the pinned YAMLs, so the claim cannot rot.
+
+Note that `bst_pair_minimum_gap` lives under **`model:`**, not under `data:`. It is read at
+`core_train.py:80` and passed into `BSTConfig`, and `models/model_bst.py:409-414` uses it as
+the `min_gap` of `_create_pair_indices`.
+
+#### The BST keys that are written in no stargraph YAML — the D-07 hazard, again
+
+`docs/FOUNDATIONS.md` D-07 records the `proj_factor` failure: a scientifically relevant
+value that upstream only ever reaches through a fallback. BST has four more of them. Three
+are consumed by `core_train.py:75-84` when it builds `model_args`, one is asserted at
+`core_train.py:41-44` before the model exists, and one arrives through the trainer loop.
+**None of them appears in any `config/stargraph/**/*.yaml`.** All are hoisted into
+`configs/bst_lurestar.yaml` at their resolved values and added to `FROZEN_KEYS`:
+
+| key | resolves from | value | what it controls |
+|---|---|---|---|
+| `model.bst_pair_maximum_gap` | `defaults.yaml:99` | `-1` | `model_bst.py:377-378` turns `-1` into `max_gap = document_len`, i.e. train on every gap |
+| `model.bst_pair_subsample_rate` | `defaults.yaml:102` | `1.0` | `model_bst.py:478-483`: at `1.0` the subsample branch is skipped and every valid pair is kept; below `1.0` the training set becomes stochastic per step |
+| `model.bst_single_gap_prediction_mode` | `defaults.yaml:104` | `eos` | `model_bst.py:584-588` rewrites the targets of gap-1 pairs. **Inert at `bst_pair_minimum_gap: 2`**, which produces no gap-1 pairs — but `core_train.py:41-44` asserts membership in `["next_token", "eos"]` before the model is built, so a missing value aborts the run at step 0, and lowering the minimum gap would make it live |
+| `data.pair_batch_size` | `defaults.yaml:67` | `32768` | text-head chunk size — **and a loss-scaling key**, see below |
+| `model.context_length` | the BST YAML (`0`) | `62` at runtime | `data/stargraph.py:243-251` overwrites it with `graph_description_len`; `model_bst.py:411` uses it as the first index a pair may start at, so BST never pairs inside the graph description |
+
+`data.pair_batch_size` deserves the emphasis. `core_train.py:495` and `:635` pass it to
+`compute_loss` for **every** arm, but GPT and NextLat absorb it into
+`**kwargs  # Extra arguments ignored for compatibility with BST` (`model_gpt.py:342`,
+`model_nextlat.py:418`). Only BST reads it, and it is not a pure memory knob:
+
+```python
+pair_accum_steps  = math.ceil(n_pairs / pair_batch_size)      # model_bst.py:600
+texthead_loss_div = loss_div * batch_size * pair_accum_steps  # model_bst.py:601
+```
+
+With more than one chunk the text-head loss becomes a mean of chunk means rather than the
+mean over pairs, and since the final chunk is short the gradient reweights. At `G(5,5)`
+scale it never bites — one tokenized sequence is 69 tokens with `context_length` 62, so
+`_create_pair_indices` yields `5+4+3+2+1 = 15` pairs at `min_gap: 2` against a chunk of
+32,768, giving exactly one chunk — but the value is pinned and the arithmetic is asserted
+rather than assumed (`test_bst_pair_batch_size_does_not_reweight_the_text_head_loss`).
+
+At the fallback `bst_pair_minimum_gap: 1` the same sequence yields **21** pairs instead of
+15, which is why losing that one key silently trains a different objective.
+
+**`data.pair_accum_steps: 1` is a dead key.** It is written in all fifteen shipped
+`config/**/*.yaml` files and read by no Python in the pinned tree — `pair_accum_steps` at
+`model_bst.py:600` is a local variable derived from `pair_batch_size`. It is copied through
+because it is an upstream key (I1), not because anything consumes it.
+
+#### "Architecture-matched" — what is true, and what must be qualified
+
+`models/model_bst.py:28` imports the very `Block` class `models/model_gpt.py:154` defines,
+and builds it at the same `n_layer: 12`, `n_head: 6`, `n_embd: 384`, `bias: false`,
+`dropout: 0.0`. **A BST layer and a GPT layer are the same object at the same width**, and
+the optimizer, schedule, effective batch size, corpus and step count are identical across
+the three arms. That is the sense in which the arms are architecture-matched, and
+`test_bst_is_architecture_matched_to_gpt_and_nextlat` asserts all of it key by key.
+
+BST is **not parameter-matched**, and the writeup must say so. `models/model_bst.py:148-161`
+builds **two** independent stacks — `transformer_f` and `transformer_b` — over one shared
+`token_embedding`, and `models/model_bst.py:53-77` adds a `TextHead` on top of the
+concatenated forward/backward embedding:
+
+| component | shape | params |
+|---|---|---|
+| `token_embedding` (shared by both stacks) | 106 x 384 | 40,704 |
+| `transformer_f` — 12 Blocks + final LayerNorm | | 21,243,264 |
+| `transformer_b` — 12 Blocks + final LayerNorm | | 21,243,264 |
+| **`TransformerEncoder` total** | | **42,527,232** |
+| `TextHead` `SwiGLU(768 -> 2048)` = `Linear(768 -> 4096)` | | 3,145,728 |
+| `TextHead` `Linear(2048 -> 768)` | | 1,572,864 |
+| `TextHead` `norm` `LayerNorm(768)`, weight only | 768 | 768 |
+| `TextHead` `lm_head` `Linear(384 -> 106)` | | 40,704 |
+| **`TextHead` total** | | **4,760,064** |
+| **BST total** (`get_num_params(non_embedding=False)`, `model_bst.py:350-360`) | | **47,287,296** |
+
+Set against the other two arms at the same `vocab_size` 106 and `block_size` 69:
+
+| arm | parameters (incl. embedding) | vs GPT |
+|---|---|---|
+| GPT | 21,324,672 | — |
+| NextLat, `proj_factor: 0.5` | 21,915,264 | +590,592 (latent-dynamics MLP) |
+| BST | **47,287,296** | +25,962,624 (a second 12-layer stack, +4,760,064 `TextHead`, −40,704 for the embedding it shares) |
+
+BST is 2.217x GPT. The honest phrasing for the writeup is: *the three arms are matched on
+layer definition, width, depth, optimizer, schedule, batch size, corpus and step budget;
+BST additionally carries a second encoder stack and a text head, as the BST objective
+requires, so it is architecture-matched but not parameter-matched.* The alternative — a
+6-layer BST to match parameters — would break the depth match instead and is not what the
+paper's Figure 6 result was measured at, so it is not on the table.
+
+`TextHead`'s hidden width is `128 * round((8 * 768 / 3) / 128) = 2048`, the same
+`SwiGLU` sizing rule the GPT MLP uses (`model_gpt.py:139-140`), applied to `2 * n_embd`.
+
+One consequence worth recording before extraction starts: BST's post-normalization hidden
+states are at **`model.encoder.transformer_f.norm`** and `...transformer_b.norm`, not at
+`model.model.transformer.norm` where the GPT and NextLat hook attaches, and there are two
+of them per token. What "the representation" means for BST is an extraction decision, not a
+config one, and it is not settled by this document.
 
 ### `configs/adapt_near.yaml` and `configs/adapt_far.yaml` — from the NextLat G(5,5) YAML
 
@@ -203,6 +346,11 @@ optimizer.grad_clip                100        model.lambda_ce        0.0  (NextL
 lr_scheduler.schedule         constant        model.proj_factor      0.5  (NextLat only)
 lr_scheduler.warmup_iters            0        seed                                1234
 lr_scheduler.warmdown_iters          0        preregistered seeds   1234, 1235, 1236
+
+model.bst_pair_minimum_gap             2  (BST only)   data.pair_batch_size   32768  (BST only)
+model.bst_pair_maximum_gap            -1  (BST only)   data.pair_accum_steps      1  (dead key)
+model.bst_pair_subsample_rate        1.0  (BST only)
+model.bst_single_gap_prediction_mode eos  (BST only)
 ```
 
 One parsing note that matters for this table: PyYAML follows YAML 1.1, whose implicit float
@@ -305,10 +453,11 @@ It resolves the per-job output root and experiment name, checks the precondition
 fails silently on, prints the exact command, and execs it.
 
 ```bash
-# Lure-Star base runs, three preregistered seeds, two models
+# Lure-Star base runs, three preregistered seeds, three architecture-matched arms
 for s in 1234 1235 1236; do
   scripts/launch_train.sh gpt_lurestar.yaml     "$s"
   scripts/launch_train.sh nextlat_lurestar.yaml "$s"
+  scripts/launch_train.sh bst_lurestar.yaml     "$s"   # competence-matched control
 done
 
 # H3 adaptation: the same two files drive both models
@@ -410,7 +559,7 @@ can ever collide with an upstream one.
 `train.py:15,17,24` import `wandb` unconditionally, so the package must be installed even for
 a fully offline run, and `defaults.yaml:34` sets `log_to_wandb: true` while none of the shipped
 5_5 YAMLs override it — an unmodified run attempts `wandb.init` on the first `log_dict`. All
-six configs set `trainer.log_to_wandb: false` and keep `trainer.log_to_file: true`, so the
+seven configs set `trainer.log_to_wandb: false` and keep `trainer.log_to_file: true`, so the
 CSVLogger output at `{out_dir}/{experiment_name}/version_N/metrics.csv` is the metric record
 that `scripts/profile_summarize.py` and the run ledger parse. This is an execution-environment
 override with no scientific surface.

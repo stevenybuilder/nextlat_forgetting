@@ -389,15 +389,20 @@ $ .venv/bin/python -m pytest tests/test_configs.py -q -k "bound_to_their_branch 
 `tests/test_hmm_pairs.py` failures the implementer reported were fixed by another agent during
 this review.)
 
-**Whole-repo run at the moment I finished: `5 failed, 457 passed`.** All five are the
-concurrent BST arm mid-landing, in files this track does not own —
-`tests/test_run_matrix.py` (four, all variants of
-`assert len(jobs) == 2 * 3 * 3` now seeing 27 jobs because the matrix has three models) and
-`tests/test_representations.py::test_layer_b_architecture_name_is_validated_before_torch_is_touched`.
-Diagnosed, not caused by anything in this review: none of the changed files
-(`materialize_configs.py`, `profile_summarize.py`, `launch_train.sh`, `test_configs.py`,
-`test_profile_tooling.py`, `test_launch_train.py`) is imported by either module. The three
-files this track owns were green in the same run.
+Whole repository, once the concurrent BST arm finished landing:
+
+```
+$ .venv/bin/python -m pytest -q
+532 passed in 75.10s (0:01:15)
+```
+
+(Intermediate runs during that landing showed up to 5 failures, all in
+`tests/test_run_matrix.py` and `tests/test_representations.py` — the BST arm mid-flight, in
+files this track does not own and that import none of the files changed here. They are green
+in the run above.)
+
+`tests/test_launch_train.py` was extended by that agent with a `bst_lurestar.yaml` case while
+this review was running, and it passes, so the BST launch path is covered by the same guards.
 
 ### The three P0 reproductions, replayed against the fixed track
 
@@ -468,6 +473,17 @@ review was running. Two things to settle, by a human:
 2. Mechanically it is fine with the fix in this review: its `family` is `lurestar`, so I5
    pins it to the frozen 200,000/20,000 corpus, and
    `materialize_configs.py --check` reports `OK  7 configs`.
+
+## Disclosure: concurrent-edit hazard on this file's neighbours
+
+`docs/CONFIG_DEVIATIONS.md` was being edited by another agent at the same time as this review.
+Both of us rewrite it whole-file, so either could silently drop the other's paragraphs. My
+edits to it are five targeted string replacements (the I5 row and paragraph, the profiling-gate
+paragraph, and the adaptation-launch paragraph), and a copy of my version is at
+`<scratchpad>/cd.mine` in case a later write loses them. If
+`test_every_override_is_documented` or `test_gradient_accumulation_fallback_rule_is_written_down`
+ever fails, that is the failure mode. **Two agents should not be whole-file-rewriting the same
+markdown deliverable**; this belongs in `PROGRAM.md` as a loop invariant.
 
 ## What remains
 

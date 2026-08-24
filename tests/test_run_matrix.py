@@ -649,3 +649,245 @@ def test_a_torn_upstream_checkpoint_rolls_back_to_the_validation_checkpoint(tmp_
     plan = make_runner(tmp_path, FakeLauncher()).plan(spec, {})
     assert plan.resume_step == 14000
     assert (out / "recovery_ckpt").read_text().strip() == str(exp / "ckpt_iter_14000_0.4412.pt")
+
+
+# --------------------------------------------------------------------------------------
+# D-18: the directory upstream actually creates
+# --------------------------------------------------------------------------------------
+
+def test_the_runner_predicts_the_seed_suffixed_checkpoint_directory(tmp_path):
+    """D-18. `train.py:98-99` renames the experiment before any path is built::
+
+        if "seed" not in experiment_name:
+            experiment_name = experiment_name + f"-seed{config.seed}"
+
+    then overwrites `config.trainer.experiment_name` (train.py:125) and joins it onto
+    `trainer.out_dir` for every checkpoint (core_train.py:933,959). `bst-s1236-base` does
+    not contain the substring "seed" -- `s1236` is not `seed` -- so the real directory is
+    `bst-s1236-base-seed1236`. A runner that looks in `{out_root}/{job_id}/` finds an empty
+    path, `resolve()` returns None, and `run_job` writes "job exited 0 but left no verified
+    checkpoint": a finished 20,000-step run recorded FAILED.
+    """
+    assert upstream_experiment_dir_name("gpt-s1234-base", 1234) == "gpt-s1234-base-seed1234"
+    assert upstream_experiment_dir_name("bst-s1236-adapt-far", 1236) == \
+        "bst-s1236-adapt-far-seed1236"
+    # a name that already carries "seed" is left alone, exactly as upstream leaves it alone
+    assert upstream_experiment_dir_name("nextlat-seed1234-base", 1234) == \
+        "nextlat-seed1234-base"
+
+    for job in build_matrix(tmp_path / "r"):
+        assert "seed" not in job.experiment_name, job.experiment_name
+        assert job.experiment_dir_name == f"{job.job_id}-seed{job.seed}"
+        assert job.checkpoint_dir == str(
+            pathlib.Path(job.out_root) / f"{job.job_id}-seed{job.seed}")
+        assert job.to_dict()["checkpoint_dir"] == job.checkpoint_dir
+
+
+@pytest.mark.parametrize("model", MODELS)
+def test_a_finished_run_in_the_real_directory_is_found_for_every_arm(tmp_path, model):
+    """The whole matrix, not just GPT, must be hashed at the path upstream wrote to."""
+    cfg = tmp_path / "cfg.yaml"
+    cfg.write_text("trainer:\n  train_batches: 20000\n")
+    out = tmp_path / "runs" / model / "1234" / "base"
+    spec = JobSpec(job_id(model, 1234, "base"), model, 1234, "base", None, str(cfg),
+                   str(out), train_batches=20000)
+
+    exp = pathlib.Path(spec.checkpoint_dir)
+    exp.mkdir(parents=True)
+    assert exp.name.endswith("-seed1234")
+    save, _ = SER
+    with open(exp / "recovery_ckpt_iter_15000.pt", "wb") as fh:
+        save({"training_steps": 15000}, fh)
+    (out / "recovery_ckpt").write_text(str(exp / "recovery_ckpt_iter_15000.pt"))
+
+    plan = make_runner(tmp_path, FakeLauncher()).plan(spec, {})
+    assert not plan.fresh and plan.resume_step == 15000
+
+
+def test_checkpoints_under_the_unsuffixed_job_id_are_not_mistaken_for_the_run(tmp_path):
+    """Negative control for D-18: the unsuffixed directory is not where upstream writes."""
+    cfg = tmp_path / "cfg.yaml"
+    cfg.write_text("trainer:\n  train_batches: 20000\n")
+    out = tmp_path / "runs" / "bst" / "1236" / "base"
+    spec = JobSpec("bst-s1236-base", "bst", 1236, "base", None, str(cfg), str(out),
+                   train_batches=20000)
+
+    wrong = out / "bst-s1236-base"          # what a job-id-only prediction would use
+    wrong.mkdir(parents=True)
+    save, _ = SER
+    with open(wrong / "recovery_ckpt_iter_15000.pt", "wb") as fh:
+        save({"training_steps": 15000}, fh)
+
+    plan = make_runner(tmp_path, FakeLauncher()).plan(spec, {})
+    assert plan.fresh, "a stray directory must not be adopted as this job's history"
+    assert pathlib.Path(spec.checkpoint_dir).name == "bst-s1236-base-seed1236"
+
+
+# --------------------------------------------------------------------------------------
+# three-arm H3 parity
+# --------------------------------------------------------------------------------------
+
+def test_near_and_far_share_one_parent_in_every_arm(tmp_path):
+    """9 base parents, 18 branches, and each pair must hang off the same checkpoint.
+
+    Run for real through the production `MatrixRunner`, `Ledger` and `DurableCheckpointer`
+    over all three arms at one seed: near and far must record the SAME
+    `parent_checkpoint_sha256` as each other and as their own base's final checkpoint, and
+    the three arms must not collide on one parent.
+    """
+    jobs = build_matrix(tmp_path / "root", seeds=(1234,), base_steps=50, adapt_steps=50)
+    assert len(jobs) == 9
+    launcher = FakeLauncher()
+    states = make_runner(tmp_path, launcher).run(jobs)
+    assert [states[j.job_id]["status"] for j in jobs] == [DONE] * 9
+
+    parents = []
+    for model in MODELS:
+        base = states[job_id(model, 1234, "base")]
+        near = states[job_id(model, 1234, "adapt", "near")]
+        far = states[job_id(model, 1234, "adapt", "far")]
+        assert near["parent_checkpoint_sha256"] == far["parent_checkpoint_sha256"], model
+        assert near["parent_checkpoint_sha256"] == base["final_checkpoint_sha256"], model
+        assert sha256_file(base["final_checkpoint"]) == base["final_checkpoint_sha256"]
+        parents.append(base["final_checkpoint_sha256"])
+    assert len(set(parents)) == 3, "the three arms must not share a base checkpoint"
+    assert_branch_parity(states, jobs)
+
+
+def test_branch_parity_catches_a_crossed_parent_in_the_bst_arm(tmp_path):
+    jobs = build_matrix(tmp_path / "r", models=("bst",), seeds=(1236,))
+    states = {
+        "bst-s1236-adapt-near": {"status": DONE, "parent_checkpoint_sha256": "a" * 64},
+        "bst-s1236-adapt-far": {"status": DONE, "parent_checkpoint_sha256": "b" * 64},
+    }
+    with pytest.raises(RuntimeError, match="do not share a parent checkpoint"):
+        assert_branch_parity(states, jobs)
+    states["bst-s1236-adapt-far"]["parent_checkpoint_sha256"] = "a" * 64
+    assert_branch_parity(states, jobs)
+
+
+# --------------------------------------------------------------------------------------
+# D-19: an adaptation job that takes no updates
+# --------------------------------------------------------------------------------------
+
+class OffsetBlindLauncher(FakeLauncher):
+    """Upstream launched with the D-19 bug: exactly one update, then a clean exit.
+
+    `--checkpoint_path` restores `training_steps` (models/model_base.py:437), the trainer
+    seeds `self.step` from it (core_train.py:309), and the loop returns as soon as
+    `self.step > trainer.train_batches` (core_train.py:569) -- which, off a 20,000-step
+    parent asked for `train_batches=500`, happens after the FIRST optimizer step. Returncode
+    0, a final checkpoint on disk, a final summary written: indistinguishable from a good
+    run by every check except the update count.
+    """
+
+    def __call__(self, plan: ResumePlan) -> LaunchResult:
+        self.calls.append(plan)
+        spec = plan.spec
+        step = (plan.parent_steps or 0) + 1
+        self.updates[spec.job_id] = 1
+        ck = self._ckpt(spec)
+        ck.save({"step": step, "job": spec.job_id,
+                 "parent": plan.parent_checkpoint_sha256}, step, kind="final")
+        (pathlib.Path(spec.out_root) / "final_summary.json").write_text(
+            json.dumps({"job_id": spec.job_id, "step": step}) + "\n")
+        return LaunchResult(0, step, "ok")
+
+
+def _done_base(tmp_path, model, ledger):
+    jobs = build_matrix(tmp_path / "root", models=(model,), seeds=(1234,),
+                        base_steps=50, adapt_steps=50)
+    base = jobs[0]
+    MatrixRunner(ledger, FakeLauncher(), serializer=SER, echo=lambda m: None).run_job(
+        base, ledger.states())
+    assert ledger.state_of(base.job_id)["status"] == DONE
+    return jobs
+
+
+@pytest.mark.parametrize("model", MODELS)
+def test_an_adaptation_job_with_no_updates_is_never_marked_done(tmp_path, model):
+    """The failure D-19 describes is a SUCCESS-shaped failure, in every arm.
+
+    The job exits 0, leaves a verified checkpoint and writes its final artifact, so
+    returncode, artifact hashing and checkpoint verification all pass. The only thing wrong
+    with it is that no adaptation happened -- and an H3 branch that trained nothing still
+    produces an erosion number, which is why this has to be caught here rather than noticed
+    later in the analysis.
+    """
+    ledger = Ledger(tmp_path / "run_ledger.json")
+    jobs = _done_base(tmp_path, model, ledger)
+    near = next(j for j in jobs if j.condition == "near")
+
+    blind = OffsetBlindLauncher()
+    MatrixRunner(ledger, blind, serializer=SER, echo=lambda m: None).run_job(
+        near, ledger.states())
+
+    entry = ledger.state_of(near.job_id)
+    assert blind.updates[near.job_id] == 1, "the launcher really did exit 0 after one step"
+    assert entry["status"] == FAILED, "a one-update adaptation must not be DONE"
+    assert entry["updates"] == 1
+    assert entry["step"] == 51
+    assert "D-19" in entry["reason"] and "500-step adaptation branch" in entry["reason"]
+
+
+@pytest.mark.parametrize("model", MODELS)
+def test_an_adaptation_job_that_takes_zero_updates_is_not_marked_done(tmp_path, model):
+    """Same guard against the exact-zero shape: `train_batches` left at the parent's step."""
+    ledger = Ledger(tmp_path / "run_ledger.json")
+    jobs = _done_base(tmp_path, model, ledger)
+    far = next(j for j in jobs if j.condition == "far")
+
+    blind = FakeLauncher(ignore_parent_offset=True)
+    MatrixRunner(ledger, blind, serializer=SER, echo=lambda m: None).run_job(
+        far, ledger.states())
+
+    entry = ledger.state_of(far.job_id)
+    assert blind.updates.get(far.job_id, 0) == 0
+    assert entry["status"] == FAILED
+    assert entry["updates"] == 0
+    assert "D-19" in entry["reason"]
+
+
+@pytest.mark.parametrize("model", MODELS)
+def test_a_healthy_adaptation_records_its_update_count_in_the_ledger(tmp_path, model):
+    """`step` is upstream's offset-carrying counter; `updates` is what PROGRAM.md freezes."""
+    ledger = Ledger(tmp_path / "run_ledger.json")
+    jobs = _done_base(tmp_path, model, ledger)
+    base = jobs[0]
+    assert ledger.state_of(base.job_id)["updates"] == 50
+    assert ledger.state_of(base.job_id)["parent_steps"] is None
+
+    launcher = FakeLauncher()
+    runner = MatrixRunner(ledger, launcher, serializer=SER, echo=lambda m: None)
+    for spec in jobs[1:]:
+        runner.run_job(spec, ledger.states())
+        entry = ledger.state_of(spec.job_id)
+        assert entry["status"] == DONE, entry.get("reason")
+        assert entry["parent_steps"] == 50, "the branch started from the 50-step parent"
+        assert entry["step"] == 100, "upstream's counter carries the parent's offset"
+        assert entry["updates"] == 50 == spec.train_batches
+
+
+def test_branch_command_offsets_train_batches_in_every_arm(tmp_path):
+    """D-19 at the command layer, for all three arms and both branches."""
+    jobs = {j.job_id: j for j in
+            build_matrix(tmp_path / "r", seeds=(1234,), adapt_steps=500)}
+    launcher = FabricLauncher(tmp_path, dry_run=True)
+    for model in MODELS:
+        for cond in ("near", "far"):
+            spec = jobs[job_id(model, 1234, "adapt", cond)]
+            cmd = launcher.command(ResumePlan(
+                spec=spec, fresh=True, parent_checkpoint="/d/base/final.pt",
+                parent_steps=20000))
+            assert "trainer.train_batches=20500" in cmd
+            assert "trainer.train_batches=500" not in cmd, (
+                f"{spec.job_id}: 500 off a 20,000-step parent returns at core_train.py:569 "
+                "after one update"
+            )
+            asked = int(next(c for c in cmd
+                             if c.startswith("trainer.train_batches=")).split("=", 1)[1])
+            assert asked - 20000 == spec.train_batches == 500
+            # and an unknown parent step count is a refusal, never a silent 500
+            with pytest.raises(ValueError, match="without the parent's step count"):
+                launcher.command(ResumePlan(spec=spec, fresh=True,
+                                            parent_checkpoint="/d/base/final.pt"))

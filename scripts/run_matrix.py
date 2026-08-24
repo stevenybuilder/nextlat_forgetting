@@ -11,7 +11,10 @@ pick each job up from its newest *verified* checkpoint. Concretely it:
   4. preserves config, seed, manifests and output root across the resume, and refuses to launch
      if any of them changed under it;
   5. writes atomic `metrics/step_{step}.json` keyed by `(run_id, step)`;
-  6. marks `DONE` only after the final evaluation artifacts exist and verify.
+  6. marks `DONE` only after the final evaluation artifacts exist and verify;
+  7. and only after the job actually took the updates it was launched for -- a zero-update
+     adaptation branch (deviation D-19) exits 0 with a valid checkpoint and a valid final
+     artifact, so nothing above this line can tell it from a real run.
 
 The single most dangerous property it enforces is the output-root separation. Upstream's resume
 pointers `recovery_ckpt` and `latest_ckpt` live at `trainer.out_dir`, one directory *above* the
@@ -242,7 +245,10 @@ def build_matrix(
 ) -> list[JobSpec]:
     """One base job per (model, seed); one `near` and one `far` adaptation job hanging off it.
 
-    Directory layout is the spec's: `runs/{model}/{seed}/{phase}/{condition}/`.
+    With the shipped defaults that is 3 arms x 3 seeds = 9 base jobs and 18 adaptation
+    branches. Directory layout is the spec's: `runs/{model}/{seed}/{phase}/{condition}/`,
+    which keys the output root on the arm as well as the seed and the branch -- the three
+    arms must not share a resume pointer any more than near and far must.
     """
     root = pathlib.Path(root)
     if config_for is None:
@@ -801,7 +807,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--root", required=True, help="durable run root, e.g. /content/lurestar")
     ap.add_argument("--ledger", default=str(_REPO / "results" / "run_ledger.json"))
     ap.add_argument("--upstream", default=str(_REPO / "upstream" / "NextLat"))
-    ap.add_argument("--models", nargs="+", default=list(MODELS))
+    ap.add_argument("--models", nargs="+", default=list(MODELS), choices=list(MODELS),
+                    help="default: all three architecture-matched arms (spec section 8). "
+                         "Restricting this to gpt+nextlat drops the competence-matched "
+                         "control and demotes the primary contrast; do it only for a "
+                         "deliberate partial rerun.")
     ap.add_argument("--seeds", nargs="+", type=int, default=list(SEEDS))
     ap.add_argument("--phase", choices=["base", "adapt", "all"], default="all")
     ap.add_argument("--only", nargs="*", default=None, help="explicit job ids")

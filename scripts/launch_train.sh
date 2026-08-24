@@ -66,6 +66,9 @@ case "$CONFIG_NAME" in
     MODEL=gpt;     OUT_DIR="$LURESTAR_ROOT/runs/gpt/seed$SEED/base";     EXP="gpt-seed$SEED-base" ;;
   nextlat_lurestar.yaml)
     MODEL=nextlat; OUT_DIR="$LURESTAR_ROOT/runs/nextlat/seed$SEED/base"; EXP="nextlat-seed$SEED-base" ;;
+  bst_lurestar.yaml)
+    # Spec sec.8 arm 3: the competence-matched control (docs/DECISION_D20_competence_gate.md).
+    MODEL=bst;     OUT_DIR="$LURESTAR_ROOT/runs/bst/seed$SEED/base";     EXP="bst-seed$SEED-base" ;;
   adapt_near.yaml|adapt_far.yaml)
     BRANCH="${CONFIG_NAME#adapt_}"; BRANCH="${BRANCH%.yaml}"
     MODEL="${LURESTAR_MODEL:-}"
@@ -81,7 +84,7 @@ case "$CONFIG_NAME" in
     MODEL=gpt;     OUT_DIR="$LURESTAR_ROOT/runs/hmm/gpt/seed$SEED/base";     EXP="gpt-seed$SEED-hmm" ;;
   nextlat_hmm.yaml)
     MODEL=nextlat; OUT_DIR="$LURESTAR_ROOT/runs/hmm/nextlat/seed$SEED/base"; EXP="nextlat-seed$SEED-hmm" ;;
-  *) die "unknown config '$CONFIG_NAME'; expected one of the six deliverables in configs/" ;;
+  *) die "unknown config '$CONFIG_NAME'; expected one of the seven deliverables in configs/" ;;
 esac
 
 # --- preconditions upstream fails silently on ------------------------------------------

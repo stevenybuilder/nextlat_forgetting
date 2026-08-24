@@ -16,7 +16,6 @@
     "model.gpt_mode",
     "model.mtp_horizon",
     "model.proj_factor",
-    "model.bst_pair_minimum_gap",
     "model.lambda_mse",
     "model.lambda_kl",
     "model.lambda_ce",
