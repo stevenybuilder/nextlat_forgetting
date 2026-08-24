@@ -1,0 +1,25 @@
+{
+  "gpu": "NVIDIA A100-SXM4-40GB",
+  "torch": "2.11.0+cu128",
+  "cuda": "12.8",
+  "precision": "bf16-mixed",
+  "region": "us-central1 (same as bucket, no cross-region egress)",
+  "steps_profiled": 500,
+  "warmup_discarded": 100,
+  "config_source": "official config/stargraph/5_5/{gpt,nextlat}_stargraph_5_5.yaml, overriding only step count, out_dir, compile, and corpus paths",
+  "effective_batch_size": 512,
+  "gradient_accumulation_needed": false,
+  "gpt": {"steady_seconds_per_step": 0.2017, "wall_seconds_500_steps": 96.7, "checkpoint_bytes": 255994215},
+  "nextlat": {"steady_seconds_per_step": 0.2335, "wall_seconds_500_steps": 93.6, "checkpoint_bytes": 273703303},
+  "nextlat_overhead_x": 1.16,
+  "measured_a100_cu_per_hour": 5.3,
+  "projection": {
+    "base_gpu_hours": 7.25, "adapt_gpu_hours": 0.36, "hmm_gpu_hours_est": 0.25,
+    "total_plus_20pct_gpu_hours": 9.44, "total_compute_units": 50.0,
+    "percent_of_balance": 2.8
+  },
+  "known_measurement_gaps": [
+    "steady_seconds_per_step was parsed from the local log, not in-driver: the driver kept only a 60-line tail so its own estimate returned null (fixed in scripts/colab_profile.py for subsequent runs)",
+    "peak VRAM read torch.cuda stats in the driver process rather than the fabric child, so it reported 0.00 GB (fixed to poll nvidia-smi); peak VRAM is therefore NOT yet measured and must be captured on the first confirmatory run"
+  ]
+}

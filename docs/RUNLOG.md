@@ -112,3 +112,35 @@ risked measuring a state whose immediate prediction target cannot differ between
 near-critical. Resolution, frozen before any model is trained: extract both positions, keep index
 62 as the preregistered primary for PSI, and compute every correct-branch logit margin from index
 63.
+
+## Profiling gate — passed on A100, at exact paper scale
+
+Ran spec section 11's 500-step gate for both objectives on the real 200,000-graph corpus, with the
+config derived from the official YAML and only step count, out_dir, compile and corpus paths
+overridden. The corpus SHA-256 was verified on the runtime against the manifest before training
+(`d13199b0...`, `f52fb14e...`) - the file that trained is provably the file that was generated.
+
+| | GPT | NextLat |
+|---|---|---|
+| steady s/step (steps 100-500) | 0.2017 | 0.2335 |
+| wall for 500 steps | 96.7 s | 93.6 s |
+| checkpoint size | 256 MB | 274 MB |
+
+NextLat's overhead is **1.16x**, not the 1.6x the pre-run model assumed. Both fit the paper's
+physical batch of 512 on a 40 GB A100, so the gradient-accumulation fallback is not needed and the
+confirmatory path carries no batch-related deviation. `bf16-mixed` is available (capability 8.0), so
+no precision deviation either.
+
+Measured A100 burn rate is **5.3 CU/h**, against a pre-run prior of 11.77 - the budget was 2.2x too
+pessimistic. Full workload projects to 9.4 GPU-h and **50 compute units, 2.8% of the 1788 balance**.
+Credits are not the constraint; wall-clock across Colab session limits is, which is what the durable
+resume layer exists for.
+
+GPT reached train loss 0.444 by step 500 and NextLat 0.459 - both learning, neither diverging.
+
+Two measurement bugs in the profiler itself, both fixed for later runs and both worth recording
+because they are the same class of error as the `tail` exit-code bug: the driver kept only a 60-line
+tail of child output, so its own steady-state estimate silently returned `null` (the numbers above
+were recovered by parsing the full local log); and peak VRAM was read from `torch.cuda` in the driver
+process rather than the `fabric run` child, so it reported 0.00 GB. **Peak VRAM is therefore still
+unmeasured** and must be captured on the first confirmatory run.
