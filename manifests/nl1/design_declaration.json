@@ -1,0 +1,172 @@
+{
+  "schema": "nextlat_forgetting/nl1_design_declaration/1",
+  "study_id": "NL-1",
+  "declared_at": "2026-08-24T18:42:54-04:00",
+  "status": "BLOCKED_PREPARATION_PROFILE_AND_BUDGET",
+  "scientific_role": "separately_numbered_exploratory_natural_language_external_validation",
+  "outcome_blind": {
+    "nl1_model_outcomes_exist": false,
+    "model_outcomes_inspected_for_design": false,
+    "training_losses_inspected_for_design": false,
+    "existing_core_outcomes_may_select_nl1": false,
+    "nl1_may_rescue_core_nulls": false
+  },
+  "dataset": {
+    "id": "HuggingFaceFW/fineweb-edu",
+    "config": "sample-100BT",
+    "revision": "v1.0.0",
+    "tokenizer": "gpt2",
+    "description": "filtered real-world web English with an LLM-annotation-trained educational quality filter; residual duplication and machine-generated-page contamination may remain; not certified wholly human-authored",
+    "downloaded": false,
+    "document_level_split_required": true,
+    "split_salt": "nl1-v1|split|",
+    "split_bucket_contract": {
+      "modulus": 23,
+      "base_buckets": "0-19",
+      "retention_bucket": 20,
+      "adaptation_episode_0_bucket": 21,
+      "adaptation_episode_1_bucket": 22,
+      "streaming_fill": "accept_whole_documents_until_each_minimum_token_quota_is_met"
+    },
+    "near_duplicate_rule": {
+      "method": "token_5gram_minhash",
+      "estimated_jaccard_threshold": 0.8,
+      "action": "remove_both_cross_split_documents_then_continue_frozen_hash_order"
+    },
+    "token_quotas": {
+      "base": 2000000000,
+      "retention": 100000000,
+      "adaptation_episode_0": 100000000,
+      "adaptation_episode_1": 100000000
+    }
+  },
+  "upstream": {
+    "repository": "JaydenTeoh/NextLat",
+    "commit": "3770be6009cea2b3c455a9ce7f2ca88b504bb955",
+    "gpt_config": {
+      "path": "upstream/NextLat/config/fineweb/100M/gpt_finewebedu.yaml",
+      "sha256": "0570c8bc7a3a7bebe9608741e018e45678da8581aba75bcbd8b09f9f91a3b851"
+    },
+    "nextlat_config": {
+      "path": "upstream/NextLat/config/fineweb/100M/nextlat_finewebedu.yaml",
+      "sha256": "ed0a56c90a21b998a5e427d3929c9be2508f1f8ef2eeaf1e9ad9012e0ec3c0d0"
+    },
+    "fineweb_datamodule": {
+      "path": "upstream/NextLat/data/fineweb.py",
+      "sha256": "a1edde49cf7d27e2bc30c897f8978b2804621dc4217297936a5d137ef0ed93cf"
+    },
+    "fineweb_pretokenizer": {
+      "path": "upstream/NextLat/data/fineweb/pretokenize_finewebedu.py",
+      "sha256": "215cc708474175d57ff5c1ae372062e22f4eef9710907f5554817e4c5518039d"
+    }
+  },
+  "design": {
+    "models": [
+      "gpt",
+      "nextlat"
+    ],
+    "seeds": [
+      3234,
+      3235,
+      3236
+    ],
+    "episodes": [
+      0,
+      1
+    ],
+    "model": {
+      "n_layer": 12,
+      "n_head": 12,
+      "n_embd": 768,
+      "block_size": 1024,
+      "effective_batch_size": 512
+    },
+    "base_training": {
+      "optimizer_updates": 3814,
+      "token_exposures_per_run": 1999634432,
+      "lr_schedule": "wsd",
+      "warmup_updates": 200,
+      "warmdown_updates": 400,
+      "checkpoint_step": 3814
+    },
+    "adaptation": {
+      "full_parameter": true,
+      "loss": "teacher_forced_next_token_cross_entropy_only",
+      "optimizer": {
+        "type": "adamw",
+        "learning_rate": 0.0001,
+        "weight_decay": 0.1,
+        "beta1": 0.9,
+        "beta2": 0.95,
+        "grad_clip": 1.0,
+        "schedule": "constant",
+        "parent_optimizer_state_restored": false
+      },
+      "nextlat_auxiliary_coefficients": {
+        "lambda_mse": 0.0,
+        "lambda_kl": 0.0,
+        "lambda_ce": 0.0
+      },
+      "optimizer_updates_per_branch": 100,
+      "token_exposures_per_branch": 52428800,
+      "early_stopping": false
+    },
+    "retention": {
+      "documents": 2000,
+      "one_span_per_document": true,
+      "prefix_tokens": 512,
+      "continuation_tokens": 128
+    },
+    "update_anchors_per_episode": 4096,
+    "nearest_anchors_k": 16,
+    "representation_site": "final_post_normalization_state_at_prefix_token_511"
+  },
+  "primary_estimand": {
+    "proximity": "negative_median_cosine_distance_to_16_nearest_fixed_episode_anchors",
+    "forgetting": "post_minus_pre_mean_cross_entropy_on_fixed_128_token_natural_continuation",
+    "branch_statistic": "spearman_rho_proximity_forgetting",
+    "aggregation": "fisher_z_then_episode_mean_within_seed",
+    "model_contrast": "nextlat_minus_gpt",
+    "direction": "positive",
+    "causal_mediation_claim_permitted": false,
+    "exact_predictive_state_claim_permitted": false
+  },
+  "fixed_secondary": {
+    "lexical_control": "token_1_to_4gram_jaccard",
+    "negative_control_anchor_permutation": "cyclic_shift_1367",
+    "negative_control_layer": "input_embedding",
+    "future_token_probe_offsets": [
+      1,
+      5,
+      10,
+      20
+    ]
+  },
+  "profile": {
+    "updates_per_model": 200,
+    "warmup_updates_excluded_from_timing": 25,
+    "allowed_physical_microbatches": [
+      8,
+      4,
+      2,
+      1
+    ],
+    "scientific_metrics_may_be_opened": false,
+    "weights_may_enter_scientific_study": false,
+    "complete_profile_exists": false,
+    "launch_decision_rule": {
+      "maximum_projected_wall_hours": 120,
+      "maximum_incremental_gpu_rental_usd": 35,
+      "explicit_user_approval_required": true,
+      "if_either_cap_exceeded": "NO_LAUNCH_COMPUTE_CAP",
+      "reduced_scientific_fallback_permitted": false
+    }
+  },
+  "launch_blockers": [
+    "document_aware_splitter_and_validator_missing",
+    "immutable_dataset_tokenizer_and_shard_receipts_missing",
+    "single_gpu_equivalence_profile_missing",
+    "measured_cost_projection_missing",
+    "explicit_budget_approval_missing"
+  ]
+}

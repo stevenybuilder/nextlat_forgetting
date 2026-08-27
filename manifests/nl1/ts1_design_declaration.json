@@ -1,0 +1,211 @@
+{
+  "schema": "nextlat_forgetting/ts1_design_declaration/1",
+  "study_id": "TS-1",
+  "declared_at": "2026-08-24T19:13:06-04:00",
+  "status": "BLOCKED_DATA_PROFILE_AND_BUDGET",
+  "scientific_role": "focused_tinystories_parity_and_language_positive_control",
+  "outcome_blind": {
+    "ts1_model_outcomes_exist": false,
+    "model_outcomes_inspected_for_design": false,
+    "training_losses_inspected_for_design": false,
+    "existing_core_or_nl1_outcomes_may_select_ts1": false,
+    "ts1_may_rescue_core_or_nl1_nulls": false
+  },
+  "dataset": {
+    "id": "cyrilzhang/TinyStories2-ascii",
+    "revision": "eec46cef1415d7fb803f866bf5cc77da39e961fc",
+    "splits": [
+      "train",
+      "validation"
+    ],
+    "tokenizer_path": "upstream/NextLat/data/tinystories/tokenizer.json",
+    "vocab_size": 1000,
+    "provenance": "2.7_million_synthetic_short_stories_generated_by_GPT_3_5_and_GPT_4",
+    "downloaded": false,
+    "remote_metadata_only_at_declaration": true,
+    "exact_order_and_packing_receipt_required": true
+  },
+  "upstream": {
+    "repository": "JaydenTeoh/NextLat",
+    "commit": "3770be6009cea2b3c455a9ce7f2ca88b504bb955",
+    "gpt_config": {
+      "path": "upstream/NextLat/config/tinystories/gpt_tinystories.yaml",
+      "sha256": "090c137592224455b7c06b2e9df8e565454e7ed298e9a30df012ab51a45b98a2"
+    },
+    "nextlat_config": {
+      "path": "upstream/NextLat/config/tinystories/nextlat_tinystories.yaml",
+      "sha256": "9323c8b3acfa3da43e407c51e6ba236c1043343bfb8dce0ae5444d4585c8d131"
+    },
+    "gpt_probe_config": {
+      "path": "upstream/NextLat/config/tinystories/probe/gpt_probe.yaml",
+      "sha256": "69c4e39e3568237ac73777eeefa7b5e4a041c6089b0b1745b07869e069d480ac"
+    },
+    "nextlat_probe_config": {
+      "path": "upstream/NextLat/config/tinystories/probe/nextlat_probe.yaml",
+      "sha256": "2e5d90d0c4bce577e4fbfc6898679483f1ba9b716e01c8fc2035bd6a74655607"
+    },
+    "tinystories_datamodule": {
+      "path": "upstream/NextLat/data/tinystories.py",
+      "sha256": "7ec7dd9449a16a601b391d9e83fffb50163886fb40f911fb82c7c1456fb0d6ab"
+    },
+    "tokenizer": {
+      "path": "upstream/NextLat/data/tinystories/tokenizer.json",
+      "sha256": "f553f8cb51a7da97f94b8571d2e0342a18b722bc11bc7a2ca6b9ec9707399b21"
+    },
+    "probe_trainer": {
+      "path": "upstream/NextLat/train_probe.py",
+      "sha256": "dd2ddd66e6e215cf56b3b844c7890c0d95f5c7e99fd5bbe69c546bcd046d5a12"
+    },
+    "probe_model": {
+      "path": "upstream/NextLat/models/model_probe.py",
+      "sha256": "9c26ea9680f375a697e345f32ba553fddd567c35aca12323df33a49459e8edfe"
+    }
+  },
+  "design": {
+    "models": [
+      "gpt",
+      "nextlat_d1"
+    ],
+    "seeds": [
+      1234,
+      1235,
+      1236
+    ],
+    "scope": "focused_gpt_versus_nextlat_d1_not_full_v4_objective_roster",
+    "model": {
+      "n_layer": 8,
+      "n_head": 8,
+      "n_embd": 768,
+      "vocab_size": 1000,
+      "block_size": 256,
+      "effective_batch_size": 256
+    },
+    "nextlat_d1_overrides": {
+      "mtp_horizon": 1,
+      "lambda_kl": 1.0,
+      "lambda_mse": 1.0,
+      "proj_factor": 1.3
+    },
+    "base_training": {
+      "optimizer_updates": 100000,
+      "token_exposures_per_run": 6553600000,
+      "optimizer": "adamw",
+      "learning_rate": 0.0003,
+      "weight_decay": 0.1,
+      "beta1": 0.9,
+      "beta2": 0.95,
+      "grad_clip": 1.0,
+      "lr_schedule": "constant",
+      "checkpoint_step": 100000,
+      "best_checkpoint_selection_permitted": false,
+      "early_stopping": false
+    },
+    "probe": {
+      "transformer_frozen": true,
+      "offsets": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "independent_linear_token_heads": 20,
+      "joint_pinned_next_state_decoder_retained": true,
+      "optimizer_updates": 20000,
+      "token_forwards_per_run": 1310720000,
+      "effective_batch_size": 256,
+      "block_size": 256,
+      "checkpoint_step": 20000,
+      "best_checkpoint_selection_permitted": false
+    }
+  },
+  "primary_estimand": {
+    "offset_contrast": "gpt_probe_cross_entropy_minus_nextlat_d1_probe_cross_entropy",
+    "long_horizon_offsets": [
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "seed_statistic": "mean_offset_contrast_over_offsets_10_to_20",
+    "direction": "positive"
+  },
+  "parity_criterion": {
+    "mean_long_horizon_contrast_positive": true,
+    "minimum_positive_seed_mean_offsets_among_10_to_20": 8,
+    "maximum_absolute_seed_mean_offset_1_contrast_nats": 0.02,
+    "all_seeds_and_offsets_reported_even_on_failure": true
+  },
+  "compute": {
+    "base_runs": 6,
+    "base_optimizer_updates": 600000,
+    "base_token_exposures": 39321600000,
+    "probe_runs": 6,
+    "probe_optimizer_updates": 120000,
+    "probe_frozen_backbone_token_forwards": 7864320000,
+    "two_gpu_wall_formula": "max(3*(100000*b_G+20000*p_G)/3600,3*(100000*b_N+20000*p_N)/3600)+measured_validation_tail_hours"
+  },
+  "profile": {
+    "base_updates_per_model": 200,
+    "probe_updates_per_model": 200,
+    "allowed_physical_microbatches": [
+      256,
+      128,
+      64,
+      32,
+      16,
+      8,
+      4,
+      2,
+      1
+    ],
+    "effective_batch_must_equal": 256,
+    "scientific_metrics_may_be_opened": false,
+    "weights_may_enter_scientific_study": false,
+    "complete_profile_exists": false,
+    "launch_decision_rule": {
+      "maximum_projected_two_gpu_wall_hours": 180,
+      "maximum_incremental_gpu_rental_usd": 55,
+      "explicit_user_approval_required": true,
+      "if_either_cap_exceeded": "NO_LAUNCH_COMPUTE_CAP",
+      "reduced_scientific_fallback_permitted": false
+    }
+  },
+  "claim_limits": {
+    "forgets_after_update": false,
+    "exact_predictive_state": false,
+    "human_authored_language": false,
+    "causal_mediation": false,
+    "full_v4_tinystories_replication": false,
+    "may_rescue_any_other_study": false
+  },
+  "launch_blockers": [
+    "pinned_dataset_snapshot_not_materialized",
+    "exact_example_order_and_packing_receipt_missing",
+    "single_gpu_batch_equivalence_profile_missing",
+    "measured_cost_projection_missing",
+    "explicit_budget_approval_missing"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "nextlat_forgetting/hmm_family_materialization/1",
+  "status": "complete",
+  "family_sha256": "e24a883dbc547c99f543433d290b0e228e2191427af041a851a1279d77a68b27",
+  "inventory_sha256": "079eeaa283a4d91eb4512726195fdc08a291e2020bb97507c8d8380ebc32e8d2",
+  "n_artifacts": 31,
+  "required_regimes": [
+    "persistent_moderate",
+    "fast_mixing_moderate",
+    "persistent_high_aliasing"
+  ],
+  "target_pairs": 2000,
+  "model_inputs_used": [],
+  "model_outcomes_inspected": false
+}

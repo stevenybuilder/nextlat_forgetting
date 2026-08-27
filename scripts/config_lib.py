@@ -349,12 +349,13 @@ def bst_pair_accum_steps(n_pairs: int, pair_batch_size: int) -> int:
 
 
 def optimizer_updates(train_batches: int, start_step: int = 0) -> int:
-    """core_train.py:564-571.
+    """Optimizer updates under the source-guarded runtime stop-rule patch.
 
     The loop increments `self.step` after each optimizer update and returns when
-    `self.step > train_batches`, so it performs `train_batches - start_step + 1` updates.
+    `self.step >= train_batches`, so the absolute target executes exactly
+    `train_batches - start_step` updates.
     """
-    return train_batches - start_step + 1
+    return train_batches - start_step
 
 
 def iter_yaml_paths(names: Iterable[str]) -> List[str]:
@@ -366,6 +367,7 @@ DELIVERABLE_CONFIGS = [
     "nextlat_lurestar.yaml",
     "bst_lurestar.yaml",
     "adapt_near.yaml",
+    "adapt_mid.yaml",
     "adapt_far.yaml",
     "gpt_hmm.yaml",
     "nextlat_hmm.yaml",

@@ -4,15 +4,15 @@
 document is generated from `results/live_numbers.json`, so a claim cannot quietly outrun its
 artifact.*
 
-![Final-state PSI for the three arms - NextLat, BST and GPT. Higher means the model pushes apart histories whose futures differ, relative to equally-perturbed histories whose futures agree. Not measured yet: at the time of writing no checkpoint exists, so this panel is empty and every number below it is `[pending]`.](results/figures/fig2_psi.png)
+![Final-state PSI for the three arms - NextLat, BST and GPT. Higher means the model pushes apart histories whose futures differ, relative to equally-perturbed histories whose futures agree. The confirmatory analysis has not been opened, so this panel and the corresponding values remain pending.](results/figures/fig2_psi.png)
 
 Code and manifests: `github.com/<pending>/nextlat-lurestar`. Everything here runs on one GPU.
 
 ## The question
 
 > Does NextLat selectively separate similar histories when a matched change alters the correct
-> future, keep equally changed but future-equivalent histories closer, and does weak separation
-> predict later interference?
+> future, keep equally changed but future-equivalent histories closer, and does that geometry
+> predict planning and vulnerability to a separately controlled learning intervention?
 
 [NextLat](https://arxiv.org/html/2511.05963) adds a latent transition model to next-token
 training: a network `p_psi` takes the hidden state `h_t` and the next token `x_{t+1}` and predicts
@@ -89,16 +89,23 @@ edits of identical size, one of which matters for the future and one of which do
 
 ![Representation distance against critical-branch margin, held out under two-fold cross-fitting.](results/figures/fig3_distance_margin.png)
 
-## H3 - does weak separation predict interference?
+## CFS-2 - a controlled causal-forgetting study
 
-This is the part that connects to work on forgetting. From each frozen base checkpoint I branch
-twice, adapting on lures that are *near* the trained items and on lures that are *far*, matched
-on adaptation examples, update count, initial loss quantiles, target-path distribution, item
-order, optimiser and scheduler state, learning rate, and batch size. Both branches are
-full-parameter next-token-only adaptation, with NextLat's auxiliary losses switched off so that
-what is being tested is the base representation rather than ongoing regularisation.
+The original Lure-Star interference branch never produced a confirmatory observation: its
+prospectively frozen matching rule failed before branch training, so I retired it rather than
+changing the matcher. A first replacement construction, CFS-1, was also stopped before training
+when an outcome-blind audit found that its low/same and low/different cells shared eight versus
+seven probe edges. That one-edge mismatch was mechanically capable of producing the interaction
+the study was meant to measure.
 
-{{live:h3_summary}}
+CFS-2 is the fresh replacement. It crosses high versus low structural overlap with same versus
+different future learning while holding exact overlap at 18/18 in the high cells and 8/8 in the
+low cells. Each branch starts from the same immutable parent state and receives 500 full-parameter,
+next-token-only updates. The primary endpoint is erosion of the untouched probe's correct-branch
+margin. The difference-in-differences asks whether conflicting learning causes extra forgetting
+specifically when its structure overlaps more with the retained item.
+
+{{live:cfs2_summary}}
 
 ![Near versus far interference and acquisition.](results/figures/fig4_interference.png)
 
@@ -120,6 +127,22 @@ not unique. An invertible transformation preserves every bit of predictive infor
 changing raw Euclidean geometry entirely. That is why the tests here are about predictive
 equivalence, relative divergence, decodability and future-distribution prediction, and not about
 whether the states line up with the belief simplex.
+
+## Dataset boundary and the language test
+
+Path-Star and the HMM are valuable because their correct futures and predictive states are known;
+that is what makes the geometry and causal controls identifiable. They do not establish that the
+same relationship holds in ordinary language. NextLat v4 also evaluated TinyStories, Manhattan
+trajectories, and 100B tokens of FineWeb-Edu, whereas the controlled core here is deliberately
+narrower.
+
+NL-1 is therefore a separately numbered external-validity study on held-out FineWeb-Edu text.
+It is not allowed to rescue a null controlled result, and it does not pretend that text has oracle
+predictive-state labels. Its protocol, compute profile, and immutable document splits must be
+fixed before training. Until NL-1 runs, every conclusion in this post is explicitly limited to
+the controlled task families above.
+
+{{live:nl1_summary}}
 
 ## What did not work
 

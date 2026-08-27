@@ -1,0 +1,15 @@
+{
+  "gpus": [
+    "NVIDIA GeForce RTX 3090",
+    "NVIDIA GeForce RTX 3090"
+  ],
+  "lightning": "2.6.5",
+  "nvidia_smi": [
+    "0, NVIDIA GeForce RTX 3090, GPU-391baea2-7208-2231-6823-d9c55f1742df, 590.48.01, 24576 MiB",
+    "1, NVIDIA GeForce RTX 3090, GPU-947ae978-061a-a3bd-76ba-a2888e359999, 590.48.01, 24576 MiB"
+  ],
+  "python": "3.12.13",
+  "schema": "nextlat_forgetting/d47_sampler_factorial_runtime/1",
+  "torch": "2.11.0+cu128",
+  "torch_cuda": "12.8"
+}

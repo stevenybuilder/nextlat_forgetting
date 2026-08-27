@@ -1,0 +1,113 @@
+{
+  "schema": "nextlat_forgetting/language_program_amendment/1",
+  "amendment_id": "LP-A1",
+  "declared_at": "2026-08-24T19:13:06-04:00",
+  "status": "PROSPECTIVE_BLOCKED_PROFILES_AND_BUDGET_APPROVAL",
+  "amendment_scope": "supersedes_language_program_role_only_without_rewriting_frozen_arm_designs",
+  "provenance": {
+    "original_fineweb_declaration": {
+      "study_id": "NL-1",
+      "path": "manifests/nl1/design_declaration.json",
+      "sha256": "d6346996458ddf31df92a88b9df622a3f096af50c8331d55820eb87705a4b0fb",
+      "must_remain_byte_identical": true
+    },
+    "new_tinystories_declaration": {
+      "study_id": "TS-1",
+      "path": "manifests/nl1/ts1_design_declaration.json",
+      "sha256": "8bf0ce4238ab2e15464ad7de658849b753e64863de400e4d3860210fb60e2a08"
+    },
+    "protocol_documents": {
+      "nl1": {
+        "path": "docs/NL1_PROTOCOL.md",
+        "sha256": "667c842c1feba6900f3a82eb3b0a934297bb6fea3dde49bddfd195d6955bb4ff"
+      },
+      "ts1": {
+        "path": "docs/TS1_PROTOCOL.md",
+        "sha256": "1af563732949866e98c3f7dbb2ae73e71832b03d0b5047684f6687ad17b29585"
+      },
+      "feasibility": {
+        "path": "docs/NL1_FEASIBILITY.md",
+        "sha256": "1b7f7a874d1b9203f85bc7f1d2b6623caa04173eca9b12fe5bd6882b75d94e43"
+      }
+    }
+  },
+  "outcome_blind": {
+    "language_program_outcomes_exist": false,
+    "corpora_downloaded_for_amendment": false,
+    "model_or_probe_outcomes_inspected": false,
+    "existing_core_outcomes_may_select_an_arm": false,
+    "one_arm_may_rescue_another_arm_or_core_null": false
+  },
+  "program": {
+    "required_for_full_language_external_validity_claim": true,
+    "required_for_unqualified_workshop_language_claim": true,
+    "arms": [
+      {
+        "study_id": "TS-1",
+        "dataset": "cyrilzhang/TinyStories2-ascii",
+        "language_provenance": "synthetic_GPT_3_5_and_GPT_4_generated_stories",
+        "role": "focused_v4_future_token_probe_parity_and_positive_control",
+        "required": true,
+        "measures_forgetting": false,
+        "exact_predictive_state_ground_truth": false
+      },
+      {
+        "study_id": "NL-1",
+        "dataset": "HuggingFaceFW/fineweb-edu/sample-100BT@v1.0.0",
+        "language_provenance": "filtered_real_world_web_text_with_residual_duplication_and_model_generated_contamination_risk",
+        "role": "scaled_real_web_geometry_to_forgetting_external_validation",
+        "same_corpus_family_as_v4": true,
+        "matches_v4_1_3B_parameter_100B_token_scale": false,
+        "required": true,
+        "measures_forgetting": true,
+        "exact_predictive_state_ground_truth": false
+      }
+    ],
+    "claim_rule": {
+      "both_arms_complete_for_full_program_claim": true,
+      "if_either_arm_missing": "REPORT_INCOMPLETE_AND_OMIT_FULL_LANGUAGE_EXTERNAL_VALIDITY_CLAIM",
+      "positive_arm_may_compensate_for_missing_or_null_arm": false,
+      "program_may_override_controlled_core_conclusion": false,
+      "fineweb_interpretation": "exploratory_triangulation_not_matched_scale_replication"
+    }
+  },
+  "launch_rules": {
+    "arms_authorized_independently": true,
+    "scientific_metrics_may_influence_launch": false,
+    "ts1": {
+      "maximum_projected_two_gpu_wall_hours": 180,
+      "maximum_incremental_gpu_rental_usd": 55,
+      "explicit_user_approval_required": true,
+      "reduced_scientific_fallback_permitted": false
+    },
+    "nl1": {
+      "maximum_projected_wall_hours": 120,
+      "maximum_incremental_gpu_rental_usd": 35,
+      "explicit_user_approval_required": true,
+      "reduced_scientific_fallback_permitted": false
+    },
+    "combined_cap_or_cross_arm_substitution_permitted": false,
+    "if_arm_exceeds_its_cap": "NO_LAUNCH_COMPUTE_CAP"
+  },
+  "compute_accounting": {
+    "ts1": {
+      "base_runs": 6,
+      "base_token_exposures": 39321600000,
+      "probe_runs": 6,
+      "frozen_backbone_probe_token_forwards": 7864320000,
+      "wall_formula": "max(3*(100000*b_G+20000*p_G)/3600,3*(100000*b_N+20000*p_N)/3600)+measured_validation_tail_hours"
+    },
+    "nl1": {
+      "base_runs": 6,
+      "base_token_exposures": 11997806592,
+      "adaptation_branches": 12,
+      "adaptation_token_exposures": 629145600,
+      "wall_lower_bound_formula": "max(3*3814*s_G/3600,3*3814*s_N/3600)+branch_and_evaluation_tail_hours"
+    }
+  },
+  "v4_comparison": {
+    "ts1": "focused_GPT_versus_NextLat_d1_subset_of_v4_TinyStories_setup_with_three_paired_seeds",
+    "nl1": "same_FineWeb_Edu_corpus_family_but_100M_class_2B_tokens_not_v4_1_3B_100B",
+    "program_purpose": "triangulation_across_synthetic_language_parity_and_real_web_forgetting"
+  }
+}

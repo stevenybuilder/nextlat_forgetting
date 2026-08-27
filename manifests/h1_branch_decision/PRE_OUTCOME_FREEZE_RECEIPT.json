@@ -1,0 +1,49 @@
+{
+  "analysis_id": "H1-BD-1",
+  "declaration": {
+    "path": "manifests/h1_branch_decision/ANALYSIS_DECLARATION.json",
+    "sha256": "2ecbec555e19b12d438d61126ddb55a12cd33dd906f25b8bb00aa6dafd65ea08"
+  },
+  "legacy_h1_unchanged": true,
+  "outcomes_inspected_before_freeze": false,
+  "schema": "nextlat_forgetting/h1_branch_decision_freeze_receipt/1",
+  "sources": {
+    "docs/DECISION_D42_COMPLETE_MEASUREMENT_SURFACE.md": {
+      "path": "docs/DECISION_D42_COMPLETE_MEASUREMENT_SURFACE.md",
+      "sha256": "7ed8d114468802168640d8fef5bc21ffa9017a19e84e5dde5f90d0b690eb5d46"
+    },
+    "docs/DECISION_D46_H1_BRANCH_DECISION_ANALYSIS.md": {
+      "path": "docs/DECISION_D46_H1_BRANCH_DECISION_ANALYSIS.md",
+      "sha256": "53b5a588f1487e35f8607ea92438d3ce9b19ec9916462348ca6b739d97b1604f"
+    },
+    "docs/PREREGISTRATION_AMENDMENT_2026-08-24.md": {
+      "path": "docs/PREREGISTRATION_AMENDMENT_2026-08-24.md",
+      "sha256": "bd056f20266636de544415632dc96effab6cc6ffdc17aca5751b863b2cd6fa7c"
+    },
+    "manifests/h1_branch_decision/ANALYSIS_DECLARATION.json": {
+      "path": "manifests/h1_branch_decision/ANALYSIS_DECLARATION.json",
+      "sha256": "2ecbec555e19b12d438d61126ddb55a12cd33dd906f25b8bb00aa6dafd65ea08"
+    },
+    "scripts/evaluate_lurestar_branch_decision.py": {
+      "path": "scripts/evaluate_lurestar_branch_decision.py",
+      "sha256": "b296c3eb5670ba0c5a89bde595c941f4a0b1ef22787a74a12a7eaf695228d207"
+    },
+    "scripts/evaluate_lurestar_checkpoints.py": {
+      "path": "scripts/evaluate_lurestar_checkpoints.py",
+      "sha256": "a080c4caada8c80cfacf3d769b8ffc00fb8518d1eed07aad29704030d5dda287"
+    },
+    "scripts/extract_lurestar_evidence.py": {
+      "path": "scripts/extract_lurestar_evidence.py",
+      "sha256": "da0c83d1971efd9716f727c216a8035b26e0f63e829a25ba52f6218458a24a4b"
+    },
+    "src/lurestar/evaluate.py": {
+      "path": "src/lurestar/evaluate.py",
+      "sha256": "b3211b1e7db57528410dab5b43eca6ec713895678ff338037b515f44cd6bcb97"
+    },
+    "src/lurestar/representations.py": {
+      "path": "src/lurestar/representations.py",
+      "sha256": "8407a227b73e2e7490d08a28379c4d9bc2bf1a96f126c059df0863fed41b60c9"
+    }
+  },
+  "status": "PASS"
+}

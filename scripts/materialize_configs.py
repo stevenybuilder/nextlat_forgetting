@@ -26,7 +26,7 @@ file, and enforces five invariants before anything reaches disk:
                                         spec authority for it (H3 adaptation, HMM).
   I5  Pools are bound to families.      A base run reads the frozen 200,000/20,000 corpus
                                         and nothing else; an adaptation branch reads only
-                                        its OWN B_near / B_far bank, out of the immutable
+                                        its OWN B_near / B_mid / B_far bank, out of the immutable
                                         adaptation directory, and may never name a reserved
                                         evaluation pool. Upstream cannot tell these files
                                         apart -- data/stargraph.py:187-190 parses only the
@@ -88,11 +88,13 @@ RUNS = f"{ROOT}/runs"
 CORPUS_TRAIN = f"{DATA}/stargraph/graph_5_5_sample_200000.txt"
 CORPUS_TEST = f"{DATA}/stargraph/graph_5_5_test_20000.txt"
 B_NEAR = f"{MANIFESTS}/adapt/graph_5_5_bnear_5000.txt"
+B_MID = f"{MANIFESTS}/adapt/graph_5_5_bmid_5000.txt"
 B_FAR = f"{MANIFESTS}/adapt/graph_5_5_bfar_5000.txt"
 B_NEAR_VAL = f"{MANIFESTS}/adapt/graph_5_5_bnearval_2000.txt"
+B_MID_VAL = f"{MANIFESTS}/adapt/graph_5_5_bmidval_2000.txt"
 B_FAR_VAL = f"{MANIFESTS}/adapt/graph_5_5_bfarval_2000.txt"
 
-PREREGISTERED_SEEDS = [1234, 1235, 1236]
+PREREGISTERED_SEEDS = [1234, 1235, 1236, 1237, 1238]
 DEFAULT_SEED = PREREGISTERED_SEEDS[0]
 
 # --------------------------------------------------------------------------------------
@@ -100,14 +102,14 @@ DEFAULT_SEED = PREREGISTERED_SEEDS[0]
 #
 # `data/stargraph.py:187-190` reads only `split("_")[1]` and `[2]` out of a data path, i.e.
 # `5` and `5`. Every stargraph bank in this project therefore looks identical to upstream,
-# and nothing downstream can tell B_near from B_far or either from the base corpus.
+# and nothing downstream can tell B_near, B_mid, or B_far from the base corpus.
 #
 # Two mutations that the rest of this generator, `--check`, and the whole config suite were
 # blind to before this invariant existed:
 #
-#   * swapping the near and far banks. Spec sec.6's primary outcome is
-#     `erosion_near - erosion_far`; a swap negates it exactly, and every artifact downstream
-#     still carries correct-looking provenance.
+#   * swapping adaptation banks. The amended H3 estimand depends on the frozen
+#     near/mid/far ordering, and every downstream artifact could otherwise retain
+#     plausible-looking provenance.
 #   * pointing an adaptation bank at `E_lure` (or at the base corpus). Spec sec.5: "No
 #     E_lure graph or lure may enter base or adaptation training."
 #
@@ -116,7 +118,7 @@ DEFAULT_SEED = PREREGISTERED_SEEDS[0]
 # tests/test_configs.py so it does not depend on this file being right.
 # --------------------------------------------------------------------------------------
 ADAPT_BANK_DIR = f"{MANIFESTS}/adapt"
-ADAPT_BANK_TAGS = {"near": "bnear", "far": "bfar"}
+ADAPT_BANK_TAGS = {"near": "bnear", "mid": "bmid", "far": "bfar"}
 # Pools that exist only to be evaluated on. A training or validation path that names one is
 # a leakage bug, not a typo.
 RESERVED_POOL_TOKENS = ("elure", "e_lure", "apair", "a_pair", "stimuli")
@@ -141,7 +143,7 @@ def _check_pool_identity(name: str, plan: Dict[str, Any], cfg: Dict[str, Any]) -
 
     branch = plan["branch"]
     own = ADAPT_BANK_TAGS[branch]
-    other = ADAPT_BANK_TAGS["far" if branch == "near" else "near"]
+    others = {tag for name, tag in ADAPT_BANK_TAGS.items() if name != branch}
     for key in STARGRAPH_PATH_KEYS:
         path = get_dotted(cfg, key)
         base = os.path.basename(path)
@@ -169,10 +171,11 @@ def _check_pool_identity(name: str, plan: Dict[str, Any], cfg: Dict[str, Any]) -
                 f"Spec sec.6's primary outcome is erosion_near - erosion_far, so a bank "
                 f"that is not bound to its branch silently negates the result."
             )
-        if other in base:
+        wrong = sorted(tag for tag in others if tag in base)
+        if wrong:
             raise AssertionError(
-                f"{name}: {key} = {base!r} carries the OPPOSITE branch tag {other!r}; the "
-                f"near and far banks are swapped."
+                f"{name}: {key} = {base!r} carries another branch tag {wrong!r}; the "
+                f"near/mid/far banks are swapped."
             )
 
 # Spec section 8 / PROGRAM.md "Frozen surface". A move here is a scientific change, not a
@@ -263,7 +266,7 @@ def _common_lurestar(model: str, seed: int) -> List[Ov]:
     out_dir = f"{RUNS}/{model}/seed{seed}/base"
     return [
         Ov("seed", seed, "SEED", A_SPEC8,
-           "One of the three preregistered confirmatory seeds. Stated explicitly instead "
+           "One of the five preregistered confirmatory seeds. Stated explicitly instead "
            "of via `sweep:`, whose experiment-directory name is built by iterating a "
            "Python set (train.py:280,322) and therefore varies with PYTHONHASHSEED.",
            inert_ok=True),
@@ -392,11 +395,12 @@ def build_bst_lurestar(seed: int = DEFAULT_SEED) -> Dict[str, Any]:
         "source": OFFICIAL_BST_5_5,
         "overrides": _common_lurestar("bst", seed) + _provenance(
             OFFICIAL_BST_5_5,
-            "Condition 3 of spec sec.8: the architecture-matched Belief State Transformer, "
+            "Condition 3 of spec sec.8: the width/depth-matched Belief State Transformer, "
             "the competence-matched control. The paper's Figure 6 puts BST at ~99.9% on "
             "G(5,5) against GPT at ~18.6% (1/d chance), so BST solves Path-Star WITHOUT a "
-            "latent-transition objective and a NextLat-vs-BST PSI gap is attributable to "
-            "the objective rather than to task success. See "
+            "latent-transition objective. A NextLat-vs-BST PSI gap is not competence-"
+            "confounded, but BST's second transformer, parameter count, and O(T^2) gradient "
+            "structure remain differences. See "
             "docs/DECISION_D20_competence_gate.md.",
         ),
         "hoists": cfg["hoists"] + [
@@ -447,7 +451,7 @@ def _adapt(branch: str, bank: str, bank_val: str, seed: int = DEFAULT_SEED) -> D
                inert_ok=True),
             Ov("trainer.compile", False, "CORRECTION", A_RUNLOG, "As for the base runs."),
             Ov("trainer.out_dir", out_dir, "OUTPUT", A_SPEC9,
-               "Separate output root per branch. Spec sec.9: 'Give every base/near/far job "
+               "Separate output root per branch. Spec sec.9: 'Give every base/near/mid/far job "
                "a separate output root; the official resume pointer lives at the "
                "output-root level and must never cross branches.'"),
             Ov("trainer.experiment_name", f"nextlat-seed{seed}-adapt-{branch}",
@@ -461,10 +465,10 @@ def _adapt(branch: str, bank: str, bank_val: str, seed: int = DEFAULT_SEED) -> D
                "(core_train.py:164-168)."),
             Ov("trainer.train_batches", 500, "H3", A_SPEC6 + " + spec sec.8 'Start H3 with "
                "5,000 adaptation items and 500 updates'",
-               "Adaptation length. Under core_train.py:564-571 this executes 501 optimizer "
-               "updates from a step-0 parent - the same inclusive-bound convention by which "
-               "the shipped train_batches: 20000 executes 20,001. Identical for near, far, "
-               "GPT and NextLat, so the near-minus-far contrast is unaffected."),
+               "Adaptation length is exactly 500 optimizer updates. Production applies the "
+               "source-hash/commit-guarded runtime stop-rule patch (`step >= train_batches`). "
+               "MatrixRunner converts the relative 500-update request to the absolute target "
+               "parent_step + 500 (20,500 for a 20,000-step parent)."),
             Ov("trainer.val_interval", 100, "CKPT", A_SPEC6,
                "Five in-run acquisition measurements over a 500-step branch; val_interval "
                "1000 would produce none."),
@@ -482,10 +486,10 @@ def _adapt(branch: str, bank: str, bank_val: str, seed: int = DEFAULT_SEED) -> D
             Ov("model.lambda_kl", 0.0, "H3", A_SPEC6, "See lambda_mse."),
             Ov("data.stargraph_train_data_path", bank, "MANIFEST", A_SPEC6,
                f"The immutable B_{branch} adaptation item bank (5,000 items). This is the "
-               "ONLY scientific difference between the near and far branches."),
+               "ONLY scientific difference between the near, mid, and far branches."),
             Ov("data.stargraph_test_data_path", bank_val, "MANIFEST", A_SPEC6,
                f"Independent B_{branch} validation set; spec sec.6 requires acquisition on "
-               "'independent near/far validation sets'."),
+               "'independent near/mid/far validation sets'."),
         ] + _provenance(
             OFFICIAL_NEXTLAT_5_5,
             f"Spec sec.6 H3 adaptation, {branch} branch. Derived from the NextLat G(5,5) "
@@ -516,22 +520,30 @@ def build_adapt_near(seed: int = DEFAULT_SEED) -> Dict[str, Any]:
     return _adapt("near", B_NEAR, B_NEAR_VAL, seed)
 
 
+def build_adapt_mid(seed: int = DEFAULT_SEED) -> Dict[str, Any]:
+    return _adapt("mid", B_MID, B_MID_VAL, seed)
+
+
 def build_adapt_far(seed: int = DEFAULT_SEED) -> Dict[str, Any]:
     return _adapt("far", B_FAR, B_FAR_VAL, seed)
 
 
 HMM_DATA = {
-    "hmm_train_data_path": f"{DATA}/hmm/hmm-train-100000-len32.npz",
-    "hmm_val_data_path": f"{DATA}/hmm/hmm-val-10000-len32.npz",
-    "hmm_generalization_data_path": f"{DATA}/hmm/hmm-gen-10000-len64.npz",
-    "hmm_matrices_path": f"{MANIFESTS}/hmm-matrices.json",
+    # Exact flat keys consumed by src/hmm_geometry/datamodule.py. The observations are
+    # already token-space matrices, so wrapping them in .npz or nesting these paths under
+    # data.hmm would make the external datamodule reject the config.
+    "hmm_train_data_path": f"{DATA}/hmm/hmm4x4_train_len32_100000.npy",
+    "hmm_val_data_path": f"{DATA}/hmm/hmm4x4_val_len32_10000.npy",
+    "hmm_generalization_data_path": [f"{DATA}/hmm/hmm4x4_lengen_len64_10000.npy"],
+    "hmm_n_obs": 4,
+    # Provenance/shape metadata is flat and prefixed too, but is not read by the trainer.
+    "hmm_matrices_path": f"{MANIFESTS}/hmm_matrices.json",
     "hmm_num_states": 4,
-    "hmm_num_observations": 4,
-    "train_sequences": 100000,
-    "val_sequences": 10000,
-    "generalization_sequences": 10000,
-    "sequence_length": 32,
-    "generalization_sequence_length": 64,
+    "hmm_train_sequences": 100000,
+    "hmm_val_sequences": 10000,
+    "hmm_generalization_sequences": 10000,
+    "hmm_sequence_length": 32,
+    "hmm_generalization_sequence_length": 64,
 }
 
 HMM_DROPS = [
@@ -543,16 +555,15 @@ HMM_DROPS = [
     Drop("data.stargraph_test_data_path",
          "read only at data/stargraph.py:183 under dataset == 'stargraph'."),
     Drop("data.stargraph_generalization_data_path",
-         "read only at data/stargraph.py:203 under data.test_generalization, and the "
-         "generalization dataloader is built only for stargraph/countdown/manhattan "
-         "(core_train.py:344-349). test_generalization stays false here."),
+         "read only by StarGraphDataModule. HMMBeliefDataModule reads its own flat "
+         "data.hmm_generalization_data_path instead."),
 ]
 
 
 def _hmm(model: str, source: str, seed: int = DEFAULT_SEED) -> Dict[str, Any]:
     out_dir = f"{RUNS}/hmm/{model}/seed{seed}/base"
     ovs = [
-        Ov("seed", seed, "SEED", A_SPEC12, "Same three preregistered seeds as Lure-Star.",
+        Ov("seed", seed, "SEED", A_SPEC12, "Same five preregistered seeds as Lure-Star.",
            inert_ok=True),
         Ov("trainer.compile", False, "HMM", A_SPEC12 + " (compile: false)", "Spec sec.12 config block."),
         Ov("trainer.out_dir", out_dir, "OUTPUT", A_SPEC9, "Unique absolute output root."),
@@ -568,19 +579,22 @@ def _hmm(model: str, source: str, seed: int = DEFAULT_SEED) -> Dict[str, Any]:
         Ov("trainer.wandb_project", "hmm_belief", "OUTPUT", A_SPEC9, "Names the second task."),
         Ov("trainer.wandb_tags", ["hmm", "4state4obs"], "OUTPUT", A_SPEC9, "Names the second task."),
         Ov("data.dataset", "hmm_belief", "HMM", A_SPEC12,
-           "Spec sec.12 config block. REQUIRES an hmm_belief datamodule registered in the "
-           "DATAMODULES dict at train.py:34-42; train.py:176-178 asserts membership. That "
-           "registration is a one-line addition applied to the runtime working copy and "
-           "recorded as an uncommitted diff (spec sec.9); upstream/ itself is never edited."),
+           "Spec sec.12 config block. scripts/train_hmm.py registers the external datamodule "
+           "in memory before delegating to pinned train.do_train; upstream/ stays untouched."),
         Ov("data.effective_batch_size", 256, "HMM", A_SPEC12, "Spec sec.12 config block."),
+        Ov("data.test_generalization", True, "HMM", A_SPEC12,
+           "Makes HMMBeliefDataModule include the frozen length-64 split when it sets "
+           "model.block_size=65. Pinned core_train does not validate this dataset's "
+           "generalization loader; length-64 evaluation remains offline."),
         Ov("model.n_layer", 4, "HMM", A_SPEC12, "Spec sec.12 config block."),
         Ov("model.n_head", 4, "HMM", A_SPEC12, "Spec sec.12 config block."),
         Ov("model.n_embd", 128, "HMM", A_SPEC12, "Spec sec.12 config block."),
-        Ov("data.hmm", dict(HMM_DATA), "HMM", A_SPEC12,
-           "Dataset sizes and immutable manifest paths for the 4-state/4-observation HMM: "
-           "100,000 train and 10,000 validation sequences of length 32 plus 10,000 "
-           "length-64 generalization sequences, and the frozen transition/emission "
-           "matrices. Namespaced under data.hmm so it cannot collide with an upstream key."),
+        *[
+            Ov(f"data.{key}", value, "HMM", A_SPEC12,
+               "Flat external-datamodule input or prefixed HMM provenance metadata; paths "
+               "name the immutable generated arrays/manifests and never an upstream corpus.")
+            for key, value in HMM_DATA.items()
+        ],
     ] + _provenance(
         source,
         "Spec sec.12 required experiment B. Copied from the official Path-Star G(5,5) YAML "
@@ -633,6 +647,7 @@ BUILDERS = {
     "nextlat_lurestar.yaml": build_nextlat_lurestar,
     "bst_lurestar.yaml": build_bst_lurestar,
     "adapt_near.yaml": build_adapt_near,
+    "adapt_mid.yaml": build_adapt_mid,
     "adapt_far.yaml": build_adapt_far,
     "gpt_hmm.yaml": build_gpt_hmm,
     "nextlat_hmm.yaml": build_nextlat_hmm,
@@ -749,7 +764,7 @@ def build_one(name: str, seed: int = DEFAULT_SEED) -> Dict[str, Any]:
             changed.add(dotted)
 
     def _covered(dotted: str) -> bool:
-        # A dict-valued override such as `provenance` or `data.hmm` covers its own leaves,
+        # A dict-valued override such as `provenance` covers its own leaves,
         # and a declared drop covers the key it removed (which either disappears from the
         # merged config or falls back to its defaults.yaml value).
         keys = set(declared) | declared_drops
@@ -815,7 +830,7 @@ HEADER = """\
 # Launch (spec section 8, single GPU):
 #   scripts/launch_train.sh {name} <seed>
 # which expands to
-#   fabric run --devices 1 --precision bf16-mixed train.py --config <this file> \\
+#   fabric run --devices 1 --precision bf16-mixed {entry} --config <this file> \\
 #     seed=<seed> trainer.out_dir=... trainer.experiment_name=...
 """
 
@@ -850,6 +865,11 @@ def main() -> int:
             commit=UPSTREAM_COMMIT,
             source=built["audit"]["source_config"],
             sha=built["audit"]["source_config_sha256"],
+            entry=(
+                f"{ROOT}/scripts/train_hmm.py"
+                if name in {"gpt_hmm.yaml", "nextlat_hmm.yaml"}
+                else "train.py"
+            ),
         ) + render(name, built["yaml"])
         path = os.path.join(CONFIGS_DIR, name)
         if args.check:

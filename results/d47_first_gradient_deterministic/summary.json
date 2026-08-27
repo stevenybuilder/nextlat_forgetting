@@ -1,0 +1,17 @@
+{
+  "ranks": {
+    "0": {
+      "aggregate_gradient_equal": true,
+      "gradient_parameter_mismatches": [],
+      "initial_parameters_equal": true,
+      "local_batch_equal": true
+    },
+    "1": {
+      "aggregate_gradient_equal": true,
+      "gradient_parameter_mismatches": [],
+      "initial_parameters_equal": true,
+      "local_batch_equal": true
+    }
+  },
+  "schema": "nextlat_forgetting/d47_first_gradient_repeat/1"
+}

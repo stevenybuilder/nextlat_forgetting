@@ -11,7 +11,7 @@ reconstructed from the spec document.
 - Generator: `scripts/materialize_configs.py` (machine-readable record: `configs/overrides.json`)
 - Verification: `tests/test_configs.py` (150 checks), `tests/test_profile_tooling.py`
 
-Spec section 8 permits exactly five classes of change — the three preregistered seeds, output
+Spec section 8 permits exactly five classes of change — the five preregistered seeds, output
 paths and experiment names, additional checkpoint/recovery frequency, model-output hooks for
 saving hidden states, and paths for the immutable lure and adaptation manifests — plus the two
 corrections established in `docs/RUNLOG.md`. Two further classes are *scientific* moves the
@@ -299,7 +299,18 @@ objective fails the suite.
 | `trainer.wandb_tags` | `[hmm, 4state4obs]` | OUTPUT | spec 9 |
 | `data.dataset` | `hmm_belief` | HMM | spec 12 |
 | `data.effective_batch_size` | `256` | HMM | spec 12 |
-| `data.hmm` | 100,000 train / 10,000 val length-32 sequences, 10,000 length-64 generalization sequences, frozen matrix manifest | HMM | spec 12 |
+| `data.test_generalization` | `true` | HMM | spec 12 |
+| `data.hmm_train_data_path` | `/content/lurestar/data/hmm/hmm4x4_train_len32_100000.npy` | HMM | spec 12 |
+| `data.hmm_val_data_path` | `/content/lurestar/data/hmm/hmm4x4_val_len32_10000.npy` | HMM | spec 12 |
+| `data.hmm_generalization_data_path` | `[/content/lurestar/data/hmm/hmm4x4_lengen_len64_10000.npy]` | HMM | spec 12 |
+| `data.hmm_n_obs` | `4` | HMM | spec 12 |
+| `data.hmm_matrices_path` | `/content/lurestar/manifests/hmm_matrices.json` | HMM | spec 12 |
+| `data.hmm_num_states` | `4` | HMM | spec 12 |
+| `data.hmm_train_sequences` | `100000` | HMM | spec 12 |
+| `data.hmm_val_sequences` | `10000` | HMM | spec 12 |
+| `data.hmm_generalization_sequences` | `10000` | HMM | spec 12 |
+| `data.hmm_sequence_length` | `32` | HMM | spec 12 |
+| `data.hmm_generalization_sequence_length` | `64` | HMM | spec 12 |
 | `model.n_layer` | `4` | HMM | spec 12 |
 | `model.n_head` | `4` | HMM | spec 12 |
 | `model.n_embd` | `128` | HMM | spec 12 |
@@ -318,8 +329,9 @@ schedule with `warmup_iters: 0` and `warmdown_iters: 0`.
 `data.stargraph_max_nodes` (`data/stargraph.py:175`; `defaults.yaml:81` still resolves it to
 50 after the merge, so nothing can raise), `data.stargraph_train_data_path`
 (`data/stargraph.py:179,187-190`), `data.stargraph_test_data_path` (`data/stargraph.py:183`),
-`data.stargraph_generalization_data_path` (`data/stargraph.py:203`, itself gated on
-`data.test_generalization`, which stays `false`).
+`data.stargraph_generalization_data_path` (`data/stargraph.py:203`). The HMM config keeps
+`data.test_generalization: true`, but its external datamodule reads the separate flat
+`data.hmm_generalization_data_path`; the pinned StarGraphDataModule is never constructed.
 
 ## Resolved paper-scale values, verified before launch
 
@@ -345,7 +357,7 @@ optimizer.beta1 / beta2     0.9 / 0.95        model.lambda_kl        1.0  (NextL
 optimizer.grad_clip                100        model.lambda_ce        0.0  (NextLat only)
 lr_scheduler.schedule         constant        model.proj_factor      0.5  (NextLat only)
 lr_scheduler.warmup_iters            0        seed                                1234
-lr_scheduler.warmdown_iters          0        preregistered seeds   1234, 1235, 1236
+lr_scheduler.warmdown_iters          0        preregistered seeds   1234, 1235, 1236, 1237, 1238
 
 model.bst_pair_minimum_gap             2  (BST only)   data.pair_batch_size   32768  (BST only)
 model.bst_pair_maximum_gap            -1  (BST only)   data.pair_accum_steps      1  (dead key)
@@ -453,8 +465,8 @@ It resolves the per-job output root and experiment name, checks the precondition
 fails silently on, prints the exact command, and execs it.
 
 ```bash
-# Lure-Star base runs, three preregistered seeds, three architecture-matched arms
-for s in 1234 1235 1236; do
+# Lure-Star base runs, five preregistered seeds, three architecture-matched arms
+for s in 1234 1235 1236 1237 1238; do
   scripts/launch_train.sh gpt_lurestar.yaml     "$s"
   scripts/launch_train.sh nextlat_lurestar.yaml "$s"
   scripts/launch_train.sh bst_lurestar.yaml     "$s"   # competence-matched control
@@ -545,14 +557,17 @@ seed, and both branches must record the same `parent_checkpoint_sha256`.
 
 `data.dataset: hmm_belief` is not a registered datamodule at the pinned commit:
 `train.py:34-42` lists `tinystories, stargraph, fineweb10B, fineweb100B, finewebedu, countdown,
-manhattan`, and `train.py:176-178` asserts membership. The runtime working copy therefore
-carries a one-line registration of the project's own `HMMBeliefDataModule`, applied to
-`$NEXTLAT_REPO` and persisted as the uncommitted diff spec section 9 requires. **The pinned
-tree at `upstream/NextLat` is never modified.** `scripts/launch_train.sh` and
-`scripts/profile.sh` both refuse to start an HMM job if the registration is absent.
+manhattan`, and `train.py:176-178` asserts membership. `scripts/train_hmm.py` imports the pinned
+trainer, registers the project's `HMMBeliefDataModule` in its in-memory `DATAMODULES` mapping,
+then delegates to `train.do_train`. **No file in the pinned runtime checkout or
+`upstream/NextLat` is modified.** `scripts/launch_train.sh` selects this shim for HMM configs;
+`scripts/profile.sh` routes its instrumented entry through the same shim and refuses to start if
+the shim, datamodule, or any required `.npy` array is absent.
 
-`data.hmm` is a namespaced sub-block rather than flat `data.*` keys so that no key we invent
-can ever collide with an upstream one.
+The external datamodule consumes flat `data.hmm_*` keys. This avoids an upstream edit while
+keeping every invented key visibly HMM-prefixed. Observation arrays are raw `.npy` files opened
+with mmap; the length-64 path is a list because the trainer's generalization interface accepts
+multiple splits.
 
 ### W&B
 
@@ -576,11 +591,11 @@ override with no scientific surface.
   (`model_nextlat.py:503-525`); a hook that modified the tensor in place would corrupt it, so
   extraction is offline and read-only.
 - **`trainer.top_k` is not set.** `data/stargraph.py:122-127` calls `model.generate` with
-  `temperature=1.0, top_k=None`, so the logged `val_(5, 5)/test_accuracy` — and therefore the
-  90% base-competence gate — is measured under **ancestral sampling**, not greedy decoding.
-  Adding `trainer.top_k: 1` would make it greedy and would change the reported metric relative
-  to the paper. Greedy accuracy is computed offline by the project's own evaluator and reported
-  alongside.
+  `temperature=1.0, top_k=None`, so the paper-comparable in-training validation metric remains
+  measured under **ancestral sampling**. Adding `trainer.top_k: 1` would silently change that
+  reported metric relative to the paper. The binding 90% base-competence gate is deliberately a
+  separate, hash-receipted offline evaluation using greedy decoding (`top_k=1`,
+  `temperature=0`); both metrics are retained rather than conflated.
 - **`data.num_workers` stays `0`.** PROGRAM.md puts dataloader workers on the mutable surface
   and raising it would speed up the resume fast-forward, but it is an unmeasured change until
   the profiling gate prices it. Determinism does not depend on it: the `RandomSampler`

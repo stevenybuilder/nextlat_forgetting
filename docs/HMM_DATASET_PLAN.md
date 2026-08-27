@@ -226,7 +226,7 @@ trainer:
   train_batches: 3000
   val_interval: 300
   compile: false
-seed: 1234                       # three runs: 1234, 1235, 1236
+seed: 1234                       # five runs: 1234, 1235, 1236, 1237, 1238
 ```
 
 `device_batch_size` and `micro_batch_size` are computed by the trainer from

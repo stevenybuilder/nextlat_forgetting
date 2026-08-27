@@ -34,7 +34,7 @@ It also makes two preregistered analyses degenerate for GPT specifically:
 
 Run the full preregistered matrix exactly as specified. Change no configuration. Then:
 
-1. **Apply the 90% competence gate to NextLat only.** For GPT, the preregistered expectation is
+1. **Apply the 90% competence gate to NextLat and the later-added BST control.** For GPT, the preregistered expectation is
    chance-level performance, and observing it is a successful replication of the paper's Figure 6
    rather than a stop condition. A GPT run *above* chance would be the surprising outcome and would
    itself require investigation.
@@ -63,25 +63,52 @@ one the spec imagined, and it is the one the evidence supports.
 
 After this decision was written, the competence confound turned out to have a direct fix already
 sitting in the pinned repository. The paper's own Figure 6 reports **BST at ~99.9% on G(5,5)** -
-a model that solves the task, is architecture-matched to GPT and NextLat, and is trained without a
-latent-transition objective. `config/stargraph/5_5/bst_stargraph_5_5.yaml` differs from the GPT
-config by exactly two keys.
+a model that solves the task, is width/depth-matched to GPT and NextLat, and is trained without a
+latent-transition objective. It is not parameter- or training-architecture-matched because its
+objective adds a second transformer and O(T²) prefix-suffix supervision. The official BST config
+differs from the GPT config by exactly two scientific settings, but the selected model class differs.
 
-Adding BST as a third arm at three seeds costs 3.7 GPU-hours, ~20 compute units, 1.1% of the
-balance. It converts the primary cross-model contrast from NextLat-versus-a-model-at-chance into
-**NextLat versus BST**, where both arms solve the task and the only systematic difference is the
-objective. H2 and H3 stop being degenerate for the control arm, because BST has a real
+Adding BST as a third arm converts the primary cross-model contrast from
+NextLat-versus-a-model-at-chance into
+**NextLat versus BST**, where both arms solve the task. The contrast removes task competence as the
+obvious explanation but still mixes the objective with BST's extra training architecture and
+parameters. H2 and H3 stop being degenerate for the control arm, because BST has a real
 correct-branch margin to predict and to erode.
 
 Points 2 and 3 above are therefore **softened rather than withdrawn**: the within-NextLat chain
 remains valuable and is still reported, but the cross-model Lure-Star contrast is no longer
-demoted - it is re-pointed at BST. Point 1 stands unchanged: the 90% competence gate applies to
-NextLat and BST, and GPT's chance-level accuracy remains a preregistered replication of Figure 6
+demoted - it is re-pointed at BST. The operational form of point 1 is now: the 90% competence gate
+applies to NextLat and BST, and GPT's chance-level accuracy remains a preregistered replication of Figure 6
 rather than a stop condition. Point 4 stands: the HMM still carries an independent cross-model
 contrast in a regime where all three arms are competent.
 
-Approved by the user on 2026-08-23 alongside a decision to keep seeds 1237 and 1238 as a declared
-extension rather than running five seeds up front.
+Approved by the user on 2026-08-23 alongside the later-ratified decision to run all five paper
+seeds (1234--1238) as confirmatory seeds up front, before inspecting any outcome.
+
+## Executable gate
+
+No near/far adaptation branch may even be planned from a merely `TRAINED` parent. Each base parent
+must be `DONE` with a ledger-hashed `evaluation/base_competence.json` and SHA sidecar. The receipt
+binds the model, seed, exact final-checkpoint path and SHA-256, evaluator and raw evaluator-output
+SHA-256, held-out dataset and manifest SHA-256, deterministic greedy decoding regime, and integer
+correct/total exact-path counts. The runner recomputes every hash and the reported ratio.
+NextLat and BST must each reach 0.90; GPT's result is always recorded and reported but does not halt
+adaptation. A missing, mismatched, stale, or tampered receipt is a refusal, never an implicit pass.
+
+Those evaluation inputs are not selected at promotion time. Before the first base update, the base
+job and ledger freeze the exact evaluator source, held-out dataset, all evaluation manifests, their
+resolved paths and SHA-256 digests, and the decoding contract as `competence_identity`. Evaluation
+and promotion require exact equality to that parent identity and verify the materialized config,
+every metrics log, the completion receipt, and the checkpoint. Thus a post-hoc evaluator/data swap
+or a partially corrupted parent cannot be promoted even if its checkpoint alone still hashes.
+
+The checkpoint-to-metric implementation is `scripts/evaluate_base_competence.py`, and the
+idempotent production bridge for all TRAINED parents is `scripts/evaluate_trained_bases.py` (full
+runtime and disconnect contract: `docs/BASE_COMPETENCE_EVALUATION.md`). The receipt path is
+`scripts/materialize_base_competence.py`. It accepts the evaluator's
+structured JSON output rather than an accuracy flag, atomically writes the receipt and sidecar,
+validates the would-be `DONE` entry, and only then appends the TRAINED-to-DONE promotion. Thus
+evaluation never relaunches paid training and tests cannot become a production gate bypass.
 
 ## How to overturn this
 

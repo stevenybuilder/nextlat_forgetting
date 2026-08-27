@@ -1,0 +1,501 @@
+{
+  "records": {
+    "hmm-gpt": {
+      "job": "hmm-gpt",
+      "task": "hmm",
+      "model": "gpt",
+      "config": "gpt_hmm.yaml",
+      "returncode": 0,
+      "steps_requested": 300,
+      "warmup_steps": 60,
+      "steps_summarized": 239,
+      "metrics_csv": [
+        "state://gate/root/runs/hmm/gpt/seed1234/base/gpt-seed1234-hmm/version_0/metrics.csv"
+      ],
+      "resolved": {
+        "effective_batch_size": 256,
+        "gradient_accum_steps": 1,
+        "device_batch_size": 256,
+        "micro_batch_size": 256,
+        "block_size": 65,
+        "vocab_size": 5,
+        "n_layer": 4,
+        "n_embd": 128,
+        "proj_factor": 1.0,
+        "compile": false
+      },
+      "wall_seconds": 27.704756259918213,
+      "resumed": false,
+      "resume_steps": [
+        0
+      ],
+      "measurement_scopes": {
+        "step_timing": "checkpoint-consistent trajectory",
+        "warmup": "global optimizer step >= 60",
+        "process_probe": "terminal successful attempt",
+        "gpu_samples": "all preserved attempts"
+      },
+      "gpu": {
+        "samples": 111,
+        "gpu_util_pct_median": 0.0,
+        "gpu_util_pct_mean": 6.324324324324325,
+        "gpu_util_pct_p05": 0.0,
+        "mem_util_pct_median": 0.0,
+        "mem_used_mib_max": 812.0
+      },
+      "seconds_per_step_median": 0.012697398000000248,
+      "seconds_per_step_p95": 0.014242934399635485,
+      "seconds_per_step_mean": 0.012877678280341318,
+      "examples_per_second": 20161.611063935696,
+      "tokens_per_second": 1310504.7191558203,
+      "wall_seconds_per_step": 0.0923491875330607,
+      "wall_seconds_scope": "terminal attempt from optimizer step 0",
+      "peak_allocated_gb": 0.2389087677001953,
+      "peak_reserved_gb": 0.275390625,
+      "host_input_wait_seconds": 2.375173210995854,
+      "dataloader_batches": 378,
+      "host_input_wait_fraction": 0.08573160466429115,
+      "checkpoint_writes": 5,
+      "checkpoint_write_seconds_median": 0.034382584000013594,
+      "checkpoint_write_seconds_max": 0.04179878800005099,
+      "checkpoint_bytes_median": 10301667,
+      "checkpoint_mb_median": 9.824435234069824,
+      "cuda": {
+        "device_name": "NVIDIA A100-SXM4-40GB",
+        "capability": [
+          8,
+          0
+        ],
+        "bf16_supported": true,
+        "total_memory_bytes": 42405855232,
+        "torch": "2.11.0+cu128",
+        "cuda_version": "12.8"
+      },
+      "probe_exit": "SystemExit(0)",
+      "vram_headroom_fraction": 0.9930269433222783,
+      "physical_batch_fits": true,
+      "missing_required": [],
+      "validation_loss": {
+        "metric": "val/loss",
+        "value": 1.320867657661438,
+        "step": 0.0
+      },
+      "train_loss_last": {
+        "metric": "loss",
+        "value": 1.2624120712280273,
+        "step": 0.0
+      }
+    },
+    "hmm-nextlat": {
+      "job": "hmm-nextlat",
+      "task": "hmm",
+      "model": "nextlat",
+      "config": "nextlat_hmm.yaml",
+      "returncode": 0,
+      "steps_requested": 300,
+      "warmup_steps": 60,
+      "steps_summarized": 239,
+      "metrics_csv": [
+        "state://gate/root/runs/hmm/nextlat/seed1234/base/nextlat-seed1234-hmm/version_0/metrics.csv"
+      ],
+      "resolved": {
+        "effective_batch_size": 256,
+        "gradient_accum_steps": 1,
+        "device_batch_size": 256,
+        "micro_batch_size": 256,
+        "block_size": 65,
+        "vocab_size": 5,
+        "n_layer": 4,
+        "n_embd": 128,
+        "proj_factor": 0.5,
+        "compile": false
+      },
+      "wall_seconds": 28.938932180404663,
+      "resumed": false,
+      "resume_steps": [
+        0
+      ],
+      "measurement_scopes": {
+        "step_timing": "checkpoint-consistent trajectory",
+        "warmup": "global optimizer step >= 60",
+        "process_probe": "terminal successful attempt",
+        "gpu_samples": "all preserved attempts"
+      },
+      "gpu": {
+        "samples": 116,
+        "gpu_util_pct_median": 0.0,
+        "gpu_util_pct_mean": 7.706896551724138,
+        "gpu_util_pct_p05": 0.0,
+        "mem_util_pct_median": 0.0,
+        "mem_used_mib_max": 876.0
+      },
+      "seconds_per_step_median": 0.01630093099993246,
+      "seconds_per_step_p95": 0.018205227699991156,
+      "seconds_per_step_mean": 0.016517157087870434,
+      "examples_per_second": 15704.624478262049,
+      "tokens_per_second": 1020800.5910870332,
+      "wall_seconds_per_step": 0.09646310726801555,
+      "wall_seconds_scope": "terminal attempt from optimizer step 0",
+      "peak_allocated_gb": 0.27266693115234375,
+      "peak_reserved_gb": 0.337890625,
+      "host_input_wait_seconds": 2.3615040919985404,
+      "dataloader_batches": 378,
+      "host_input_wait_fraction": 0.08160301414291916,
+      "checkpoint_writes": 5,
+      "checkpoint_write_seconds_median": 0.032464738999806286,
+      "checkpoint_write_seconds_max": 0.04950237200000629,
+      "checkpoint_bytes_median": 11096387,
+      "checkpoint_mb_median": 10.5823392868042,
+      "cuda": {
+        "device_name": "NVIDIA A100-SXM4-40GB",
+        "capability": [
+          8,
+          0
+        ],
+        "bf16_supported": true,
+        "total_memory_bytes": 42405855232,
+        "torch": "2.11.0+cu128",
+        "cuda_version": "12.8"
+      },
+      "probe_exit": "SystemExit(0)",
+      "vram_headroom_fraction": 0.9914444056365541,
+      "physical_batch_fits": true,
+      "missing_required": [],
+      "validation_loss": {
+        "metric": "val/loss",
+        "value": 1.28889799118042,
+        "step": 0.0
+      },
+      "train_loss_last": {
+        "metric": "loss",
+        "value": 1.2691442966461182,
+        "step": 0.0
+      }
+    },
+    "lurestar-bst": {
+      "job": "lurestar-bst",
+      "task": "lurestar",
+      "model": "bst",
+      "config": "bst_lurestar.yaml",
+      "returncode": 0,
+      "steps_requested": 500,
+      "warmup_steps": 100,
+      "steps_summarized": 395,
+      "metrics_csv": [
+        "state://gate/root/runs/bst/seed1234/base/bst-seed1234-base/version_0/metrics.csv",
+        "state://gate/root/runs/bst/seed1234/base/bst-seed1234-base/version_1/metrics.csv"
+      ],
+      "resolved": {
+        "effective_batch_size": 512,
+        "gradient_accum_steps": 1,
+        "device_batch_size": 512,
+        "micro_batch_size": 512,
+        "block_size": 69,
+        "vocab_size": 106,
+        "n_layer": 12,
+        "n_embd": 384,
+        "proj_factor": 1.0,
+        "compile": false
+      },
+      "wall_seconds": 761.5029706954956,
+      "resumed": true,
+      "resume_steps": [
+        0,
+        250
+      ],
+      "measurement_scopes": {
+        "step_timing": "checkpoint-consistent trajectory",
+        "warmup": "global optimizer step >= 100",
+        "process_probe": "terminal successful attempt",
+        "gpu_samples": "all preserved attempts"
+      },
+      "gpu": {
+        "samples": 3044,
+        "gpu_util_pct_median": 25.0,
+        "gpu_util_pct_mean": 29.380749014454665,
+        "gpu_util_pct_p05": 0.0,
+        "mem_util_pct_median": 12.0,
+        "mem_used_mib_max": 16336.0
+      },
+      "seconds_per_step_median": 2.150289860000157,
+      "seconds_per_step_p95": 2.192244487700009,
+      "seconds_per_step_mean": 2.1522478073341755,
+      "examples_per_second": 238.1074335717523,
+      "tokens_per_second": 16429.41291645091,
+      "wall_seconds_per_step": 3.046011882781982,
+      "wall_seconds_scope": "terminal attempt from optimizer step 250",
+      "peak_allocated_gb": 15.305182933807373,
+      "peak_reserved_gb": 15.416015625,
+      "host_input_wait_seconds": 13.958619601003193,
+      "dataloader_batches": 734,
+      "host_input_wait_fraction": 0.01833035475653432,
+      "checkpoint_writes": 3,
+      "checkpoint_write_seconds_median": 1.2835634059997574,
+      "checkpoint_write_seconds_max": 1.6430511190001198,
+      "checkpoint_bytes_median": 567659011,
+      "checkpoint_mb_median": 541.361819267273,
+      "cuda": {
+        "device_name": "NVIDIA A100-SXM4-40GB",
+        "capability": [
+          8,
+          0
+        ],
+        "bf16_supported": true,
+        "total_memory_bytes": 42405855232,
+        "torch": "2.11.0+cu128",
+        "cuda_version": "12.8"
+      },
+      "probe_exit": "ok",
+      "vram_headroom_fraction": 0.6096571889556179,
+      "physical_batch_fits": true,
+      "missing_required": [],
+      "validation_accuracy": {
+        "metric": "val_(5, 5)/test_accuracy",
+        "value": 5.008012885809876e-05,
+        "step": 0.0
+      },
+      "validation_loss": {
+        "metric": "val/loss",
+        "value": 2.219595193862915,
+        "step": 0.0
+      },
+      "train_loss_last": {
+        "metric": "loss",
+        "value": 1.0973283052444458,
+        "step": 0.0
+      }
+    },
+    "lurestar-gpt": {
+      "job": "lurestar-gpt",
+      "task": "lurestar",
+      "model": "gpt",
+      "config": "gpt_lurestar.yaml",
+      "returncode": 0,
+      "steps_requested": 500,
+      "warmup_steps": 100,
+      "steps_summarized": 399,
+      "metrics_csv": "state://gate/root/runs/gpt/seed1234/base/gpt-seed1234-base/version_0/metrics.csv",
+      "resolved": {
+        "effective_batch_size": 512,
+        "gradient_accum_steps": 1,
+        "device_batch_size": 512,
+        "micro_batch_size": 512,
+        "block_size": 69,
+        "vocab_size": 106,
+        "n_layer": 12,
+        "n_embd": 384,
+        "proj_factor": 1.0,
+        "compile": false
+      },
+      "wall_seconds": 117.53446292877197,
+      "resumed": false,
+      "resume_steps": [
+        0
+      ],
+      "measurement_scopes": {
+        "step_timing": "checkpoint-consistent trajectory",
+        "warmup": "global optimizer step >= 100",
+        "process_probe": "terminal successful attempt",
+        "gpu_samples": "all preserved attempts"
+      },
+      "gpu": {
+        "samples": 470,
+        "gpu_util_pct_median": 77.0,
+        "gpu_util_pct_mean": 55.38723404255319,
+        "gpu_util_pct_p05": 0.0,
+        "mem_util_pct_median": 60.0,
+        "mem_used_mib_max": 8312.0
+      },
+      "seconds_per_step_median": 0.10059657200008587,
+      "seconds_per_step_p95": 0.10090605010002492,
+      "seconds_per_step_mean": 0.1007896441729373,
+      "examples_per_second": 5089.636652823149,
+      "tokens_per_second": 351184.9290447973,
+      "wall_seconds_per_step": 0.23506892585754394,
+      "wall_seconds_scope": "terminal attempt from optimizer step 0",
+      "peak_allocated_gb": 7.45191764831543,
+      "peak_reserved_gb": 7.59765625,
+      "host_input_wait_seconds": 12.903555579999079,
+      "dataloader_batches": 656,
+      "host_input_wait_fraction": 0.10978529410406945,
+      "checkpoint_writes": 5,
+      "checkpoint_write_seconds_median": 0.5973817490000783,
+      "checkpoint_write_seconds_max": 0.6451566360000243,
+      "checkpoint_bytes_median": 256007843,
+      "checkpoint_mb_median": 244.14810466766357,
+      "cuda": {
+        "device_name": "NVIDIA A100-SXM4-40GB",
+        "capability": [
+          8,
+          0
+        ],
+        "bf16_supported": true,
+        "total_memory_bytes": 42405855232,
+        "torch": "2.11.0+cu128",
+        "cuda_version": "12.8"
+      },
+      "probe_exit": "ok",
+      "vram_headroom_fraction": 0.8076227625791655,
+      "physical_batch_fits": true,
+      "missing_required": [],
+      "validation_accuracy": {
+        "metric": "val_(5, 5)/test_accuracy",
+        "value": 0.0,
+        "step": 0.0
+      },
+      "validation_loss": {
+        "metric": "val/loss",
+        "value": 2.0452067852020264,
+        "step": 0.0
+      },
+      "train_loss_last": {
+        "metric": "loss",
+        "value": 0.4703200161457062,
+        "step": 0.0
+      }
+    },
+    "lurestar-nextlat": {
+      "job": "lurestar-nextlat",
+      "task": "lurestar",
+      "model": "nextlat",
+      "config": "nextlat_lurestar.yaml",
+      "returncode": 0,
+      "steps_requested": 500,
+      "warmup_steps": 100,
+      "steps_summarized": 399,
+      "metrics_csv": "state://gate/root/runs/nextlat/seed1234/base/nextlat-seed1234-base/version_0/metrics.csv",
+      "resolved": {
+        "effective_batch_size": 512,
+        "gradient_accum_steps": 1,
+        "device_batch_size": 512,
+        "micro_batch_size": 512,
+        "block_size": 69,
+        "vocab_size": 106,
+        "n_layer": 12,
+        "n_embd": 384,
+        "proj_factor": 0.5,
+        "compile": false
+      },
+      "wall_seconds": 125.79533338546753,
+      "resumed": false,
+      "resume_steps": [
+        0
+      ],
+      "measurement_scopes": {
+        "step_timing": "checkpoint-consistent trajectory",
+        "warmup": "global optimizer step >= 100",
+        "process_probe": "terminal successful attempt",
+        "gpu_samples": "all preserved attempts"
+      },
+      "gpu": {
+        "samples": 503,
+        "gpu_util_pct_median": 77.0,
+        "gpu_util_pct_mean": 57.87872763419483,
+        "gpu_util_pct_p05": 0.0,
+        "mem_util_pct_median": 61.0,
+        "mem_used_mib_max": 9988.0
+      },
+      "seconds_per_step_median": 0.11536158499995963,
+      "seconds_per_step_p95": 0.11562663209999754,
+      "seconds_per_step_mean": 0.11552266583709198,
+      "examples_per_second": 4438.219187090565,
+      "tokens_per_second": 306237.123909249,
+      "wall_seconds_per_step": 0.25159066677093506,
+      "wall_seconds_scope": "terminal attempt from optimizer step 0",
+      "peak_allocated_gb": 8.594399452209473,
+      "peak_reserved_gb": 9.234375,
+      "host_input_wait_seconds": 12.90460997500054,
+      "dataloader_batches": 656,
+      "host_input_wait_fraction": 0.10258417087267993,
+      "checkpoint_writes": 5,
+      "checkpoint_write_seconds_median": 0.6434934830000429,
+      "checkpoint_write_seconds_max": 0.6689464269999235,
+      "checkpoint_bytes_median": 263100035,
+      "checkpoint_mb_median": 250.91174602508545,
+      "cuda": {
+        "device_name": "NVIDIA A100-SXM4-40GB",
+        "capability": [
+          8,
+          0
+        ],
+        "bf16_supported": true,
+        "total_memory_bytes": 42405855232,
+        "torch": "2.11.0+cu128",
+        "cuda_version": "12.8"
+      },
+      "probe_exit": "ok",
+      "vram_headroom_fraction": 0.7661800569342659,
+      "physical_batch_fits": true,
+      "missing_required": [],
+      "validation_accuracy": {
+        "metric": "val_(5, 5)/test_accuracy",
+        "value": 0.0,
+        "step": 0.0
+      },
+      "validation_loss": {
+        "metric": "val/loss",
+        "value": 3.770200729370117,
+        "step": 0.0
+      },
+      "train_loss_last": {
+        "metric": "loss",
+        "value": 2.8818206787109375,
+        "step": 0.0
+      }
+    }
+  },
+  "contrast": {
+    "lurestar": {
+      "nextlat_step_time_overhead": 1.1467745143429058,
+      "nextlat_throughput_ratio": 0.8720110078248411,
+      "nextlat_peak_allocated_overhead": 1.1533137989189013,
+      "nextlat_peak_reserved_overhead": 1.2154241645244217,
+      "nextlat_checkpoint_bytes_overhead": 1.0277030262701756
+    },
+    "hmm": {
+      "nextlat_step_time_overhead": 1.283800901565198,
+      "nextlat_throughput_ratio": 0.7789369821915605,
+      "nextlat_peak_allocated_overhead": 1.1413014841485905,
+      "nextlat_peak_reserved_overhead": 1.2269503546099292,
+      "nextlat_checkpoint_bytes_overhead": 1.0771447960800906
+    }
+  },
+  "projection": {
+    "assumptions": {
+      "seeds": 5,
+      "lurestar_models": [
+        "gpt",
+        "nextlat",
+        "bst"
+      ],
+      "hmm_models": [
+        "gpt",
+        "nextlat"
+      ],
+      "base_steps": 20000,
+      "adaptation_steps": 500,
+      "adaptation_branches_total": 30,
+      "hmm_steps": 3000,
+      "interruption_margin": 0.2
+    },
+    "lurestar_gpu_hours": {
+      "gpt": 2.860724972113505,
+      "nextlat": 3.2759877481099946,
+      "bst": 59.87289204511545
+    },
+    "lurestar_gpu_hours_total": 66.00960476533895,
+    "adapt_gpu_hours": {
+      "gpt": 0.1480144298473426,
+      "nextlat": 0.16916183309716676,
+      "bst": 3.004340963972437
+    },
+    "adapt_gpu_hours_total": 3.321517226916946,
+    "hmm_gpu_hours": {
+      "gpt": 0.05347886806666793,
+      "nextlat": 0.06846162481638203
+    },
+    "hmm_gpu_hours_total": 0.12194049288304995,
+    "subtotal_gpu_hours": 69.45306248513893,
+    "with_interruption_margin_gpu_hours": 83.34367498216672
+  }
+}

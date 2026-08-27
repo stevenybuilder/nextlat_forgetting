@@ -220,6 +220,49 @@ class CheckpointRecord:
         return CheckpointRecord(**{k: v for k, v in d.items() if k in known})
 
 
+def _loaded_step(state: t.Any) -> int | None:
+    """Return the optimizer-step counter encoded in a deserialized checkpoint.
+
+    Production Fabric checkpoints use ``training_steps``.  ``step`` remains accepted for
+    checkpoints written directly by this module's lightweight test/rehearsal serializer; it is
+    normalized into ``training_steps`` in the verification sidecar and never weakens adoption of
+    an upstream checkpoint, whose filename and payload must still agree exactly.
+    """
+    if not isinstance(state, dict):
+        return None
+    value = state.get("training_steps", state.get("step"))
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return int(value)
+
+
+def exact_sidecar_step(metadata: t.Any) -> int:
+    """Return one unambiguous integer step from legacy or modern sidecar JSON.
+
+    Receipt-pinned a962 sidecars use ``step``; successor sidecars also carry
+    ``training_steps``.  Either spelling is exact evidence, but boolean/non-integer values,
+    an absent value, or conflicting dual keys are never coerced.
+    """
+    if not isinstance(metadata, dict):
+        raise ValueError("checkpoint sidecar must be a JSON object")
+    values: dict[str, int] = {}
+    for key in ("step", "training_steps"):
+        if key not in metadata:
+            continue
+        value = metadata[key]
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"checkpoint sidecar {key} must be an integer")
+        values[key] = int(value)
+    if not values:
+        raise ValueError("checkpoint sidecar has neither step nor training_steps")
+    if len(set(values.values())) != 1:
+        raise ValueError(
+            "checkpoint sidecar step/training_steps conflict: "
+            f"{values.get('step')} != {values.get('training_steps')}"
+        )
+    return next(iter(values.values()))
+
+
 def verify_pointer(out_dir: os.PathLike | str, pointer: str = RECOVERY_POINTER) -> tuple[bool, str]:
     """Check the invariant `the pointer never points at a file that fails its hash`.
 
@@ -379,6 +422,14 @@ class DurableCheckpointer:
         name = filename or f"{kind}_ckpt_iter_{step}.pt"
         path = self.ckpt_dir / name
 
+        filename_step = _step_from_name(name)
+        state_step = _loaded_step(state)
+        if filename_step != int(step) or state_step != int(step):
+            raise CheckpointCorrupt(
+                f"checkpoint step mismatch before save: filename={filename_step}, "
+                f"requested={int(step)}, payload={state_step}"
+            )
+
         _write_stream_atomic(path, lambda fh: self.save_fn(state, fh), fsync=self.fsync)
 
         digest = sha256_file(path)
@@ -399,10 +450,12 @@ class DurableCheckpointer:
             saved_at=self.clock(),
             kind=kind,
             run_id=self.run_id,
-            extra=dict(extra or {}),
+            extra=dict(extra or {}, training_steps=int(step)),
         )
+        sidecar = rec.to_dict()
+        sidecar["training_steps"] = int(step)
         atomic_write_json(
-            path.with_name(path.name + META_SUFFIX), rec.to_dict(), fsync=self.fsync
+            path.with_name(path.name + META_SUFFIX), sidecar, fsync=self.fsync
         )
 
         records = [r for r in self.read_index() if r.path != rec.path]
@@ -450,11 +503,32 @@ class DurableCheckpointer:
         digest = sha256_file(p)
         if digest != rec.sha256:
             return False, f"{p.name} sha {digest[:12]} != recorded {rec.sha256[:12]}"
+        filename_step = _step_from_name(p.name)
+        sidecar_path = p.with_name(p.name + META_SUFFIX)
+        if not sidecar_path.is_file():
+            return False, f"{p.name} lacks verification sidecar"
+        try:
+            sidecar = json.loads(sidecar_path.read_text())
+            sidecar_step = exact_sidecar_step(sidecar)
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            return False, f"{p.name} has invalid verification sidecar: {exc!r}"
+        if ("training_steps" not in sidecar or filename_step != rec.step or
+                sidecar_step != rec.step):
+            return False, (
+                f"{p.name} step mismatch: filename={filename_step}, "
+                f"sidecar={sidecar_step}, index={rec.step}"
+            )
         if deep:
             try:
-                self.load_fn(p)
+                loaded = self.load_fn(p)
             except Exception as exc:  # noqa: BLE001
                 return False, f"{p.name} failed to deserialize: {exc!r}"
+            loaded_step = _loaded_step(loaded)
+            if loaded_step != rec.step:
+                return False, (
+                    f"{p.name} loaded training_steps {loaded_step} != exact filename/index "
+                    f"step {rec.step}"
+                )
         return True, "ok"
 
     def resolve(self, *, deep: bool = True) -> CheckpointRecord | None:
@@ -550,19 +624,58 @@ class DurableCheckpointer:
             step = _step_from_name(p.name)
             if step is None:
                 raise ValueError(f"cannot infer a step from {p.name}; pass step=")
+        filename_step = _step_from_name(p.name)
+        if filename_step is None or filename_step != int(step):
+            raise CheckpointCorrupt(
+                f"checkpoint filename step {filename_step} != requested step {int(step)}: {p}"
+            )
         try:
-            self.load_fn(p)
+            loaded = self.load_fn(p)
         except Exception as exc:  # noqa: BLE001
             raise CheckpointCorrupt(f"{p} did not deserialize: {exc!r}") from exc
+        loaded_step = _loaded_step(loaded)
+        if loaded_step != int(step):
+            raise CheckpointCorrupt(
+                f"{p} loaded training_steps {loaded_step} != filename step {int(step)}"
+            )
 
         rec = CheckpointRecord(
             path=str(p), step=int(step), sha256=sha256_file(p),
             size_bytes=p.stat().st_size, saved_at=self.clock(), kind=kind,
-            run_id=self.run_id, extra=dict(extra or {}),
+            run_id=self.run_id, extra=dict(extra or {}, training_steps=int(step)),
         )
-        atomic_write_json(
-            p.with_name(p.name + META_SUFFIX), rec.to_dict(), fsync=self.fsync
-        )
+        sidecar_path = p.with_name(p.name + META_SUFFIX)
+        if sidecar_path.is_file():
+            try:
+                existing_sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise CheckpointCorrupt(
+                    f"existing checkpoint sidecar is invalid: {sidecar_path}: {exc}"
+                ) from exc
+            if (
+                existing_sidecar.get("sha256") != rec.sha256
+                or existing_sidecar.get("size_bytes") != rec.size_bytes
+            ):
+                raise CheckpointCorrupt(
+                    f"existing checkpoint sidecar does not bind exact step/payload: {sidecar_path}"
+                )
+            try:
+                existing_step = exact_sidecar_step(existing_sidecar)
+            except ValueError as exc:
+                raise CheckpointCorrupt(
+                    f"existing checkpoint sidecar has invalid step identity: {sidecar_path}: {exc}"
+                ) from exc
+            if "training_steps" not in existing_sidecar or existing_step != int(step):
+                raise CheckpointCorrupt(
+                    f"existing checkpoint sidecar does not bind exact step/payload: {sidecar_path}"
+                )
+            # A recovery receipt binds these exact sidecar bytes.  Re-indexing an upstream
+            # checkpoint must not silently rewrite that immutable evidence merely to add our
+            # own saved_at/kind fields.
+        else:
+            sidecar = rec.to_dict()
+            sidecar["training_steps"] = int(step)
+            atomic_write_json(sidecar_path, sidecar, fsync=self.fsync)
         records = [r for r in self.read_index() if r.path != rec.path]
         records.insert(0, rec)
         records.sort(key=lambda r: (r.step, r.saved_at), reverse=True)
@@ -673,8 +786,12 @@ class DurableCheckpointer:
         KeyboardInterrupt and any exception escaping the training loop all land here. This
         must never raise: the emergency path failing is not a reason to lose the traceback.
         """
-        tb = "".join(traceback.format_exception(exc)) if exc is not None else "".join(
-            traceback.format_stack()
+        # The single-exception form is Python 3.10+; keep the emergency path usable
+        # under the project's Python 3.9 host verifier as well as current Colab.
+        tb = (
+            "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+            if exc is not None
+            else "".join(traceback.format_stack())
         )
         info = {
             "run_id": self.run_id,

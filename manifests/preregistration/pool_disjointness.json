@@ -1,0 +1,40 @@
+{
+  "checks": {
+    "adaptation_evaluation_overlap_count": 0,
+    "all_pairwise_overlap_count": 0,
+    "training_evaluation_overlap_count": 0
+  },
+  "domains": {
+    "evaluation": {
+      "count": 8000,
+      "set_sha256": "c5bff8273c4856da5ba137f9a89b347bb3d5c2e64c6f45bfc4926e7ccb9ab26f"
+    },
+    "training": {
+      "count": 200000,
+      "set_sha256": "772f26fdf5fe3671a696d079aa8239ba86972f7a74d1021c3f1699d4079f76c1"
+    }
+  },
+  "identity": "canonical solver graph key (edge ordering and recorded answer ignored)",
+  "pairwise_overlap_counts": {
+    "evaluation__training": 0
+  },
+  "schema": "nextlat_forgetting/pool_disjointness_source/1",
+  "sources": {
+    "evaluation": {
+      "path": "manifests/e_lure.jsonl",
+      "sha256": "f67765e6ea2afd4156c9d03ad0271afe224f1a54ddf1afc82118fcc3e4541495"
+    },
+    "h3_permanent_block": {
+      "path": "manifests/h3_selected/PERMANENT_H3_BLOCK.json",
+      "sha256": "82d526ad5cb6ac5fb942790488a6b766e59b816acb27ed405a00852f40925778"
+    },
+    "h3_permanent_block_sidecar": {
+      "path": "manifests/h3_selected/PERMANENT_H3_BLOCK.json.sha256",
+      "sha256": "24b47f2d49e084d4b09e39393938294d7ef1a7ba6e5bbf90d56b4e7145a65d0b"
+    },
+    "training": {
+      "path": "data/stargraph/graph_5_5_sample_200000.txt",
+      "sha256": "d13199b00c41d74325931cfecb15e3cf876d5e7d999c3257aaf4962e44827d76"
+    }
+  }
+}

@@ -8,11 +8,13 @@ is rejected.  A test that cannot reject the mutant is not a test.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import warnings
 
 import numpy as np
 import pytest
+from scipy import stats
 
 from lurestar import evaluate as E
 from lurestar import representations as R
@@ -440,6 +442,7 @@ def test_seed_level_contrast_uses_seeds_and_refuses_item_arrays():
     assert con.n_seeds == 3
     assert con.ci.unit == "training seed"
     assert con.ci.n_units == 3
+    assert con.ci.method.startswith("two-sided paired Student-t")
     assert con.estimate == pytest.approx(np.mean([0.021, 0.008, 0.031]))
     assert con.sign_flip_p == pytest.approx(0.25)
     assert con.min_attainable_p == pytest.approx(0.25)
@@ -487,6 +490,41 @@ def test_exact_sign_flip_p_is_the_enumeration_it_claims_to_be():
     # {0.2, 0.2, 0.0, 0.0, 0.0667, 0.0667, 0.1333, 0.1333}; two are >= 0.2.
     assert E._exact_sign_flip_p(d) == pytest.approx(2 / 8)
     assert E._exact_sign_flip_p(np.array([1.0, 1.0, 1.0, 1.0])) == pytest.approx(2 / 16)
+
+
+def test_seed_interval_is_student_t_with_loso_not_seed_bootstrap():
+    a = {1: 0.4, 2: 0.6, 3: 0.9, 4: 0.7, 5: 1.1}
+    b = {seed: 0.2 for seed in a}
+    first = E.model_contrast_seed_level(
+        a, b, label_a="nextlat", label_b="bst", rng=np.random.default_rng(1), n_boot=100
+    )
+    second = E.model_contrast_seed_level(
+        a, b, label_a="nextlat", label_b="bst", rng=np.random.default_rng(999), n_boot=9999
+    )
+    diffs = np.asarray([a[s] - b[s] for s in sorted(a)])
+    expected_half_width = stats.t.ppf(.975, 4) * diffs.std(ddof=1) / np.sqrt(5)
+    assert first.ci.ci_low == pytest.approx(diffs.mean() - expected_half_width)
+    assert first.ci.as_dict() == second.ci.as_dict(), "seed bootstrap RNG must not affect Student-t"
+    assert first.paired_standardized_effect == pytest.approx(diffs.mean() / diffs.std(ddof=1))
+    assert [entry["omitted_seed"] for entry in first.leave_one_seed_out] == [1, 2, 3, 4, 5]
+    assert all(entry["n_seeds"] == 4 for entry in first.leave_one_seed_out)
+
+
+def test_npsi_formula_and_fail_closed_denominator():
+    critical = np.asarray([2.0, 4.0, 6.0])
+    safe = np.asarray([1.0, 1.0, 2.0])
+    value, denominator = E.normalized_psi(critical, safe)
+    assert denominator == 16.0
+    assert value == pytest.approx(2.0 * 8.0 / 16.0)
+    result = E.bootstrap_psi_items(
+        critical, safe, rng=np.random.default_rng(0), n_boot=100
+    )
+    assert result.npsi == value
+    assert result.as_dict()["npsi_role"].endswith("cannot rescue a co-primary result")
+    with pytest.raises(ValueError, match="strictly positive and finite"):
+        E.normalized_psi(np.zeros(3), np.zeros(3))
+    with pytest.raises(ValueError, match="finite"):
+        E.normalized_psi(np.asarray([1.0, np.nan]), np.ones(2))
 
 
 # =====================================================================================
@@ -587,26 +625,62 @@ def test_h2_recovers_the_planted_coefficient_direction():
 
     out = E.fit_h2(crit_margin, base_crit_dist, base_margin, rng=np.random.default_rng(9))
     rep, res = out["report"], out["result"]
-    assert rep["r2_heldout"] > 0.7
-    assert rep["spearman_rho_pred_vs_actual"] > 0.8
-    dirs = rep["coefficient_directions_standardized"]
-    assert dirs["base_critical_distance"]["sign_consistent"]
-    assert dirs["base_critical_distance"]["signs"] == [1, 1]
-    assert dirs["base_correct_branch_margin"]["signs"] == [1, 1]
-    assert rep["margin_extraction_index"] == R.BRANCH_MARGIN_INDEX == 63
+    assert rep["r2_heldout_M1"] > 0.7
+    assert rep["delta_r2_heldout"] > 0.0
+    dirs = rep["distance_coefficient_directions_standardized"]
+    assert dirs["sign_consistent"]
+    assert dirs["signs"] == [1, 1]
+    assert rep["extraction_index"] == R.BRANCH_MARGIN_INDEX == 63
+    assert rep["folds_reused_exactly"] is True
     assert res.n_folds == 2
 
     # Planting the OPPOSITE sign must flip the reported direction.
     crit_margin_neg = 1.5 + 0.8 * base_margin - 6.0 * base_crit_dist + rng.normal(0, 0.5, n)
     out2 = E.fit_h2(crit_margin_neg, base_crit_dist, base_margin, rng=np.random.default_rng(9))
-    assert out2["report"]["coefficient_directions_standardized"][
-        "base_critical_distance"
-    ]["signs"] == [-1, -1]
+    assert out2["report"]["distance_coefficient_directions_standardized"]["signs"] == [-1, -1]
 
     # A pure-noise outcome must NOT produce a positive held-out R^2.
     out3 = E.fit_h2(rng.standard_normal(n), base_crit_dist, base_margin,
                     rng=np.random.default_rng(9))
-    assert out3["report"]["r2_heldout"] < 0.05
+    assert out3["report"]["r2_heldout_M1"] < 0.05
+
+
+def test_h2_base_id_folds_are_exact_sha_parity_and_seed_free():
+    # Digest-looking IDs are still UTF-8 text inputs to a *second* SHA-256.  These values
+    # deliberately include known mismatches between that contract and ``int(id, 16) % 2``.
+    ids = np.asarray([f"{value:064x}" for value in (0, 1, 2, 3, 7, 8)])
+    expected = np.asarray([
+        int(hashlib.sha256(base_id.encode("utf-8")).hexdigest(), 16) % 2
+        for base_id in ids.tolist()
+    ], dtype=np.int64)
+    got = E.base_id_folds(ids)
+    assert expected.tolist() == [1, 1, 1, 1, 0, 0]  # freeze known direct-parity mismatches
+    assert got.tolist() == expected.tolist()
+    assert got.tolist() != [int(base_id, 16) % 2 for base_id in ids.tolist()]
+    assert np.array_equal(got, E.base_id_folds(ids))
+    with pytest.raises(ValueError, match="lowercase SHA-256"):
+        E.base_id_folds(["not-a-digest"] * 4)
+
+
+def test_h2_is_nested_incremental_on_identical_folds():
+    rng = np.random.default_rng(808)
+    n = 400
+    base = rng.normal(size=n)
+    distance = rng.normal(size=n)
+    outcome = 2.0 * base + 3.0 * distance + rng.normal(scale=.1, size=n)
+    ids = np.asarray([hashlib.sha256(f"base-{i}".encode()).hexdigest() for i in range(n)])
+    folds = E.base_id_folds(ids)
+    out = E.fit_h2(outcome, distance, base, folds=folds)
+    report = out["report"]
+    assert report["M0"]["model"] == "y ~ base_correct_branch_margin"
+    assert report["M1"]["model"] == (
+        "y ~ base_correct_branch_margin + base_critical_distance"
+    )
+    assert report["delta_r2_heldout"] == pytest.approx(
+        report["r2_heldout_M1"] - report["r2_heldout_M0"]
+    )
+    assert np.array_equal(out["baseline_result"].fold_index, out["result"].fold_index)
+    assert report["heldout_spearman_incremental"]["definition"].startswith("OOF")
 
 
 # =====================================================================================
@@ -638,11 +712,32 @@ def test_whitened_euclidean_equals_mahalanobis_under_the_same_covariance():
     # W is a genuine inverse square root of the covariance actually used.
     assert np.allclose(w.transform @ w.transform, np.linalg.inv(w.covariance), atol=1e-9)
     assert np.allclose(w.transform, w.transform.T, atol=1e-12)
-
     # Discrimination: plain Euclidean is NOT the same thing on a correlated covariance.
     plain = np.sqrt(np.einsum("ij,ij->i", diff, diff))
     assert not np.allclose(got, plain, rtol=0.05)
 
+
+def test_whitener_refuses_same_base_group_under_different_condition_row_ids():
+    rng = np.random.default_rng(551)
+    pool = rng.normal(size=(8, 4))
+    item_ids = [f"base-{i // 2}:condition-{i % 2}" for i in range(8)]
+    group_ids = [f"base-{i // 2}" for i in range(8)]
+    whitener = R.Whitener.fit(pool, item_ids=item_ids, group_ids=group_ids)
+    scored_a = rng.normal(size=(2, 4))
+    scored_b = rng.normal(size=(2, 4))
+    with pytest.raises(R.LeakageError, match="scored group"):
+        whitener.distance(
+            scored_a, scored_b,
+            item_ids=["novel-row-a", "novel-row-b"],
+            group_ids=["base-0", "new-base"],
+        )
+    clean = whitener.distance(
+        scored_a, scored_b,
+        item_ids=["novel-row-a", "novel-row-b"],
+        group_ids=["new-base-a", "new-base-b"],
+    )
+    assert np.isfinite(clean).all()
+    assert whitener.report()["group_leakage_checked"] is True
 
 def test_whitener_reports_shrinkage_and_never_reports_zero():
     rng = np.random.default_rng(66)
@@ -808,9 +903,31 @@ def test_similarity_dependent_interference_reduces_to_the_shared_parent_form():
 
 def test_layer_b_is_lazy_and_layer_a_needs_no_torch():
     """Importing the module and running all of Layer A must not require torch."""
+    import subprocess
     import sys
+    from pathlib import Path
 
-    assert "torch" not in sys.modules, "Layer A must not drag torch in at import time"
+    source_root = str(Path(R.__file__).resolve().parents[1])
+
+    # Check import laziness in a fresh interpreter.  Inspecting this pytest
+    # process is order-dependent: an unrelated earlier test may legitimately
+    # have imported torch without representations.py being responsible for it.
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                f"import sys; sys.path.insert(0, {source_root!r}); "
+                "import lurestar.representations; "
+                "assert 'torch' not in sys.modules, "
+                "'representations import eagerly loaded torch'"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert probe.returncode == 0, probe.stderr
     if not R.TORCH_AVAILABLE:
         with pytest.raises(RuntimeError, match="Layer B needs torch"):
             R.forward_states_and_logits(object(), None, architecture="gpt")
@@ -1546,6 +1663,116 @@ def test_extract_positions_carries_bst_secondary_state_and_only_for_bst(monkeypa
         )
         assert out["architecture"] == arch
         assert out["state_source"] == R.STATE_SOURCE[arch]
+
+
+def test_intermediate_hooks_return_fixed_12x2_stack_verify_parity_and_remove():
+    torch = pytest.importorskip("torch")
+
+    class Block(torch.nn.Module):
+        def __init__(self, value):
+            super().__init__()
+            self.value = value
+
+        def forward(self, x, **_kwargs):
+            return x + self.value
+
+    class Inner(torch.nn.Module):
+        def __init__(self, corrupt=False):
+            super().__init__()
+            self.corrupt = corrupt
+            self.token_embedding = torch.nn.Embedding(106, 6)
+            self.transformer = torch.nn.ModuleDict({
+                "blocks": torch.nn.ModuleList([Block(float(i + 1)) for i in range(12)]),
+                "norm": torch.nn.LayerNorm(6),
+            })
+            self.lm_head = torch.nn.Linear(6, 106, bias=False)
+
+        def forward(self, tokens, return_hidden_states=False, **_kwargs):
+            x = self.token_embedding(tokens)
+            for block in self.transformer.blocks:
+                x = block(x)
+            hidden = self.transformer.norm(x)
+            if self.corrupt:
+                hidden = hidden + 1.0
+            logits = self.lm_head(hidden)
+            return (logits, hidden) if return_hidden_states else logits
+
+    tokens = np.zeros((4, 69), dtype=np.int64)
+    model = Inner()
+    result = R.extract_positions(
+        model, tokens, architecture="gpt", batch_size=2, capture_blocks=True
+    )
+    assert result["intermediate_hidden"].shape == (4, 12, 2, 6)
+    assert all(len(block._forward_hooks) == 0 for block in model.transformer.blocks)
+
+    corrupt = Inner(corrupt=True)
+    with pytest.raises(RuntimeError, match="block 11 plus final norm"):
+        R.extract_positions(
+            corrupt, tokens, architecture="gpt", batch_size=2, capture_blocks=True
+        )
+    assert all(len(block._forward_hooks) == 0 for block in corrupt.transformer.blocks)
+
+
+def test_bst_intermediate_hooks_capture_forward_stack_only():
+    torch = pytest.importorskip("torch")
+
+    class Block(torch.nn.Module):
+        def forward(self, x, **_kwargs):
+            return x + .1
+
+    class Encoder(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.embedding = torch.nn.Embedding(106, 6)
+            self.transformer_f = torch.nn.ModuleDict({
+                "blocks": torch.nn.ModuleList([Block() for _ in range(12)]),
+                "norm": torch.nn.LayerNorm(6),
+            })
+            self.transformer_b = torch.nn.ModuleDict({
+                "blocks": torch.nn.ModuleList([Block() for _ in range(12)]),
+                "norm": torch.nn.LayerNorm(6),
+            })
+
+        def forward(self, tokens, compute_forward=True, compute_backward=True):
+            def run(stack):
+                x = self.embedding(tokens)
+                for block in stack.blocks:
+                    x = block(x)
+                return stack.norm(x)
+            return (
+                run(self.transformer_f) if compute_forward else None,
+                run(self.transformer_b) if compute_backward else None,
+            )
+
+    class TextHead(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.mlp = torch.nn.Linear(12, 12)
+            torch.nn.init.zeros_(self.mlp.weight)
+            torch.nn.init.zeros_(self.mlp.bias)
+            self.norm = torch.nn.Identity()
+            self.lm_head = torch.nn.Linear(6, 106, bias=False)
+
+        def forward(self, fwd, bwd):
+            x = torch.cat([fwd, bwd], dim=-1)
+            x = x + self.mlp(x)
+            next_state, prev_state = self.norm(x).chunk(2, dim=-1)
+            return torch.stack([self.lm_head(next_state), self.lm_head(prev_state)], dim=1)
+
+    class BST(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.encoder = Encoder()
+            self.text_head = TextHead()
+
+    model = BST()
+    result = R.extract_positions(
+        model, np.zeros((2, 69), dtype=np.int64), architecture="bst",
+        capture_blocks=True,
+    )
+    assert result["intermediate_hidden"].shape == (2, 12, 2, 6)
+    assert all(len(block._forward_hooks) == 0 for block in model.encoder.transformer_f.blocks)
+    assert all(len(block._forward_hooks) == 0 for block in model.encoder.transformer_b.blocks)
 
 
 # =====================================================================================

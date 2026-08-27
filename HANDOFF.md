@@ -1,160 +1,96 @@
-# HANDOFF — NextLat × Predictive Geometry
+# HANDOFF — NextLat predictive geometry
 
-Written 2026-08-23 for a cold pickup by another agent or session. Read this file, then
-`nextlat_v4_predictive_geometry_spec.md`, then `docs/FOUNDATIONS.md`. Everything below is
-verified fact with the command that established it, not intention.
+Updated **2026-08-24 19:30 EDT**. This is the cold-pickup entry point, not a scientific
+amendment. Read [`README.md`](README.md), then [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md)
+and [`docs/INDEX.md`](docs/INDEX.md). The remote ledgers remain authoritative for live execution.
 
-## What this project is, in one paragraph
+## Current state
 
-The NextLat paper (arXiv:2511.05963v4) adds a latent transition model to next-token training and
-proves the hidden state becomes a belief state — a sufficient statistic of the history for
-predicting the future. It shows the representation gets compressed (effective rank 52.7 vs GPT's
-160.1) but never asks what the geometry *is*. Its own §6 says so: *"On the analysis side, we do
-not study the structure of the learned representations under NextLat, leaving open questions about
-how the method shapes latent spaces."* This project fills exactly that gap by asking whether
-NextLat separates histories whose futures differ while keeping future-equivalent histories close,
-whether that geometry predicts planning behaviour, and whether it predicts which memories interfere
-under later training. A 4-state HMM supplies exact Bayesian ground truth that Path-Star cannot.
+- **HMM:** all 30/30 cells are durably `TRAINED` at exactly 3,000 updates with checkpoint paths
+  and SHA-256s. HMM scientific evaluation has not been opened.
+- **Lure-Star bases:** GPT seeds 1234--1237 are durably `DONE` at 20,000 updates with competence
+  receipts. GPT seed 1238 is training on Vast instance `48593365`; BST seed 1236 is training on
+  `48598595`; and BST seed 1234 is training on the third worker, `48625433`. The allowlists are
+  disjoint. The remaining eight base jobs are not verified complete.
+- **CFS-1:** blocked permanently for production claims by the 8-versus-7 low-overlap confound.
+- **CFS-2:** balanced 18/18/8/8 stimuli, independent construct audit, frozen 64-branch execution
+  envelope, runner, recovery, evaluator preflight, and three-site activation-patching runner are
+  implemented. No branch has launched. The blocks-3/7/10 patching sweep with all named controls is
+  required for every completed branch; it is not an optional post-hoc analysis.
+- **Lure-Star H3:** permanently retired by its prospectively frozen matching stop rule. It is not
+  pending work.
+- **H1-BD-1:** separately declared h63 branch-decision analysis is code-ready; no outcome opened.
+- **TS-1/NL-1:** the TinyStories parity and FineWeb-Edu external-validity protocols remain frozen
+  for provenance, but both are deferred outside the current milestone. No corpus download,
+  timing profile, or language GPU run is in the active queue.
 
-## Status: BUILD COMPLETE, SWEEP NOT STARTED
+## Vast worker policy
 
-No model has been trained. 0.25 of 1788 compute units spent. No Colab runtime is active.
+Supervisor is retained so training survives laptop, SSH, and Codex disconnects. It is not allowed
+to retry every nonzero exit:
 
-### Verified done
+- incomplete training and explicit transport failures may resume;
+- a `TRAINED` checkpoint with evaluator identity, schema, or hash failure is quarantined and exits
+  cleanly without an autorestart loop;
+- unknown post-training failures also quarantine for review rather than repeatedly spending GPU;
+- Colab re-exec/reconnection behavior is not inherited by the Vast adapter;
+- a restart skips broad recovery download only when the worker ledger and every selected terminal
+  artifact verify locally by exact path, step, and SHA-256. Otherwise scoped durable restore runs.
 
-| Thing | Evidence |
-|---|---|
-| Upstream pinned | `upstream/NextLat` @ `3770be6009cea2b3c455a9ce7f2ca88b504bb955`, read-only |
-| Paper-scale corpus | `data/stargraph/`, 200k train sha256 `d13199b0…`, 20k test `f52fb14e…`, byte-identical to upstream's serial render, generated in 4.6s by `scripts/generate_corpus.py` |
-| Corpus on GCS | `gs://nextlat-lurestar-project-flash-490419/lurestar/corpus/stargraph/`, hash-verified on an A100 runtime |
-| Stimuli | 2,000 quartets in `manifests/e_lure.jsonl` + `a_pair` (1,000) + `b_near` (5,000) + `b_far` (15,000), each with `.sha256` |
-| HMM frozen | `manifests/hmm_matrices.json`, chosen by a 2,592-point **model-blind** grid search, 83 candidates passed, payload sha256 recorded |
-| Profiling gate | `results/profile_summary.json` — A100, GPT 0.2017 s/step, NextLat 0.2335 s/step, batch 512 fits in 40GB, no gradient accumulation, bf16-mixed available |
-| Tests | 369 passed / 5 skipped / 0 failed as of the pre-BST baseline. **Re-run and re-baseline before trusting this line.** |
+The GPT-1234 incident was caused by a provider-adapter path mismatch. Training froze
+`/content/project/manifests/corpus.sha256`; evaluation was initially given an identical copy at
+`/content/lurestar/manifests/corpus.sha256`. Absolute path is part of the frozen identity, so the
+refusal was correct. The adapter now uses the original frozen path. No training was lost or
+repeated.
 
-### In flight when this was written
+## Minimal next actions
 
-Two background workflows may have completed after this file was written — check for their outputs
-before redoing their work:
+1. Let the three active base cells finish. For each: evaluate once against its frozen competence
+   identity, promote to `DONE`, and verify the durable ledger/state receipt before the next cell.
+2. Evaluate the 30 completed HMM cells under the frozen HMM contract, then aggregate by seed. Do
+   not treat training loss as an HMM scientific result.
+3. After all required bases are `DONE`, run Lure-Star extraction, H1/H2, and the separately named
+   H1-BD-1 analysis.
+4. Launch CFS-2 only after exact parent-checkpoint lineage is materialized and compute is
+   explicitly authorized. Never use a CFS-1 stream in CFS-2. Run the required inference-only
+   activation-patching sweep for every completed CFS-2 branch.
 
-* `lurestar-bst-arm` → writes `docs/review/bst-arm.md`, edits `configs/`, `scripts/run_matrix.py`,
-  `scripts/config_lib.py`, `src/lurestar/representations.py`.
-* `standing-agents-sweep-1` → writes `docs/QA_LOG.md`, `docs/QA_STATUS.md`,
-  `docs/THROUGHPUT_LOG.md`, `docs/UNSLOP_REPORT.md`, `docs/UNSLOP_LOG.md`.
+## Scientific boundaries
 
-## The immediate next actions, in order
+- The core controlled studies use synthetic Path-Star and exact HMM data for internal validity.
+- CFS-2 is the controlled causal-forgetting study; it does not establish causal mediation in
+  ordinary language.
+- TS-1/NL-1 are deferred external-validity studies and cannot rescue a core null. The current
+  project makes no ordinary-language generalization claim.
+- Legacy H1 at h62 remains unchanged. H1-BD-1 at h63 cannot relabel or rescue it.
+- Report all frozen endpoints and nulls. Do not tune generators, metrics, layers, thresholds, or
+  exclusions after looking at outcomes.
+- A checkpoint is not a result: `TRAINED`, competence `DONE`, evidence extraction, scientific
+  evaluation, aggregation, and interpretation are distinct lifecycle states.
 
-1. **Apply the queued seed change.** See `.agent_state/PENDING_SEED_CHANGE.md`. The spec already
-   says five confirmatory seeds; the code still says three. `scripts/run_matrix.py:72` has
-   `SEEDS = (1234, 1235, 1236)` → make it `(1234, 1235, 1236, 1237, 1238)`, same in
-   `scripts/config_lib.py`, re-materialize configs, and verify the seed-1234–1236 configs come back
-   **byte-identical** (they were frozen earlier and must not move).
-2. **Re-run the full suite** and re-baseline: `.venv/bin/python -m pytest tests/ -q`.
-3. **Read `docs/QA_LOG.md`** if it exists. Do not launch the sweep with an open P0.
-4. **Launch the sweep**: `.venv/bin/python scripts/colab_train_loop.py` from the project root. It
-   packages the project, pushes it to GCS, starts an A100, execs itself as the DRIVER, and restarts
-   on a fresh runtime whenever Colab drops it. Resume state lives in GCS, so a re-exec resumes.
-5. **Run the standing agents on cadence** while it trains — QA after the first seed lands, unslop
-   before anything is shared.
-6. **Figures, then the writeup.** `report/blog.md` is the single source of truth; `{{live:KEY}}`
-   tokens are filled from `results/live_numbers.json` by `scripts/build_report.py`, which renders
-   the Word doc. An unfilled key renders as `[pending]` on purpose.
-7. **Publish**: public GitHub repo, no secrets. `.env`, `.secrets/`, and the ADC path must never be
-   committed — secret-scan before pushing.
+## Operational checks
 
-## Five landmines. Every one of these fails SILENTLY.
+Query provider state using safe field selection; never print raw instance JSON because it may
+contain Jupyter tokens:
 
-1. **D-19 — adaptation jobs that do nothing.** Branching a 20,000-step parent restores
-   `training_steps`, so the loop starts at step 20,001. An adapt config with `train_batches: 500`
-   returns *immediately* and looks like a clean completion with **zero optimizer updates** — a
-   fabricated H3 null. Set `20500`, or reset `training_steps` first, and keep the test that catches
-   a zero-update job.
-2. **D-07 — the wrong model for 20,000 steps.** `proj_factor: 0.5` appears upstream *only* inside
-   the `sweep:` block. Delete the sweep and it silently defaults to `1.0`: dynamics hidden 768
-   instead of 384, ~+885k params, no warning. Assert the resolved value and the parameter count at
-   step 0.
-3. **D-06 — a 100× tighter gradient clip.** The spec's key name `clip_gradient_norm` does not
-   exist; the real key is `optimizer.grad_clip`. Under the wrong name it falls back to `1.0` while
-   the paper uses `100`.
-4. **D-11 — measuring a state that cannot vary.** The token generated at the `=` delimiter
-   (index 62) is the *source*, which is already in the prompt and identical across every member of
-   a quartet. The first real branch decision is index 63. Extract **both**; index 62 stays the
-   preregistered primary for PSI, and every correct-branch margin comes from index 63.
-5. **D-20 — halting on a correct run.** The paper puts GPT on G(5,5) at ~18.6%, which is 1/d
-   chance. The 90% competence gate therefore applies to **NextLat and BST only**. See
-   `docs/DECISION_D20_competence_gate.md`.
-
-## Colab transport — three failures already hit, all fixed, all easy to reintroduce
-
-1. **A child process's stdout does not reach the `colab exec` stream.** Relay it in-process with
-   `Popen` + readline, or the run is blind. The first smoke test "passed" while running blind.
-2. **`cmd | tail -N` returns tail's exit status.** The second smoke test reported `RC=0` while
-   `train.py` was dying on `Missing key test_generalization`. Never pipe a checked command.
-3. **`colab exec` forwards no argv and leaves `__file__` undefined.** Parameters arrive via an
-   uploaded sidecar JSON; guard every `__file__` with a `try/except NameError`.
-
-Also: never hand-write a training config. Derive it from the official YAML and override only
-permitted keys — a reconstructed config is what caused failure 2.
-
-## Credentials and GCS
-
-Service-account keys are blocked by the org policy `constraints/iam.disableServiceAccountKeyCreation`.
-The working pattern, verified both directions on a runtime: upload the local `authorized_user` ADC
-(`~/.config/gcloud/application_default_credentials.json`) to `/content/adc.json`; the python
-`google-cloud-storage` client reads it from `GOOGLE_APPLICATION_CREDENTIALS`, and the `gcloud` CLI
-works from an access token minted in-process into `CLOUDSDK_AUTH_ACCESS_TOKEN`. The refresh token is
-long-lived so a run can re-mint indefinitely. **This credential has full `cloud-platform` scope and
-must never be committed, echoed, or persisted to Drive** (risk R12 in `docs/FOUNDATIONS.md`).
-
-## Design decisions already made — do not silently revisit
-
-* **Three architecture-matched arms: GPT, NextLat, BST.** BST is the competence-matched control:
-  the paper puts it at ~99.9% on G(5,5) *without* a latent-transition objective, so **NextLat vs
-  BST is the primary cross-model contrast**, NextLat vs GPT is secondary and competence-confounded,
-  and BST vs GPT shows how much is competence alone. Cost 3.7 GPU-h / ~20 CU.
-* **Five confirmatory seeds** (1234–1238), matching the paper. Decided before any training, so
-  nothing was chosen on results.
-* **Manhattan priced and declined**: 359 GPU-h / 1,902 CU / 106% of balance for one seed pair;
-  1,076 GPU-h / 319% for three. No checkpoints were released. A 15%-scale fallback (60k steps, one
-  seed pair, 54 GPU-h / 285 CU) is recorded in spec §14 if it is ever justified.
-* **Total projected: 23.5 GPU-h, ~125 CU, 7% of balance.**
-* **The stimulus invariant is weaker than the spec's literal text, deliberately and provably.**
-  `docs/STIMULUS_DESIGN.md` proves identical absolute edit positions are impossible with a shared
-  anchor, refutes the obvious repair (it would turn a 2-token perturbation into a ~10-token one),
-  and states the adopted invariant plainly. Do not "fix" this without reading that proof.
-
-## What honesty requires of the writeup
-
-* Report every preregistered metric, including the nulls. Path-Star has one consistent algorithm,
-  so H3 may legitimately come out flat. A clean null is the result, not a failure.
-* Seeds are the inferential unit for cross-model contrasts; items never substitute for seeds.
-* State what effect size five seeds could not have detected.
-* No biological claims. "Pattern separation" only as an explicitly labelled computational abstraction.
-* Do not present as novel anything the paper already owns: ordinary Path-Star accuracy, lower
-  effective rank, "NextLat is more compressed", t-SNE/UMAP plots, generic forgetting.
-* The audience is Pratyusha Sharma. Her forgetting work is *parameter-space* (intruder dimensions,
-  spectral shift); this is *representation-space*. Name the disanalogy rather than blurring them.
-
-## Where things live
-
-```
-nextlat_v4_predictive_geometry_spec.md   the spec (revised: scope constraints are priced decisions)
-PROGRAM.md                               what an autonomous agent may and may not change
-HANDOFF.md                               this file
-docs/FOUNDATIONS.md                      37-row deviation ledger + 12 ranked risks
-docs/UPSTREAM_REPORT.md                  1085-line repo cartography, file:line cited
-docs/PAPER_NOTES.md                      grounded paper extraction incl. verbatim Limitations
-docs/STIMULUS_DESIGN.md                  the impossibility proof and the adopted invariant
-docs/EXTRACTION.md                       which hidden state, at which position, and why
-docs/DECISION_D20_competence_gate.md     why GPT is allowed to fail, and how BST repairs it
-docs/RUNLOG.md                           append-only log of what was actually established
-docs/review/*.md                         adversarial reviews of each build track
-src/lurestar/                            generate, validate, representations, evaluate, durable_checkpoint
-src/hmm_geometry/                        generate, forward, pair_bank, evaluate
-scripts/colab_train_loop.py              dual-role resumable sweep driver (LOOP on Mac, DRIVER on Colab)
-scripts/run_matrix.py                    idempotent job matrix + ledger
-scripts/build_report.py                  report/blog.md + results/live_numbers.json -> .docx
-report/blog.md                           the writeup, single source of truth
+```bash
+vastai show instances --raw \
+  | jq '[.[] | {id,actual_status,intended_status,gpu_name,dph_total,label}]'
 ```
 
-Durable root: `gs://nextlat-lurestar-project-flash-490419/lurestar/`
+Use focused tests for the changed component during a run. The current cross-study focused check is:
+
+```bash
+.venv/bin/pytest -q \
+  tests/test_cfs2_generate.py tests/test_run_cfs2_matrix.py \
+  tests/test_evaluate_cfs2.py tests/test_stimulus_validity_audit.py \
+  tests/test_run_cfs1_matrix.py tests/test_lurestar_branch_decision.py \
+  tests/test_nl1_declaration.py tests/test_vast_run_base_matrix.py
+```
+
+Run the full suite only before freezing a new scientific source bundle or after a cross-cutting
+code change—not on every checkpoint, reconnect, evaluation, or provider restart.
+
+Credentials, Jupyter tokens, `.env`, local session state, and provider logs must never be committed.
+The documentation index classifies historical amendments and incident records; their presence is
+provenance, not an instruction to rerun old gates.

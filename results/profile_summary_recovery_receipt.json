@@ -1,0 +1,28 @@
+{
+  "schema": "nextlat_forgetting/profile_summary_recovery/1",
+  "status": "NONCONFIRMATORY_ENGINEERING_EVIDENCE",
+  "recovered_at": "2026-08-24T07:01:48Z",
+  "source_profile_id": "a100-be81d2f1e79c-8d316efc9c53",
+  "state_uri": "gs://nextlat-lurestar-project-flash-490419/lurestar/profiles/a100-be81d2f1e79c-8d316efc9c53/state.json",
+  "state_generation": 12,
+  "state_sha256": "5ea74eb05e72759fbaa2cded94ee758300cfe9057d5a7d6f8ef81d566afa577a",
+  "artifact_fingerprint": "750bd272041bd003f50e85ac888b9508ef242a022577a106b23b31e82ea68ca6",
+  "verified_artifacts_restored": 34,
+  "repair": {
+    "constant_zero_global_step": "used the order of rows with steps_per_sec as the checkpoint-relative optimizer-update index",
+    "legacy_zero_exit_probe": "treated SystemExit(0) and SystemExit(None) as successful process exits",
+    "retrained_any_model": false,
+    "used_paid_compute": false
+  },
+  "parser_bindings": {
+    "scripts/profile_summarize.py": "61786fe1aa95411638fc93a749ad5b885db01695d50179cb195e44f6e620853d",
+    "scripts/profile_entry.py": "b2c0bf0798d42153c2ca439c12fce073474a5fc1d03d9ea3d3a6490fd21d0cc5",
+    "scripts/profile_resume.py": "9d5a2d75979ca706bbd91c29d57cfe447c7d5455c748d06a215ae621e814c8c8",
+    "scripts/colab_profile_loop.py": "769bf3fe14ec73f2e75776336f8d528a05fee235344e5e6b4655dbea437f893b"
+  },
+  "outputs": {
+    "results/profile_summary_recovered.json": "ccccea44a5f4ce321b21827a2c8276ac23d906fd538c2e9893f78696b72d0d1a",
+    "results/profile_summary_recovered.md": "4ba74d9c2772d0e7a62de2526c9edafc5c4551ee93a6199c709a2d6d5999b84b"
+  },
+  "warning": "This recovery fixes profiling telemetry only. It does not authorize confirmatory training and its pre-amendment cost projection must be recalculated for the strengthened design."
+}

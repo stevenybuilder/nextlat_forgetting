@@ -16,7 +16,7 @@
 # Launch (spec section 8, single GPU):
 #   scripts/launch_train.sh nextlat_hmm.yaml <seed>
 # which expands to
-#   fabric run --devices 1 --precision bf16-mixed train.py --config <this file> \
+#   fabric run --devices 1 --precision bf16-mixed /content/lurestar/scripts/train_hmm.py --config <this file> \
 #     seed=<seed> trainer.out_dir=... trainer.experiment_name=...
 use_nextlat: true
 trainer:
@@ -48,19 +48,19 @@ data:
   gradient_accum_steps: 1
   pair_accum_steps: 1
   num_workers: 0
-  test_generalization: false
-  hmm:
-    hmm_train_data_path: /content/lurestar/data/hmm/hmm-train-100000-len32.npz
-    hmm_val_data_path: /content/lurestar/data/hmm/hmm-val-10000-len32.npz
-    hmm_generalization_data_path: /content/lurestar/data/hmm/hmm-gen-10000-len64.npz
-    hmm_matrices_path: /content/lurestar/manifests/hmm-matrices.json
-    hmm_num_states: 4
-    hmm_num_observations: 4
-    train_sequences: 100000
-    val_sequences: 10000
-    generalization_sequences: 10000
-    sequence_length: 32
-    generalization_sequence_length: 64
+  test_generalization: true
+  hmm_train_data_path: /content/lurestar/data/hmm/hmm4x4_train_len32_100000.npy
+  hmm_val_data_path: /content/lurestar/data/hmm/hmm4x4_val_len32_10000.npy
+  hmm_generalization_data_path:
+  - /content/lurestar/data/hmm/hmm4x4_lengen_len64_10000.npy
+  hmm_n_obs: 4
+  hmm_matrices_path: /content/lurestar/manifests/hmm_matrices.json
+  hmm_num_states: 4
+  hmm_train_sequences: 100000
+  hmm_val_sequences: 10000
+  hmm_generalization_sequences: 10000
+  hmm_sequence_length: 32
+  hmm_generalization_sequence_length: 64
 model:
   n_layer: 4
   n_head: 4
@@ -102,5 +102,7 @@ preregistration:
   - 1234
   - 1235
   - 1236
+  - 1237
+  - 1238
   primary_distance: centered cosine
   robustness_distance: whitened Euclidean

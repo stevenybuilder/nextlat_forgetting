@@ -192,7 +192,11 @@ def materialize(
     if path is not None:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".npz.partial")
-        np.savez(tmp, tokens=matrix, digest=np.array(digest))
+        # Passing ``tmp`` directly makes NumPy append ``.npz`` because the partial
+        # filename does not end with that suffix.  Write through a file object so the
+        # bytes land at the exact same-directory path that is atomically published below.
+        with tmp.open("wb") as fh:
+            np.savez(fh, tokens=matrix, digest=np.array(digest))
         os.replace(tmp, path)
         log(f"[fast_stargraph] cached -> {path}")
     return matrix

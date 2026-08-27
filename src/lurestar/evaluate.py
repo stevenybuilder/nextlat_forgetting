@@ -15,12 +15,13 @@ The three things this module refuses to let a caller get wrong:
    (spec §6/H3: "Items do not substitute for independent training seeds"; the same rule
    governs the H1 model contrast).  The two live in separately named functions with
    different argument types — item functions take arrays, the seed function takes a
-   mapping keyed by seed id — so an array of 20,000 items cannot be passed where three
+   mapping keyed by seed id — so an array of 20,000 items cannot be passed where five
    seeds belong.
 
 **The design is three-armed** (spec §8, and `docs/DECISION_D20_competence_gate.md`
-"Superseded in part"): NextLat, BST and GPT, architecture-matched at 12L/6H/384 on
-G(5,5), differing only in objective.  BST is the competence-matched control — the paper's
+"Superseded in part"): NextLat, BST and GPT, width/depth-matched at 12L/6H/384 on
+G(5,5). BST is competence-matched but adds a second transformer, more parameters, and
+O(T²) prefix-suffix supervision. The paper's
 Figure 6 puts it at ~99.9% where GPT sits at ~18.6%, which is 1/d chance — so
 :data:`PREREGISTERED_CONTRASTS` fixes the priority order *before* any number exists:
 
@@ -30,9 +31,8 @@ Figure 6 puts it at ~99.9% where GPT sits at ~18.6%, which is 1/d chance — so
 
 Every contrast is reported through :func:`contrast_with_mde`, which carries the estimate,
 the seed-level interval, the exact sign-flip p, **and** the smallest effect that this many
-seeds could have detected.  The last one is not decoration: with three seeds the exact
-randomization test cannot reach p <= 0.05 at any effect size (its floor is 2^-2 = 0.25),
-and the t-based minimum detectable effect is around three seed-level standard deviations.
+seeds could have detected. The last one is not decoration: with five seeds the exact
+randomization test still cannot reach p <= 0.05 at any effect size (its floor is 0.0625).
 A writeup that reports the estimate without that number is claiming a null it never had
 the resolution to see.
 """
@@ -40,6 +40,7 @@ the resolution to see.
 from __future__ import annotations
 
 import itertools
+import hashlib
 import math
 import warnings
 from dataclasses import dataclass, field
@@ -73,11 +74,13 @@ __all__ = [
     "psi_per_arm",
     "three_arm_contrasts",
     "BootstrapCI",
+    "StudentTCI",
     "PSIResult",
     "SeedContrast",
     "CrossFitResult",
     "MIN_SEEDS_FOR_INTERVAL",
     "psi_items",
+    "normalized_psi",
     "psi_distances_centered_cosine",
     "psi_distances_whitened",
     "paired_bootstrap_mean",
@@ -85,11 +88,21 @@ __all__ = [
     "model_contrast_seed_level",
     "crossfit_linear",
     "fit_h2",
+    "base_id_folds",
     "first_branch_accuracy",
     "exact_path_accuracy",
     "safe_lure_invariance",
     "margin_erosion",
     "similarity_dependent_interference",
+    "EXACT_ITEM_LOSS",
+    "EXACT_ADAPTATION_LOSS",
+    "DISTANCE_DIAGNOSTIC_QUANTILES",
+    "gradient_alignment_baselines",
+    "jacobian_ntk_overlap",
+    "grouped_folds",
+    "fit_h3_incremental",
+    "fit_h3_model_distance_interaction",
+    "h3_distance_diagnostic",
 ]
 
 #: Below this many seeds a seed-level interval is reported but is not evidence on its own.
@@ -99,6 +112,17 @@ __all__ = [
 MIN_SEEDS_FOR_INTERVAL = 5
 
 _MAX_BOOTSTRAP_CELLS = 20_000_000  # chunking budget so n_boot * n never blows up RAM
+
+# These strings are part of the analysis contract, not prose supplied by a caller.  A gradient
+# of a convenient surrogate is not an admissible control for the confirmatory H3 analysis.
+EXACT_ITEM_LOSS = "cross_entropy(correct_first_branch_token@index63)"
+EXACT_ADAPTATION_LOSS = (
+    "mean_autoregressive_next_token_cross_entropy(first_effective_adaptation_batch)"
+)
+
+# Frozen before outcomes.  Every bin is reported in order; no bin may be selected because its
+# outcome looks interesting.  The inferential nonlinear check below is continuous (d + d^2).
+DISTANCE_DIAGNOSTIC_QUANTILES = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
 
 
 # =====================================================================================
@@ -165,6 +189,7 @@ def psi_distances_whitened(
     *,
     whitener: Whitener,
     item_ids: Optional[Sequence] = None,
+    group_ids: Optional[Sequence] = None,
 ) -> dict:
     """Both PSI distances under the DECLARED ROBUSTNESS CHECK (whitened Euclidean).
 
@@ -179,12 +204,18 @@ def psi_distances_whitened(
         )
     if item_ids is None:
         raise LeakageError("item_ids is required for a reported whitened-distance metric")
+    if whitener.fit_group_ids and group_ids is None:
+        raise LeakageError("group_ids is required for a group-held-out whitened metric")
     return {
         "metric": "whitened_euclidean",
         "role": "declared robustness check (spec §6/H1)",
         "whitener": whitener.report(),
-        "d_critical": whitener.distance(h_base, h_near_critical, item_ids=item_ids),
-        "d_safe": whitener.distance(h_base, h_near_safe, item_ids=item_ids),
+        "d_critical": whitener.distance(
+            h_base, h_near_critical, item_ids=item_ids, group_ids=group_ids
+        ),
+        "d_safe": whitener.distance(
+            h_base, h_near_safe, item_ids=item_ids, group_ids=group_ids
+        ),
     }
 
 
@@ -297,6 +328,8 @@ class PSIResult:
     d_safe_mean: float = 0.0
     metric: str = "centered_cosine"
     extraction_index: int = PSI_EXTRACTION_INDEX
+    npsi: float = 0.0
+    npsi_denominator: float = 0.0
 
     def as_dict(self) -> dict:
         return {
@@ -305,8 +338,36 @@ class PSIResult:
             "extraction_index": self.extraction_index,
             "d_critical_mean": self.d_critical_mean,
             "d_safe_mean": self.d_safe_mean,
+            "npsi": self.npsi,
+            "npsi_denominator": self.npsi_denominator,
+            "npsi_role": "mandatory scale diagnostic; cannot rescue a co-primary result",
             "ci": self.ci.as_dict(),
         }
+
+
+def normalized_psi(d_critical: np.ndarray, d_safe: np.ndarray) -> tuple[float, float]:
+    """Return the frozen dimensionless nPSI diagnostic and its denominator.
+
+    The numerator and denominator use the same aligned scored items.  A non-finite or
+    non-positive denominator invalidates the cell; silently substituting an epsilon would
+    turn this diagnostic into a tunable statistic.
+    """
+    c = np.asarray(d_critical, dtype=np.float64)
+    s = np.asarray(d_safe, dtype=np.float64)
+    if c.shape != s.shape or c.ndim != 1:
+        raise ValueError("nPSI distances must be aligned 1-D arrays")
+    if not np.all(np.isfinite(c)) or not np.all(np.isfinite(s)):
+        raise ValueError("nPSI distances must be finite")
+    denominator = float(np.sum(c + s, dtype=np.float64))
+    numerator = float(2.0 * np.sum(c - s, dtype=np.float64))
+    if not np.isfinite(denominator) or denominator <= 0.0:
+        raise ValueError("nPSI denominator must be strictly positive and finite")
+    if not np.isfinite(numerator):
+        raise ValueError("nPSI numerator must be finite")
+    value = numerator / denominator
+    if not np.isfinite(value):
+        raise ValueError("nPSI must be finite")
+    return float(value), denominator
 
 
 def bootstrap_psi_items(
@@ -327,6 +388,7 @@ def bootstrap_psi_items(
     :func:`model_contrast_seed_level`.
     """
     per_item = psi_items(d_critical, d_safe)
+    npsi, npsi_denominator = normalized_psi(d_critical, d_safe)
     ci = paired_bootstrap_mean(
         per_item, unit="item (quartet)", rng=rng, n_boot=n_boot, alpha=alpha
     )
@@ -338,12 +400,67 @@ def bootstrap_psi_items(
         d_safe_mean=float(np.mean(d_safe)),
         metric=metric,
         extraction_index=int(extraction_index),
+        npsi=npsi,
+        npsi_denominator=npsi_denominator,
     )
 
 
 # =====================================================================================
 # The model contrast — SEEDS are the unit
 # =====================================================================================
+
+
+@dataclass(frozen=True)
+class StudentTCI:
+    """Two-sided paired Student-t interval over independent training-seed differences."""
+
+    estimate: float
+    ci_low: float
+    ci_high: float
+    se: float
+    n_units: int
+    unit: str
+    alpha: float
+    df: int
+    t_critical: float
+    method: str = "two-sided paired Student-t interval over training-seed differences"
+
+    def as_dict(self) -> dict:
+        return {
+            "estimate": self.estimate,
+            "ci_low": self.ci_low,
+            "ci_high": self.ci_high,
+            "se": self.se,
+            "n_units": self.n_units,
+            "unit": self.unit,
+            "alpha": self.alpha,
+            "df": self.df,
+            "t_critical": self.t_critical,
+            "method": self.method,
+        }
+
+
+def _paired_student_t_interval(differences: np.ndarray, *, alpha: float) -> StudentTCI:
+    d = np.asarray(differences, dtype=np.float64).ravel()
+    if d.size < 2 or not np.all(np.isfinite(d)):
+        raise ValueError("paired Student-t interval needs at least two finite seed differences")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in (0, 1)")
+    estimate = float(d.mean())
+    se = float(d.std(ddof=1) / math.sqrt(d.size))
+    critical = float(stats.t.ppf(1.0 - alpha / 2.0, d.size - 1))
+    half_width = critical * se
+    return StudentTCI(
+        estimate=estimate,
+        ci_low=float(estimate - half_width),
+        ci_high=float(estimate + half_width),
+        se=se,
+        n_units=int(d.size),
+        unit="training seed",
+        alpha=float(alpha),
+        df=int(d.size - 1),
+        t_critical=critical,
+    )
 
 
 @dataclass(frozen=True)
@@ -355,11 +472,13 @@ class SeedContrast:
     value_b: tuple
     per_seed_difference: tuple
     estimate: float
-    ci: BootstrapCI
+    ci: StudentTCI
     sign_flip_p: float
     min_attainable_p: float
     n_seeds: int
     underpowered: bool
+    paired_standardized_effect: Optional[float]
+    leave_one_seed_out: tuple
 
     def as_dict(self) -> dict:
         return {
@@ -375,6 +494,9 @@ class SeedContrast:
             "min_attainable_p": self.min_attainable_p,
             "n_seeds": self.n_seeds,
             "underpowered": self.underpowered,
+            "paired_standardized_effect": self.paired_standardized_effect,
+            "paired_standardized_effect_definition": "mean(per-seed difference) / SD(per-seed difference)",
+            "leave_one_seed_out": list(self.leave_one_seed_out),
         }
 
 
@@ -403,7 +525,7 @@ def model_contrast_seed_level(
     Both arguments are mappings ``{seed_id: statistic}`` — one scalar per trained model,
     typically the item-mean PSI of that (model, seed) cell.  A mapping is demanded, not an
     array, precisely so that an item-level array cannot be passed here by accident; with
-    three confirmatory seeds the correct n is 3, and an interval computed over 20,000
+    five confirmatory seeds the correct n is 5, and an interval computed over 20,000
     items would be roughly 80x too narrow while describing a different estimand.
 
     Seeds are paired (the same seed trains both models, spec §8), so the estimator is the
@@ -411,8 +533,8 @@ def model_contrast_seed_level(
 
     * every per-seed value and difference (spec §6/H3 "report every seed");
     * the exact two-sided sign-flip randomization p-value over all 2^n assignments, plus
-      the smallest p that n seeds could possibly attain (2^{1-n}) — with n=3 that floor is
-      0.25, which is the honest statement of what three seeds can show.
+      the smallest p that n seeds could possibly attain (2^{1-n}) — with n=5 that floor is
+      0.0625, still above the conventional 0.05 threshold.
     """
     for name, m in (("value_by_seed_a", value_by_seed_a), ("value_by_seed_b", value_by_seed_b)):
         if not isinstance(m, Mapping):
@@ -431,9 +553,11 @@ def model_contrast_seed_level(
     a = np.array([float(value_by_seed_a[s]) for s in seeds])
     b = np.array([float(value_by_seed_b[s]) for s in seeds])
     diffs = a - b
-    ci = paired_bootstrap_mean(
-        diffs, unit="training seed", rng=rng, n_boot=n_boot, alpha=alpha
-    )
+    if not isinstance(rng, np.random.Generator):
+        raise TypeError("rng must be an explicit numpy Generator")
+    # ``rng``/``n_boot`` remain accepted for API compatibility with item-level callers, but
+    # the confirmatory seed interval is analytically fixed to paired Student-t.
+    ci = _paired_student_t_interval(diffs, alpha=alpha)
     n = len(seeds)
     if n < MIN_SEEDS_FOR_INTERVAL:
         warnings.warn(
@@ -441,6 +565,21 @@ def model_contrast_seed_level(
             "report it with the per-seed values and the sign-flip p, never alone",
             stacklevel=2,
         )
+    sd = float(diffs.std(ddof=1))
+    standardized = None if sd == 0.0 else float(diffs.mean() / sd)
+    loso = []
+    for omitted_index, omitted_seed in enumerate(seeds):
+        retained = np.delete(diffs, omitted_index)
+        retained_ci = (
+            _paired_student_t_interval(retained, alpha=alpha).as_dict()
+            if retained.size >= 2 else None
+        )
+        loso.append({
+            "omitted_seed": omitted_seed,
+            "n_seeds": int(retained.size),
+            "estimate": float(retained.mean()),
+            "ci": retained_ci,
+        })
     return SeedContrast(
         label_a=label_a,
         label_b=label_b,
@@ -454,6 +593,8 @@ def model_contrast_seed_level(
         min_attainable_p=float(2.0 ** (1 - n)),
         n_seeds=n,
         underpowered=bool(n < MIN_SEEDS_FOR_INTERVAL),
+        paired_standardized_effect=standardized,
+        leave_one_seed_out=tuple(loso),
     )
 
 
@@ -497,9 +638,10 @@ PREREGISTERED_CONTRASTS = (
         priority=1,
         role="primary (competence-matched)",
         reading=(
-            "Both arms solve G(5,5) (paper Fig. 6: NextLat ~99.8%, BST ~99.9%) and differ "
-            "only in the objective, so a PSI gap here is attributable to the "
-            "latent-transition objective rather than to task success. This is the "
+            "Both arms solve G(5,5) (paper Fig. 6: NextLat ~99.8%, BST ~99.9%), so this "
+            "contrast reduces the task-competence confound. It is not an objective-only "
+            "causal comparison: BST adds a backward transformer, more parameters, and O(T^2) "
+            "prefix-suffix supervision. This controlled but non-isolating contrast is the "
             "contrast the project's claim rests on."
         ),
     ),
@@ -597,8 +739,8 @@ def minimum_detectable_effect(
     """Smallest |effect| a paired ``n_seeds``-seed contrast could have detected.
 
     ``sd_per_seed`` is the standard deviation of the *per-seed differences*, not of the
-    items.  With three confirmatory seeds this number comes out near three seed-level
-    SDs, which is the honest answer to "what could this design not have seen".
+    items. With five confirmatory seeds this remains the honest answer to "what could this
+    design not have seen".
 
     Two facts travel with it, both of which a reader needs and neither of which the point
     estimate shows:
@@ -1104,11 +1246,14 @@ def fit_h2(
     rng: Optional[np.random.Generator] = None,
     folds: Optional[np.ndarray] = None,
     n_folds: int = 2,
+    outcome_name: str = "critical_correct_branch_margin",
+    baseline_name: str = "base_correct_branch_margin",
+    extraction_index: int = BRANCH_MARGIN_INDEX,
 ) -> dict:
-    """The preregistered H2 held-out model (spec §6/H2), with two-fold cross-fitting.
+    """The preregistered nested H2 models, with fixed two-fold cross-fitting.
 
-        critical_correct_branch_margin
-            ~ base_critical_distance + base_correct_branch_margin
+        M0: critical_correct_branch_margin ~ base_correct_branch_margin
+        M1: critical_correct_branch_margin ~ base_correct_branch_margin + distance
 
     Margin is primary because accuracy may be at ceiling (spec §6/H2).  Every margin here
     is computed from the logits at :data:`BRANCH_MARGIN_INDEX` = 63, not at the ``=``
@@ -1122,29 +1267,82 @@ def fit_h2(
     m = np.asarray(base_correct_branch_margin, dtype=np.float64).ravel()
     if not (y.shape == d.shape == m.shape):
         raise ValueError(f"shape mismatch: y {y.shape}, distance {d.shape}, margin {m.shape}")
-    X = np.column_stack([d, m])
-    res = crossfit_linear(
-        X,
-        y,
+    if folds is None:
+        if not isinstance(rng, np.random.Generator):
+            raise ValueError("pass an explicit rng or the frozen base-id folds")
+        folds = _make_folds(y.size, n_folds, rng)
+    base = crossfit_linear(
+        m[:, None], y,
         n_folds=n_folds,
-        rng=rng,
         folds=folds,
-        feature_names=("base_critical_distance", "base_correct_branch_margin"),
+        feature_names=(baseline_name,),
     )
-    rho_d, p_d = stats.spearmanr(d, y)
-    rho_m, p_m = stats.spearmanr(m, y)
-    out = res.as_dict()
-    out.update(
-        {
-            "outcome": "critical_correct_branch_margin",
-            "margin_extraction_index": int(BRANCH_MARGIN_INDEX),
-            "marginal_spearman": {
-                "base_critical_distance": {"rho": float(rho_d), "p": float(p_d)},
-                "base_correct_branch_margin": {"rho": float(rho_m), "p": float(p_m)},
-            },
-        }
+    full = crossfit_linear(
+        np.column_stack([m, d]), y,
+        n_folds=n_folds,
+        folds=folds,
+        feature_names=(baseline_name, "base_critical_distance"),
     )
-    return {"report": out, "result": res}
+    if not np.array_equal(base.fold_index, full.fold_index):
+        raise RuntimeError("H2 nested models did not reuse identical folds")
+    incremental_prediction = full.y_pred_heldout - base.y_pred_heldout
+    baseline_residual = y - base.y_pred_heldout
+    if np.std(incremental_prediction) == 0 or np.std(baseline_residual) == 0:
+        rho_incremental, p_incremental = float("nan"), float("nan")
+    else:
+        rho_incremental, p_incremental = stats.spearmanr(
+            incremental_prediction, baseline_residual
+        )
+    out = {
+        "outcome": outcome_name,
+        "extraction_index": int(extraction_index),
+        "estimand": "incremental out-of-fold predictive value of base-to-critical distance",
+        "M0": base.as_dict(),
+        "M1": full.as_dict(),
+        "r2_heldout_M0": base.r2_heldout,
+        "r2_heldout_M1": full.r2_heldout,
+        "delta_r2_heldout": float(full.r2_heldout - base.r2_heldout),
+        "heldout_spearman_incremental": {
+            "rho": float(rho_incremental),
+            "p": float(p_incremental),
+            "definition": "OOF (M1-M0) prediction versus OOF M0 residual",
+        },
+        "distance_coefficient_directions_standardized": full.coefficient_directions()[
+            "base_critical_distance"
+        ],
+        "folds_reused_exactly": True,
+        "fold_assignment_sha256": hashlib.sha256(
+            np.asarray(full.fold_index, dtype="<i8").tobytes()
+        ).hexdigest(),
+        "standardization": "training complement only",
+    }
+    return {"report": out, "baseline_result": base, "result": full}
+
+
+def base_id_folds(base_ids: Sequence) -> np.ndarray:
+    """Frozen H2 folds: ``int(SHA256(base_id UTF-8), 16) % 2``.
+
+    The evidence layer carries each canonical base serialization by its lowercase SHA-256
+    identity.  That 64-character identity is nevertheless the *input text* to this second
+    SHA-256 operation; its hexadecimal numeric parity is not the fold.  Thus no analysis seed,
+    sorting, balancing, or outcome-dependent operation enters the split.
+    """
+    ids = np.asarray(base_ids).ravel()
+    if ids.size < 4:
+        raise ValueError("need at least four base identities for two-fold cross-fitting")
+    normalized = [str(value) for value in ids.tolist()]
+    if any(
+        len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value)
+        for value in normalized
+    ):
+        raise ValueError("every base identity must be a lowercase SHA-256 digest")
+    folds = np.asarray([
+        int(hashlib.sha256(value.encode("utf-8")).hexdigest(), 16) % 2
+        for value in normalized
+    ], dtype=np.int64)
+    if set(folds.tolist()) != {0, 1}:
+        raise ValueError("SHA-256 parity produced an empty H2 fold")
+    return folds
 
 
 # =====================================================================================
@@ -1212,6 +1410,10 @@ def similarity_dependent_interference(
     margin_after_near: np.ndarray,
     margin_after_far: np.ndarray,
     *,
+    item_ids_near: Optional[Sequence] = None,
+    item_ids_far: Optional[Sequence] = None,
+    parent_sha256_near: Optional[str] = None,
+    parent_sha256_far: Optional[str] = None,
     rng: np.random.Generator,
     n_boot: int = 10_000,
     alpha: float = 0.05,
@@ -1223,6 +1425,26 @@ def similarity_dependent_interference(
     take it through the erosion definitions so the reported components match the spec's
     wording, and we assert the cancellation holds.
     """
+    if (item_ids_near is None) != (item_ids_far is None):
+        raise ValueError("pass both item-id arrays or neither")
+    if item_ids_near is not None:
+        ids_n = np.asarray(item_ids_near).ravel()
+        ids_f = np.asarray(item_ids_far).ravel()
+        if ids_n.shape != ids_f.shape or not np.array_equal(ids_n, ids_f):
+            raise ValueError("near and far evaluations must contain identical A_pair ids in order")
+        if ids_n.shape[0] != np.asarray(margin_before).size:
+            raise ValueError("A_pair item-id count does not match the margin arrays")
+    if (parent_sha256_near is None) != (parent_sha256_far is None):
+        raise ValueError("pass both parent checkpoint hashes or neither")
+    if parent_sha256_near is not None:
+        for value in (parent_sha256_near, parent_sha256_far):
+            if not isinstance(value, str) or len(value) != 64 or any(
+                ch not in "0123456789abcdef" for ch in value
+            ):
+                raise ValueError("parent checkpoint hashes must be lowercase SHA-256")
+        if parent_sha256_near != parent_sha256_far:
+            raise ValueError("near and far branches do not share the same parent checkpoint")
+
     e_near = margin_erosion(margin_before, margin_after_near)
     e_far = margin_erosion(margin_before, margin_after_far)
     diff = e_near - e_far
@@ -1236,8 +1458,301 @@ def similarity_dependent_interference(
         "erosion_near_mean": float(e_near.mean()),
         "erosion_far_mean": float(e_far.mean()),
         "similarity_dependent_interference": float(diff.mean()),
+        "shared_parent_verified": bool(parent_sha256_near is not None),
+        "paired_item_order_verified": bool(item_ids_near is not None),
         "ci": paired_bootstrap_mean(
             diff, unit="item (A_pair, within parent checkpoint)", rng=rng,
             n_boot=n_boot, alpha=alpha,
         ),
+    }
+
+
+# =====================================================================================
+# Reviewer-grade H3 controls — exact gradient/NTK baselines and incremental prediction
+# =====================================================================================
+
+
+def _rows(x: np.ndarray, name: str) -> np.ndarray:
+    """Flatten every observation after axis zero without changing its values."""
+    a = np.asarray(x, dtype=np.float64)
+    if a.ndim < 2:
+        raise ValueError(f"{name} must have shape (n_items, ...); got {a.shape}")
+    a = a.reshape(a.shape[0], -1)
+    if not np.all(np.isfinite(a)):
+        raise ValueError(f"{name} must be finite")
+    return a
+
+
+def _reference_rows(x: np.ndarray, n: int, name: str) -> np.ndarray:
+    a = np.asarray(x, dtype=np.float64)
+    if a.ndim == 1:
+        a = np.broadcast_to(a.reshape(1, -1), (n, a.size))
+    else:
+        a = _rows(a, name)
+        if a.shape[0] == 1:
+            a = np.broadcast_to(a, (n, a.shape[1]))
+    if a.shape[0] != n:
+        raise ValueError(f"{name} has {a.shape[0]} rows; expected 1 or {n}")
+    if not np.all(np.isfinite(a)):
+        raise ValueError(f"{name} must be finite")
+    return a
+
+
+def gradient_alignment_baselines(
+    item_gradients: np.ndarray,
+    adaptation_gradients: np.ndarray,
+    *,
+    item_loss: str,
+    adaptation_loss: str,
+    epsilon: float = 1e-30,
+) -> dict:
+    """Exact per-item gradient dot product and cosine against the adaptation update.
+
+    The inputs are gradients with respect to the same ordered parameter vector.  The
+    adaptation input may be one bank-mean gradient, or one matched gradient per item.  We
+    deliberately require the frozen loss identifiers: silently substituting a logit margin,
+    hidden-state proxy, or validation loss would make the control easier to compute but would
+    no longer test the first-order interference explanation.
+    """
+    if item_loss != EXACT_ITEM_LOSS or adaptation_loss != EXACT_ADAPTATION_LOSS:
+        raise ValueError(
+            "gradient controls must use the frozen exact item and adaptation losses: "
+            f"{EXACT_ITEM_LOSS!r} and {EXACT_ADAPTATION_LOSS!r}"
+        )
+    g = _rows(item_gradients, "item_gradients")
+    a = _reference_rows(adaptation_gradients, g.shape[0], "adaptation_gradients")
+    if g.shape[1] != a.shape[1]:
+        raise ValueError("item and adaptation gradients use different parameter vectors")
+    dot = np.einsum("ij,ij->i", g, a)
+    item_norm = np.linalg.norm(g, axis=1)
+    adaptation_norm = np.linalg.norm(a, axis=1)
+    denom = item_norm * adaptation_norm
+    cosine = np.divide(dot, denom, out=np.zeros_like(dot), where=denom > epsilon)
+    return {
+        "gradient_dot": dot,
+        "gradient_cosine": cosine,
+        "item_gradient_norm": item_norm,
+        "adaptation_gradient_norm": adaptation_norm,
+        "item_loss": item_loss,
+        "adaptation_loss": adaptation_loss,
+        "zero_norm_policy": "cosine=0",
+        "first_order_sign": (
+            "positive dot predicts margin/loss movement in the direction implied by the "
+            "explicit outcome sign; do not take an absolute value"
+        ),
+    }
+
+
+def jacobian_ntk_overlap(
+    item_jacobians: np.ndarray,
+    adaptation_jacobians: np.ndarray,
+    *,
+    item_target: str = "correct_first_branch_logit_margin@index63",
+    adaptation_target: str = "next_token_logits_on_adaptation_bank",
+    epsilon: float = 1e-30,
+) -> dict:
+    """Frobenius inner product/cosine of exact output Jacobians (an empirical NTK control).
+
+    All non-item axes — output coordinates and the ordered parameter vector — are flattened.
+    This is intentionally a diagnostic alongside the loss-gradient baseline, not a replacement:
+    a Jacobian overlap omits residual-dependent weighting present in cross-entropy gradients.
+    """
+    j = _rows(item_jacobians, "item_jacobians")
+    a = _reference_rows(adaptation_jacobians, j.shape[0], "adaptation_jacobians")
+    if j.shape[1] != a.shape[1]:
+        raise ValueError("item and adaptation Jacobians use different output/parameter axes")
+    dot = np.einsum("ij,ij->i", j, a)
+    jn, an = np.linalg.norm(j, axis=1), np.linalg.norm(a, axis=1)
+    denom = jn * an
+    cosine = np.divide(dot, denom, out=np.zeros_like(dot), where=denom > epsilon)
+    return {
+        "ntk_frobenius_dot": dot,
+        "ntk_frobenius_cosine": cosine,
+        "item_jacobian_norm": jn,
+        "adaptation_jacobian_norm": an,
+        "item_target": item_target,
+        "adaptation_target": adaptation_target,
+        "role": "preregistered diagnostic; gradient alignment is the primary mechanistic control",
+        "zero_norm_policy": "cosine=0",
+    }
+
+
+def grouped_folds(group_ids: Sequence, *, n_folds: int = 2, seed: int = 73021) -> np.ndarray:
+    """Outcome-independent deterministic folds keeping repeated item/parent groups together."""
+    ids = np.asarray(group_ids).ravel()
+    if ids.size < 2 * n_folds:
+        raise ValueError(f"need at least {2 * n_folds} rows for {n_folds}-fold cross-fitting")
+    groups = sorted(set(str(x) for x in ids.tolist()))
+    if len(groups) < n_folds:
+        raise ValueError("fewer unique groups than folds")
+    ordered = sorted(
+        groups,
+        key=lambda value: hashlib.sha256(f"{seed}:{value}".encode("utf-8")).digest(),
+    )
+    mapping = {value: i % n_folds for i, value in enumerate(ordered)}
+    folds = np.asarray([mapping[str(x)] for x in ids.tolist()], dtype=np.int64)
+    if min(np.sum(folds == k) for k in range(n_folds)) == 0:
+        raise RuntimeError("group-fold construction produced an empty fold")
+    return folds
+
+
+def fit_h3_incremental(
+    erosion: np.ndarray,
+    hidden_distance: np.ndarray,
+    gradient_dot: np.ndarray,
+    gradient_cosine: np.ndarray,
+    initial_margin: np.ndarray,
+    initial_lure_loss: np.ndarray,
+    realized_acquisition: np.ndarray,
+    *,
+    folds: np.ndarray,
+) -> dict:
+    """Does frozen hidden distance add held-out prediction beyond mechanistic controls?
+
+    Baseline and augmented models use *identical, caller-frozen folds*.  The confirmatory
+    incremental estimand is ``OOF R2(full) - OOF R2(controls)``; neither model is selected or
+    tuned after outcomes.  Realized acquisition is included because unequal branch learning can
+    otherwise masquerade as similarity-dependent interference.
+    """
+    arrays = [
+        np.asarray(v, dtype=np.float64).ravel()
+        for v in (erosion, hidden_distance, gradient_dot, gradient_cosine,
+                  initial_margin, initial_lure_loss, realized_acquisition)
+    ]
+    if len({a.shape for a in arrays}) != 1:
+        raise ValueError("all H3 arrays must have one value per item")
+    y, distance, gdot, gcos, margin, lure, acquisition = arrays
+    baseline_names = (
+        "gradient_dot", "gradient_cosine", "initial_margin",
+        "initial_lure_loss", "realized_acquisition",
+    )
+    X0 = np.column_stack([gdot, gcos, margin, lure, acquisition])
+    base = crossfit_linear(X0, y, folds=folds, feature_names=baseline_names)
+    full = crossfit_linear(
+        np.column_stack([X0, distance]), y, folds=folds,
+        feature_names=baseline_names + ("frozen_hidden_distance",),
+    )
+    mse0 = float(np.mean((y - base.y_pred_heldout) ** 2))
+    mse1 = float(np.mean((y - full.y_pred_heldout) ** 2))
+    return {
+        "estimand": "incremental out-of-fold predictive value of frozen hidden distance",
+        "outcome": "item-level margin erosion (before - after; positive is worse)",
+        "baseline": base.as_dict(),
+        "augmented": full.as_dict(),
+        "delta_r2_heldout": float(full.r2_heldout - base.r2_heldout),
+        "delta_mse_heldout": float(mse1 - mse0),
+        "folds_reused_exactly": bool(np.array_equal(base.fold_index, full.fold_index)),
+        "fold_assignment_sha256": hashlib.sha256(
+            np.asarray(folds, dtype="<i8").tobytes()
+        ).hexdigest(),
+        "baseline_result": base,
+        "augmented_result": full,
+    }
+
+
+def fit_h3_model_distance_interaction(
+    erosion: np.ndarray,
+    hidden_distance: np.ndarray,
+    model_labels: Sequence[str],
+    controls: np.ndarray,
+    *,
+    folds: np.ndarray,
+    control_names: Sequence[str],
+    model_order: Sequence[str] = ARMS,
+    reference_model: str = "bst",
+) -> dict:
+    """Fixed pooled model-by-distance interaction with BST as the declared reference arm."""
+    y = np.asarray(erosion, dtype=np.float64).ravel()
+    d = np.asarray(hidden_distance, dtype=np.float64).ravel()
+    labels = np.asarray(model_labels).astype(str).ravel()
+    C = np.asarray(controls, dtype=np.float64)
+    if C.ndim == 1:
+        C = C[:, None]
+    if y.shape != d.shape or labels.shape != y.shape or C.shape[0] != y.size:
+        raise ValueError("interaction inputs must have one aligned row per observation")
+    order = tuple(model_order)
+    if reference_model not in order:
+        raise ValueError("reference_model must be in model_order")
+    unknown = sorted(set(labels) - set(order))
+    if unknown or set(labels) != set(order):
+        raise ValueError(f"model labels must contain every frozen arm exactly as levels; got {unknown}")
+    other = tuple(m for m in order if m != reference_model)
+    indicators = np.column_stack([(labels == model).astype(float) for model in other])
+    interactions = indicators * d[:, None]
+    names = tuple(control_names) + ("frozen_hidden_distance",) + tuple(
+        f"model[{m}]" for m in other
+    ) + tuple(f"distance:model[{m}]" for m in other)
+    if len(control_names) != C.shape[1]:
+        raise ValueError("control_names length does not match controls")
+    result = crossfit_linear(
+        np.column_stack([C, d, indicators, interactions]), y,
+        folds=folds, feature_names=names,
+    )
+    return {
+        "reference_model": reference_model,
+        "model_order_frozen": list(order),
+        "interaction_terms": [f"distance:model[{m}]" for m in other],
+        "report": result.as_dict(),
+        "result": result,
+    }
+
+
+def h3_distance_diagnostic(
+    erosion: np.ndarray,
+    hidden_distance: np.ndarray,
+    controls: np.ndarray,
+    *,
+    folds: np.ndarray,
+    control_names: Sequence[str],
+    quantiles: Sequence[float] = DISTANCE_DIAGNOSTIC_QUANTILES,
+) -> dict:
+    """Frozen continuous quadratic check plus exhaustive distance-quantile descriptives.
+
+    The quadratic term is the only nonlinear inferential diagnostic.  Quantile bins depend only
+    on the pre-adaptation distance and all bins are reported; they are descriptive and may not be
+    searched, merged, or promoted into the primary result after seeing erosion.
+    """
+    y = np.asarray(erosion, dtype=np.float64).ravel()
+    d = np.asarray(hidden_distance, dtype=np.float64).ravel()
+    C = np.asarray(controls, dtype=np.float64)
+    if C.ndim == 1:
+        C = C[:, None]
+    if y.shape != d.shape or C.shape[0] != y.size:
+        raise ValueError("diagnostic inputs must have one aligned row per observation")
+    if len(control_names) != C.shape[1]:
+        raise ValueError("control_names length does not match controls")
+    q = tuple(float(x) for x in quantiles)
+    if q != DISTANCE_DIAGNOSTIC_QUANTILES:
+        raise ValueError("confirmatory diagnostic quantiles are frozen and may not be changed")
+    linear = crossfit_linear(
+        np.column_stack([C, d]), y, folds=folds,
+        feature_names=tuple(control_names) + ("frozen_hidden_distance",),
+    )
+    quadratic = crossfit_linear(
+        np.column_stack([C, d, d * d]), y, folds=folds,
+        feature_names=tuple(control_names) + ("frozen_hidden_distance", "distance_squared"),
+    )
+    edges = np.quantile(d, q)
+    # searchsorted with interior edges gives stable left-to-right bins and keeps the maximum.
+    bins = np.searchsorted(edges[1:-1], d, side="right")
+    summaries = []
+    for k in range(len(q) - 1):
+        mask = bins == k
+        summaries.append({
+            "bin": k + 1,
+            "quantile_interval": [q[k], q[k + 1]],
+            "distance_edge": [float(edges[k]), float(edges[k + 1])],
+            "n": int(mask.sum()),
+            "mean_distance": float(d[mask].mean()) if mask.any() else None,
+            "mean_erosion": float(y[mask].mean()) if mask.any() else None,
+        })
+    return {
+        "status": "preregistered diagnostic; not multiplicity-free confirmatory evidence",
+        "linear": linear.as_dict(),
+        "quadratic": quadratic.as_dict(),
+        "delta_r2_quadratic_over_linear": float(quadratic.r2_heldout - linear.r2_heldout),
+        "distance_quantiles": summaries,
+        "bin_policy": "distance-only fixed quintiles; report all; no outcome-selected bins",
+        "linear_result": linear,
+        "quadratic_result": quadratic,
     }

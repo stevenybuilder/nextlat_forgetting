@@ -132,6 +132,12 @@ QUANTILE_RULE = {
     "js_high_bits": "90th percentile of JS divergence over calibration lure pairs",
     "edit_low": "fixed at 2 a priori; a near-lure differs by at most two symbols",
 }
+FUTURE_QUANTILE_RULE = {
+    **QUANTILE_RULE,
+    "js_low_bits": "1st percentile of exact future-distribution JS over calibration same-length pairs",
+    "js_control_min_bits": "median exact future-distribution JS over the same pairs",
+    "js_high_bits": "90th percentile of exact future-distribution JS over calibration lure pairs",
+}
 
 
 class ThresholdMismatch(RuntimeError):
@@ -325,6 +331,7 @@ def sample_same_length_pairs(
     n_pairs: int,
     rng: np.random.Generator,
     eligible: dict[int, np.ndarray] | None = None,
+    distance_target: str = "belief_js",
 ) -> dict[int, dict[str, np.ndarray]]:
     """Draw random pairs of distinct sequences at a shared prefix length.
 
@@ -342,9 +349,16 @@ def sample_same_length_pairs(
         j = pick[rng.integers(0, len(pick), size=per_length)]
         keep = i != j
         i, j = i[keep], j[keep]
-        jsd = js_divergence(pool.beliefs[i, t - 1], pool.beliefs[j, t - 1])
+        belief_jsd = js_divergence(pool.beliefs[i, t - 1], pool.beliefs[j, t - 1])
+        future_jsd = js_divergence(pool.next_obs[i, t], pool.next_obs[j, t])
+        if distance_target not in ("belief_js", "future_js"):
+            raise ValueError(f"unknown HMM pair distance target {distance_target!r}")
+        jsd = future_jsd if distance_target == "future_js" else belief_jsd
         lev = levenshtein_batch(pool.obs[i, :t].astype(np.int32), pool.obs[j, :t].astype(np.int32))
-        out[t] = {"i": i, "j": j, "jsd": jsd, "lev": lev}
+        out[t] = {
+            "i": i, "j": j, "jsd": jsd, "belief_jsd": belief_jsd,
+            "future_jsd": future_jsd, "lev": lev,
+        }
     return out
 
 
@@ -355,6 +369,7 @@ def make_lure_candidates(
     rng: np.random.Generator,
     forbidden_prefixes: set[bytes] | None = None,
     eligible: dict[int, np.ndarray] | None = None,
+    distance_target: str = "belief_js",
 ) -> dict[int, dict[str, np.ndarray]]:
     """Construct near-lures by substituting one or two symbols in a held-out prefix.
 
@@ -388,7 +403,13 @@ def make_lure_candidates(
         res = forward_batch(hmm, lure[changed].astype(np.int64))
         base_b = pool.beliefs[base_idx[changed], t - 1]
         lure_b = res.beliefs[:, -1, :]
-        jsd = js_divergence(base_b, lure_b)
+        belief_jsd = js_divergence(base_b, lure_b)
+        base_future = pool.next_obs[base_idx[changed], t]
+        lure_future = res.next_obs[:, -1, :]
+        future_jsd = js_divergence(base_future, lure_future)
+        if distance_target not in ("belief_js", "future_js"):
+            raise ValueError(f"unknown HMM pair distance target {distance_target!r}")
+        jsd = future_jsd if distance_target == "future_js" else belief_jsd
         lev = levenshtein_batch(base[changed], lure[changed])
 
         keep = lev >= 1
@@ -405,6 +426,8 @@ def make_lure_candidates(
             "lure_belief": lure_b[keep],
             "lure_next_obs": res.next_obs[:, -1, :][keep],
             "jsd": jsd[keep],
+            "belief_jsd": belief_jsd[keep],
+            "future_jsd": future_jsd[keep],
             "lev": lev[keep],
         }
     return out
@@ -432,11 +455,16 @@ class Thresholds:
     calibration_pools: list  # [{name, sha256, prefix_min, prefix_max}, ...]
     hmm_sha256: str
     fit_seed: int
+    distance_target: str = "belief_js"
     verified: bool = field(default=False, compare=False)
 
     def payload(self) -> dict:
         d = {k: v for k, v in self.__dict__.items() if k != "verified"}
-        d["quantile_rule"] = QUANTILE_RULE
+        if self.distance_target == "belief_js":
+            d.pop("distance_target", None)  # preserve the shipped legacy threshold identity
+        d["quantile_rule"] = (
+            FUTURE_QUANTILE_RULE if self.distance_target == "future_js" else QUANTILE_RULE
+        )
         return d
 
     def sha256(self) -> str:
@@ -469,6 +497,7 @@ def fit_thresholds(
     hmm: HMM,
     seed: int = 20260823,
     n_pairs: int = CALIBRATION_PAIRS,
+    distance_target: str = "belief_js",
 ) -> Thresholds:
     """Fit every threshold from the calibration pools alone, by the preregistered quantile rule.
 
@@ -482,14 +511,16 @@ def fit_thresholds(
     edit_cuts: dict[str, int] = {}
     pools_meta = []
     for pool in calibration_pools:
-        pairs = sample_same_length_pairs(pool, n_pairs, rng)
+        pairs = sample_same_length_pairs(pool, n_pairs, rng, distance_target=distance_target)
         for t, v in pairs.items():
             key = str(int(t))
             if key in edit_cuts:
                 raise ValueError(f"prefix length {t} is calibrated by two pools")
             edit_cuts[key] = int(np.percentile(v["lev"], 75))
         jsd_parts.append(np.concatenate([v["jsd"] for v in pairs.values()]))
-        lures = make_lure_candidates(pool, hmm, CALIBRATION_LURE_BASES, rng)
+        lures = make_lure_candidates(
+            pool, hmm, CALIBRATION_LURE_BASES, rng, distance_target=distance_target
+        )
         lure_parts.append(np.concatenate([v["jsd"] for v in lures.values()]))
         pools_meta.append(
             {
@@ -515,6 +546,7 @@ def fit_thresholds(
         calibration_pools=pools_meta,
         hmm_sha256=hmm.sha256(),
         fit_seed=seed,
+        distance_target=distance_target,
     )
 
 
@@ -523,6 +555,7 @@ def freeze_thresholds(thresholds: Thresholds, path: Path = THRESHOLDS_PATH) -> d
     payload = {
         "schema": "nextlat_forgetting/hmm_thresholds/1",
         "thresholds": thresholds.payload(),
+        "distance_target": thresholds.distance_target,
         "sha256": thresholds.sha256(),
     }
     if path.exists():
@@ -561,7 +594,8 @@ def load_thresholds(path: Path = THRESHOLDS_PATH) -> Thresholds:
             f"{path} has been edited since it was frozen "
             f"(recomputed {thresholds.sha256()[:12]} != recorded {payload['sha256'][:12]})"
         )
-    if stored.get("quantile_rule") != QUANTILE_RULE:
+    expected_rule = FUTURE_QUANTILE_RULE if thresholds.distance_target == "future_js" else QUANTILE_RULE
+    if stored.get("quantile_rule") != expected_rule:
         raise ThresholdMismatch(
             "the frozen file records a different quantile rule than the code implements"
         )
@@ -624,7 +658,10 @@ def build_bank(
 
     rng = np.random.default_rng(seed)
     eligible, dropped = pool.eligible_indices(forbidden_prefixes)
-    pairs_by_len = sample_same_length_pairs(pool, n_search_pairs, rng, eligible=eligible)
+    pairs_by_len = sample_same_length_pairs(
+        pool, n_search_pairs, rng, eligible=eligible,
+        distance_target=thresholds.distance_target,
+    )
     lures_by_len = make_lure_candidates(
         pool,
         hmm,
@@ -632,16 +669,22 @@ def build_bank(
         rng,
         forbidden_prefixes=forbidden_prefixes,
         eligible=eligible,
+        distance_target=thresholds.distance_target,
     )
 
     # --- predictively equivalent pairs, and their history-distance-matched controls ----------
     # Control candidates are indexed by (prefix length, edit distance) so a control can be matched
     # exactly, never approximately.
-    control_pool: dict[tuple[int, int], list[tuple[int, int, float]]] = {}
+    control_pool: dict[tuple[int, int], list[tuple[int, int, float, float, float]]] = {}
     for t, d in pairs_by_len.items():
         hi = d["jsd"] >= thresholds.js_control_min_bits
-        for i, j, lev, jsd in zip(d["i"][hi], d["j"][hi], d["lev"][hi], d["jsd"][hi]):
-            control_pool.setdefault((t, int(lev)), []).append((int(i), int(j), float(jsd)))
+        for i, j, lev, jsd, bjs, fjs in zip(
+            d["i"][hi], d["j"][hi], d["lev"][hi], d["jsd"][hi],
+            d["belief_jsd"][hi], d["future_jsd"][hi],
+        ):
+            control_pool.setdefault((t, int(lev)), []).append(
+                (int(i), int(j), float(jsd), float(bjs), float(fjs))
+            )
 
     equivalent: list[dict] = []
     controls: list[dict] = []
@@ -673,12 +716,12 @@ def build_bank(
             if not bucket:
                 n_dropped_no_control += 1
                 continue
-            ci, cj, cjsd = bucket.pop()
+            ci, cj, cjsd, cbjs, cfjs = bucket.pop()
             while (t, min(ci, cj), max(ci, cj)) in seen_pairs:
                 if not bucket:
                     ci = cj = -1
                     break
-                ci, cj, cjsd = bucket.pop()
+                ci, cj, cjsd, cbjs, cfjs = bucket.pop()
             if ci < 0:
                 n_dropped_no_control += 1
                 continue
@@ -686,8 +729,7 @@ def build_bank(
             seen_pairs.add((t, min(i, j), max(i, j)))
             seen_pairs.add((t, min(ci, cj), max(ci, cj)))
             pair_id = f"{pool.name}-equiv-t{t}-{i}-{j}"
-            equivalent.append(
-                {
+            equivalent_row = {
                     "pair_id": pair_id,
                     "pair_type": "equivalent",
                     "pool": pool.name,
@@ -697,9 +739,7 @@ def build_bank(
                     "a": _item(pool, i, t),
                     "b": _item(pool, j, t),
                 }
-            )
-            controls.append(
-                {
+            control_row = {
                     "pair_id": f"{pool.name}-control-t{t}-{ci}-{cj}",
                     "pair_type": "matched_control",
                     "pool": pool.name,
@@ -710,7 +750,17 @@ def build_bank(
                     "a": _item(pool, ci, t),
                     "b": _item(pool, cj, t),
                 }
-            )
+            if thresholds.distance_target == "future_js":
+                equivalent_row.update({
+                    "future_js_divergence_bits": float(d["future_jsd"][k]),
+                    "belief_js_divergence_bits": float(d["belief_jsd"][k]),
+                })
+                control_row.update({
+                    "future_js_divergence_bits": cfjs,
+                    "belief_js_divergence_bits": cbjs,
+                })
+            equivalent.append(equivalent_row)
+            controls.append(control_row)
             taken += 1
 
     # --- predictively divergent near-lures ---------------------------------------------------
@@ -730,8 +780,7 @@ def build_bank(
             if lure_key in seen_lures:
                 continue
             seen_lures.add(lure_key)
-            near_lures.append(
-                {
+            lure_row = {
                     "pair_id": f"{pool.name}-lure-t{t}-{base}-{int(k)}",
                     "pair_type": "near_lure",
                     "pool": pool.name,
@@ -747,12 +796,18 @@ def build_bank(
                         "next_obs": [float(x) for x in d["lure_next_obs"][k]],
                     },
                 }
-            )
+            if thresholds.distance_target == "future_js":
+                lure_row.update({
+                    "future_js_divergence_bits": float(d["future_jsd"][k]),
+                    "belief_js_divergence_bits": float(d["belief_jsd"][k]),
+                })
+            near_lures.append(lure_row)
 
     stats = {
         "pool": pool.name,
         "pool_sha256": pool.sha256(),
         "seed": seed,
+        "distance_target": thresholds.distance_target,
         "n_equivalent": len(equivalent),
         "n_near_lure": len(near_lures),
         "n_matched_control": len(controls),

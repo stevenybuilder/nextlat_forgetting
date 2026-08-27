@@ -87,5 +87,7 @@ preregistration:
   - 1234
   - 1235
   - 1236
+  - 1237
+  - 1238
   primary_distance: centered cosine
   robustness_distance: whitened Euclidean

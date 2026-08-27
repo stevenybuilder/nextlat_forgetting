@@ -566,12 +566,14 @@ class Whitener:
     n_features: int
     condition_number: float
     fit_item_ids: frozenset = field(default_factory=frozenset)
+    fit_group_ids: frozenset = field(default_factory=frozenset)
 
     @staticmethod
     def fit(
         pool_states: np.ndarray,
         *,
         item_ids: Optional[Iterable] = None,
+        group_ids: Optional[Iterable] = None,
         shrinkage: object = "ledoit_wolf",
         min_shrinkage: float = 1e-3,
     ) -> "Whitener":
@@ -607,6 +609,10 @@ class Whitener:
             raise ValueError(
                 f"item_ids has {len(ids)} unique entries but the pool has {n} rows"
             )
+        group_values = None if group_ids is None else list(group_ids)
+        groups = frozenset() if group_values is None else frozenset(group_values)
+        if group_values is not None and len(group_values) != n:
+            raise ValueError("group_ids must have one entry per whitening-pool row")
         return Whitener(
             mean=mean,
             transform=W,
@@ -616,26 +622,35 @@ class Whitener:
             n_features=int(p),
             condition_number=float(evals.max() / evals.min()),
             fit_item_ids=ids,
+            fit_group_ids=groups,
         )
 
-    def _check_ids(self, item_ids: Optional[Iterable]) -> None:
-        if not self.fit_item_ids:
-            # The whitener was fit without ids, so "held out" cannot be checked at all.
-            # `report()["pool_is_heldout"]` is False; the caller is responsible.
-            return
-        if item_ids is None:
-            raise LeakageError(
-                "this Whitener was fit with item ids, so every scored batch must supply "
-                "item_ids too; omitting them turns the held-out guarantee back into an "
-                "honour system"
-            )
-        overlap = self.fit_item_ids & frozenset(item_ids)
-        if overlap:
-            raise LeakageError(
-                f"{len(overlap)} scored item(s) were in the whitening pool "
-                f"(e.g. {sorted(map(str, overlap))[:3]}); the covariance must be "
-                "estimated on a disjoint held-out pool"
-            )
+    def _check_ids(self, item_ids: Optional[Iterable], group_ids: Optional[Iterable]) -> None:
+        if self.fit_item_ids:
+            if item_ids is None:
+                raise LeakageError(
+                    "this Whitener was fit with item ids, so every scored batch must supply "
+                    "item_ids too; omitting them turns the held-out guarantee back into an "
+                    "honour system"
+                )
+            overlap = self.fit_item_ids & frozenset(item_ids)
+            if overlap:
+                raise LeakageError(
+                    f"{len(overlap)} scored item(s) were in the whitening pool "
+                    f"(e.g. {sorted(map(str, overlap))[:3]}); the covariance must be "
+                    "estimated on a disjoint held-out pool"
+                )
+        if self.fit_group_ids:
+            if group_ids is None:
+                raise LeakageError(
+                    "this Whitener was fit with group ids, so scored group_ids are mandatory"
+                )
+            group_overlap = self.fit_group_ids & frozenset(group_ids)
+            if group_overlap:
+                raise LeakageError(
+                    f"{len(group_overlap)} scored group(s) were in the whitening pool; "
+                    "all condition rows of a base quartet belong to one leakage domain"
+                )
 
     def apply(self, states: np.ndarray) -> np.ndarray:
         X = _as2d(states, "states")
@@ -649,6 +664,7 @@ class Whitener:
         b: np.ndarray,
         *,
         item_ids: Optional[Iterable] = None,
+        group_ids: Optional[Iterable] = None,
     ) -> np.ndarray:
         """Whitened Euclidean distance, rowwise.
 
@@ -656,7 +672,7 @@ class Whitener:
         ``sqrt((a-b)^T Sigma^{-1} (a-b))``.  The shared ``mean`` cancels in ``a - b``,
         so only the metric (not the location) of the held-out pool enters.
         """
-        self._check_ids(item_ids)
+        self._check_ids(item_ids, group_ids)
         A = _as2d(a, "a")
         B = _as2d(b, "b")
         if A.shape != B.shape:
@@ -674,6 +690,7 @@ class Whitener:
             "n_features": self.n_features,
             "condition_number": self.condition_number,
             "pool_is_heldout": bool(self.fit_item_ids),
+            "group_leakage_checked": bool(self.fit_group_ids),
         }
 
 
@@ -956,6 +973,7 @@ def extract_positions(
     batch_size: int = 256,
     device: Optional[str] = None,
     eos_token_id: int = EOS_TOKEN_ID,
+    capture_blocks: bool = False,
 ) -> dict:
     """Batched extraction -> plain numpy, ready for Layer A.
 
@@ -980,17 +998,64 @@ def extract_positions(
     if hasattr(inner_model, "eval"):
         inner_model.eval()
     parts: dict = {}
+    block_modules, final_norm = (), None
+    handles = []
+    captured: list = []
+
+    def to_numpy(tensor):
+        value = tensor.float().cpu()
+        try:
+            return value.numpy()
+        except RuntimeError:  # old local torch wheels built against NumPy 1.x
+            return np.asarray(value.tolist(), dtype=np.float32)
+    if capture_blocks:
+        arch = str(architecture).lower()
+        if arch == "bst":
+            encoder = getattr(inner_model, "encoder", None)
+            stack = getattr(encoder, "transformer_f", None)
+        else:
+            stack = getattr(inner_model, "transformer", None)
+        if stack is None or not hasattr(stack, "blocks") or not hasattr(stack, "norm"):
+            raise ValueError(f"{arch} model does not expose the frozen 12-block extraction stack")
+        block_modules = tuple(stack.blocks)
+        final_norm = stack.norm
+        if len(block_modules) != 12:
+            raise ValueError(f"mandatory intermediate extraction requires exactly 12 blocks; got {len(block_modules)}")
+
+        def capture(_module, _inputs, output):
+            tensor = output[0] if isinstance(output, (tuple, list)) else output
+            captured.append(tensor.detach())
+
+        handles = [module.register_forward_hook(capture) for module in block_modules]
     try:
         for start in range(0, tok.shape[0], batch_size):
             chunk = tok[start : start + batch_size]
+            captured.clear()
             out = forward_all_states(
                 inner_model, chunk, architecture=architecture, eos_token_id=eos_token_id
             )
+            if capture_blocks:
+                if len(captured) != 12:
+                    raise RuntimeError(
+                        f"intermediate hook captured {len(captured)} block outputs; expected 12"
+                    )
+                stacked = torch.stack(
+                    [tensor.index_select(1, pos_t) for tensor in captured], dim=1
+                )
+                parity = final_norm(captured[-1]).index_select(1, pos_t)
+                final = out["hidden"].index_select(1, pos_t)
+                if not torch.allclose(parity, final, atol=1e-4, rtol=1e-4):
+                    raise RuntimeError("block 11 plus final norm does not reproduce final hidden state")
+                parts.setdefault("intermediate_hidden", []).append(
+                    to_numpy(stacked)
+                )
             for name, tensor in out.items():
                 parts.setdefault(name, []).append(
-                    tensor.index_select(1, pos_t).float().cpu().numpy()
+                    to_numpy(tensor.index_select(1, pos_t))
                 )
     finally:
+        for handle in handles:
+            handle.remove()
         if was_training and hasattr(inner_model, "train"):
             inner_model.train()
     arch = str(architecture).lower()

@@ -195,12 +195,81 @@ def test_warmup_boundary_actually_bites(tmp_path: Path) -> None:
     assert kept["seconds_per_step_p95"] < 0.3
 
 
+def test_resumed_metrics_splice_at_durable_checkpoint_boundary(tmp_path: Path) -> None:
+    """Abandoned post-checkpoint rows must not be double-counted after replacement."""
+    job = _write_job(tmp_path, model="bst", step_scale=1.0)
+    exp_dir = Path(job["out_dir"]) / job["experiment_name"]
+    version0 = exp_dir / "version_0"
+    # The lost attempt reached step 364, but its last authoritative checkpoint is step 250.
+    (version0 / "metrics.csv").write_text(
+        "step,steps_per_sec,loss\n" +
+        "".join(f"{step},5.0,0.4\n" for step in range(365)))
+    version1 = exp_dir / "version_1"
+    version1.mkdir()
+    (version1 / "metrics.csv").write_text(
+        "step,steps_per_sec,loss\n" +
+        "".join(f"{step},4.0,0.3\n" for step in range(250, 500)))
+    ledger = Path(job["probe_glob"]).parent / "lurestar-bst.attempts.json"
+    ledger.write_text(json.dumps({
+        "schema": "nextlat_forgetting/profile_attempts/1",
+        "job": "lurestar-bst", "target_steps": 500, "warmup_steps": 100,
+        "attempts": [
+            {"attempt": 0, "resume_step": 0, "version_start_index": 0},
+            {"attempt": 1, "resume_step": 250, "version_start_index": 1},
+        ],
+    }))
+    job["attempt_ledger"] = str(ledger)
+
+    rec = ps.summarize_job(job)
+
+    assert rec["resumed"] is True
+    assert rec["resume_steps"] == [0, 250]
+    assert rec["steps_summarized"] == 400
+    # 150 pre-checkpoint rows at 0.2s + 250 resumed rows at 0.25s.
+    assert rec["seconds_per_step_mean"] == pytest.approx((150 * .2 + 250 * .25) / 400)
+
+    broken = json.loads(ledger.read_text())
+    broken["attempts"][-1]["version_start_index"] = 2
+    ledger.write_text(json.dumps(broken))
+    with pytest.raises(ValueError, match="missing logger version"):
+        ps.summarize_job(job)
+
+
+def test_constant_zero_logger_step_uses_checkpoint_relative_row_order(tmp_path: Path) -> None:
+    """Manual optimization's constant global step must not erase paid timing evidence."""
+    job = _write_job(tmp_path, model="gpt")
+    metrics = Path(job["out_dir"]) / job["experiment_name"] / "version_0" / "metrics.csv"
+    metrics.write_text(
+        "step,steps_per_sec,loss\n" +
+        "".join(f"0,{10.0 if index >= 100 else 1.0},0.3\n" for index in range(500)))
+
+    record = ps.summarize_job(job)
+
+    assert record["steps_summarized"] == 400
+    assert record["seconds_per_step_median"] == pytest.approx(0.1)
+
+
+def test_profile_entry_treats_system_exit_zero_as_success(tmp_path: Path) -> None:
+    work, env = _stub_env(tmp_path)
+    (work / "train.py").write_text("raise SystemExit(0)\n")
+    env["PROFILE_PROBE_JSON"] = str(tmp_path / "probe.{pid}.json")
+
+    proc = subprocess.run([PYTHON, str(REPO / "scripts" / "profile_entry.py")],
+                          cwd=str(work), env=env, capture_output=True, text=True)
+
+    assert proc.returncode == 0
+    probe = json.loads(next(tmp_path.glob("probe.*.json")).read_text())
+    assert probe["exit"] == "ok"
+
+
 def test_contrast_and_projection(tmp_path: Path) -> None:
     gpt = _write_job(tmp_path, model="gpt")
     # NextLat is 1.25x slower per step and holds 1.2x the memory
     nl = _write_job(tmp_path, model="nextlat", step_scale=1.25)
+    bst = _write_job(tmp_path, model="bst", step_scale=2.0)
     records = {"lurestar-gpt": ps.summarize_job(gpt),
-               "lurestar-nextlat": ps.summarize_job(nl)}
+               "lurestar-nextlat": ps.summarize_job(nl),
+               "lurestar-bst": ps.summarize_job(bst)}
 
     con = ps.contrast(records, "lurestar")
     assert con["nextlat_step_time_overhead"] == pytest.approx(1.25)
@@ -209,13 +278,13 @@ def test_contrast_and_projection(tmp_path: Path) -> None:
 
     proj = ps.project(records)
     ckpt = 3.0  # median checkpoint write from the synthetic probe
-    expected_gpt = (0.20 * 20000 + ckpt * (20000 // 250)) * 3 / 3600
+    expected_gpt = (0.20 * 20000 + ckpt * (20000 // 250)) * 5 / 3600
     assert proj["lurestar_gpu_hours"]["gpt"] == pytest.approx(expected_gpt)
-    expected_nl = (0.25 * 20000 + ckpt * (20000 // 250)) * 3 / 3600
+    expected_nl = (0.25 * 20000 + ckpt * (20000 // 250)) * 5 / 3600
     assert proj["lurestar_gpu_hours"]["nextlat"] == pytest.approx(expected_nl)
 
-    # adaptation: 500 updates, 6 branches per model, recovery every 100 steps
-    expected_adapt_gpt = (0.20 * 500 + ckpt * 5) * 6 / 3600
+    # adaptation: 500 updates, 10 branches per model, recovery every 100 steps
+    expected_adapt_gpt = (0.20 * 500 + ckpt * 5) * 10 / 3600
     assert proj["adapt_gpu_hours"]["gpt"] == pytest.approx(expected_adapt_gpt)
 
     # the HMM profile is absent, so the gate must say so rather than quietly under-budget
@@ -239,9 +308,12 @@ def test_missing_probe_is_reported_not_silently_zero(tmp_path: Path) -> None:
 
 
 def _complete_gate(tmp_path: Path) -> Path:
-    """All four spec section 11 jobs, every measurement present."""
-    for task, steps, warm, eb in (("lurestar", 500, 100, 512), ("hmm", 300, 60, 256)):
-        for model in ("gpt", "nextlat"):
+    """All five spec section 11 jobs, every measurement present."""
+    for task, steps, warm, eb, models in (
+        ("lurestar", 500, 100, 512, ("gpt", "nextlat", "bst")),
+        ("hmm", 300, 60, 256, ("gpt", "nextlat")),
+    ):
+        for model in models:
             _write_job(tmp_path, model=model, task=task, eff_batch=eb,
                        steps=steps, warmup=warm)
     return tmp_path / "jobs"
@@ -261,7 +333,7 @@ def test_gate_passes_only_when_every_required_measurement_is_present(tmp_path: P
     proc = _run_gate(jobs, tmp_path / "summary.json")
     assert proc.returncode == 0, proc.stdout + proc.stderr
     summary = json.loads((tmp_path / "summary.json").read_text())
-    assert set(summary["records"]) == {"lurestar-gpt", "lurestar-nextlat",
+    assert set(summary["records"]) == {"lurestar-gpt", "lurestar-nextlat", "lurestar-bst",
                                        "hmm-gpt", "hmm-nextlat"}
     for rec in summary["records"].values():
         assert rec["missing_required"] == []
@@ -277,7 +349,7 @@ def test_gate_fails_when_peak_vram_was_never_measured(tmp_path: Path) -> None:
     for path in jobs.glob("*.probe.*.json"):
         path.unlink()
         removed += 1
-    assert removed == 4, "fixture changed: expected one probe per job"
+    assert removed == 5, "fixture changed: expected one probe per job"
 
     proc = _run_gate(jobs, tmp_path / "summary.json")
     assert proc.returncode != 0, proc.stdout + proc.stderr
@@ -437,6 +509,29 @@ def test_profile_entry_probes_fire(tmp_path: Path) -> None:
     assert (work / "ckpt.pt").is_file()
 
 
+def test_profile_entry_exposes_external_train_sibling_imports(tmp_path: Path) -> None:
+    """runpy must preserve the import layout that direct train.py execution would have."""
+    work, env = _stub_env(tmp_path)
+    trainer = tmp_path / "external-trainer"
+    trainer.mkdir()
+    (trainer / "core_train.py").write_text("VALUE = 'SIBLING CORE TRAIN OK'\n")
+    (trainer / "train.py").write_text(
+        "import core_train\nprint(core_train.VALUE)\n"
+    )
+    env["PROFILE_PROBE_JSON"] = str(tmp_path / "probe.{pid}.json")
+    env["PROFILE_TRAIN_PY"] = str(trainer / "train.py")
+
+    proc = subprocess.run(
+        [PYTHON, str(REPO / "scripts" / "profile_entry.py")],
+        cwd=str(work), env=env, capture_output=True, text=True,
+    )
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "SIBLING CORE TRAIN OK" in proc.stdout
+    probe = json.loads(next(tmp_path.glob("probe.*.json")).read_text())
+    assert probe["exit"] == "ok"
+
+
 def test_profile_entry_records_a_crash_instead_of_swallowing_it(tmp_path: Path) -> None:
     work, env = _stub_env(tmp_path)
     (work / "train.py").write_text("raise RuntimeError('boom')\n")
@@ -472,6 +567,13 @@ def test_profile_entry_refuses_without_train_py(tmp_path: Path) -> None:
 # --------------------------------------------------------------------------------------
 
 
+def test_profile_sh_routes_hmm_instrumentation_through_the_external_shim() -> None:
+    text = (REPO / "scripts" / "profile.sh").read_text()
+    assert 'PROFILE_TRAIN_PY=$SCRIPT_DIR/train_hmm.py' in text
+    assert 'grep -q "hmm_belief"' not in text
+    assert "['data']['hmm']" not in text
+
+
 def test_profile_sh_dry_run_emits_the_spec_step_counts(tmp_path: Path) -> None:
     repo = tmp_path / "fakerepo"
     repo.mkdir()
@@ -484,10 +586,10 @@ def test_profile_sh_dry_run_emits_the_spec_step_counts(tmp_path: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
     out = proc.stdout
     # spec section 11: 500 Lure-Star steps for each model, through profile_entry.py
-    assert out.count("trainer.train_batches=500") == 2
-    assert out.count("profile_entry.py") == 2
+    assert out.count("trainer.train_batches=500") == 3
+    assert out.count("profile_entry.py") == 3
     assert "--devices 1" in out and "--precision bf16-mixed" in out
-    assert "configs/gpt_lurestar.yaml" in out and "configs/nextlat_lurestar.yaml" in out
+    assert all(f"configs/{model}_lurestar.yaml" in out for model in ("gpt", "nextlat", "bst"))
     # the HMM half must announce that it is skipped, not vanish
     assert "HMM skipped" in proc.stderr
     # and the profile must not write into a confirmatory output root

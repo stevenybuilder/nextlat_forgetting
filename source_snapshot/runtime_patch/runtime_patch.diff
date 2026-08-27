@@ -1,0 +1,793 @@
+--- a/core_train.py
++++ b/core_train.py
+@@ -24,6 +24,8 @@
+ from models.model_mtp_gloeckle import MTPGloeckle, MTPGloeckleConfig
+ from models.model_mtp_jtp import JTP, MTPJTPConfig
+ from models.model_speculative import SpeculativeModel
++from lurestar_adaptation import install_common_adaptation
++from lurestar_runtime import (assert_step0_contract, guarded_remove, publish_verified_pointer, retain_verified_recovery)
+ 
+ 
+ def initialize_model(
+@@ -204,6 +206,7 @@
+     fabric.print(
+         f"Number of parameters (excluding embedding): {model.get_num_params(non_embedding=True):,}"
+     )
++    assert_step0_contract(config, model, fabric)
+ 
+     # Compile must occur before fabric.setup()
+     if config.trainer.compile:
+@@ -219,7 +222,12 @@
+         is_device_cuda = fabric.device.type == "cuda"
+         fused_available = "fused" in inspect.signature(torch.optim.AdamW).parameters
+         # This is native PyTorch fused optimizer, not use_fused_kernels in config
+-        use_fused = fused_available and is_device_cuda
++        # Lightning cannot clip scaled FP16 gradients through an optimizer that
++        # handles AMP unscaling internally (PyTorch fused AdamW on T4). Keep the
++        # paper/confirmatory BF16 CUDA path fused, but use the equivalent non-fused
++        # AdamW implementation whenever an actual GradScaler is active.
++        amp_scaler = getattr(fabric.strategy.precision, "scaler", None)
++        use_fused = fused_available and is_device_cuda and amp_scaler is None
+ 
+         model.configure_optimizers(
+             weight_decay=config.optimizer.weight_decay,
+@@ -243,6 +251,7 @@
+     else:
+         fabric.print("Initialized a new model from scratch")
+ 
++    install_common_adaptation(config, model, fabric)
+     return model
+ 
+ 
+@@ -566,7 +575,7 @@
+                 assert (
+                     self.step == self.model.training_steps
+                 ), "Bug in training loop: trainer step count does not match model step count"
+-                if self.step > self.config.trainer.train_batches:
++                if self.step >= self.config.trainer.train_batches:
+                     # End of training
+                     return
+ 
+@@ -797,7 +806,13 @@
+                 if self.fabric.global_rank == 0:
+                     for ckpt in old_checkpoints:
+                         if ckpt not in self.checkpoints_to_always_keep:
+-                            os.remove(ckpt)
++                            guarded_remove(
++                                ckpt,
++                                os.path.join(self.config.trainer.out_dir,
++                                             self.config.trainer.experiment_name),
++                                protected_pointer=os.path.join(
++                                    self.config.trainer.out_dir, "latest_ckpt"),
++                            )
+ 
+             # Update latest and best checkpoint paths
+             if self.config.trainer.save_last_checkpoint:
+@@ -939,13 +954,11 @@
+             self.model.lr_scheduler_state = [s.state_dict() for s in self.lr_schedulers]
+         self.model.save_checkpoint(ckpt_path)
+ 
+-        # Save the file path to the latest checkpoint
++        # Publish only a hash- and deserialize-verified checkpoint.
+         if self.fabric.global_rank == 0:
+-            with open(
+-                os.path.join(self.config.trainer.out_dir, "latest_ckpt"),
+-                "w",
+-            ) as f:
+-                f.write(ckpt_path)
++            publish_verified_pointer(
++                os.path.join(self.config.trainer.out_dir, "latest_ckpt"), ckpt_path
++            )
+ 
+         return ckpt_path
+ 
+@@ -965,20 +978,15 @@
+             self.model.lr_scheduler_state = [s.state_dict() for s in self.lr_schedulers]
+         self.model.save_checkpoint(ckpt_path)
+ 
+-        # Save the most recent file path to the recovery checkpoint pointer file
++        # Publish after read-back verification, then retain two verified generations.
+         if self.fabric.global_rank == 0:
+-            with open(
+-                os.path.join(self.config.trainer.out_dir, "recovery_ckpt"),
+-                "w",
+-            ) as f:
+-                f.write(ckpt_path)
+-
+-        # Delete the old recovery checkpoint file if it exists
+-        if self.recovery_checkpoint_path is not None:
+-            if self.fabric.global_rank == 0:
+-                os.remove(self.recovery_checkpoint_path)
+-
+-        # Update the recovery checkpoint path
++            recovery_pointer = os.path.join(
++                self.config.trainer.out_dir, "recovery_ckpt"
++            )
++            publish_verified_pointer(recovery_pointer, ckpt_path)
++            retain_verified_recovery(ckpt_dir, recovery_pointer, keep=2)
++
++        # Kept for upstream observability; retention is reconstructed from disk on resume.
+         self.recovery_checkpoint_path = ckpt_path
+ 
+     def _select_lr_lambda(self) -> Callable[[Optional[int]], float]:
+--- a/models/model_base.py
++++ b/models/model_base.py
+@@ -6,6 +6,7 @@
+ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+ 
+ from utils.import_utils import is_liger_kernel_available
++from lurestar_runtime import (RNG_KEY, SCALER_KEY, atomic_fabric_save, capture_amp_scaler_state, capture_rng_state, restore_amp_scaler_state, restore_rng_state)
+ 
+ LigerFusedLinearCrossEntropyLoss = None
+ if is_liger_kernel_available():
+@@ -414,7 +415,9 @@
+             state["training_steps"] = self.training_steps
+         if self.lr_scheduler_state is not None:
+             state["lr_scheduler_state"] = self.lr_scheduler_state
+-        self.fabric.save(file_path, state)
++        state[SCALER_KEY] = capture_amp_scaler_state(self.fabric)
++        state[RNG_KEY] = capture_rng_state(torch)
++        atomic_fabric_save(self.fabric, file_path, state)
+ 
+     def load_checkpoint(self, file_path: str, strict: bool = True):
+         """
+@@ -432,10 +435,18 @@
+             )
+             state.pop("optimizer", None)
+         # fabric.load() will in-place modify all objects in the state
+-        self.fabric.load(file_path, state, strict=strict, weights_only=False)
++        checkpoint_remainder = self.fabric.load(
++            file_path, state, strict=strict, weights_only=False
++        )
+         # Update training steps manually because it is an int
+         self.training_steps = state["training_steps"]
+         self.lr_scheduler_state = self._read_scheduler_state_from_checkpoint(file_path)
++        restored_scaler = restore_amp_scaler_state(
++            checkpoint_remainder.get(SCALER_KEY), self.fabric
++        )
++        self.fabric.print(f"Restored Lure-Star AMP scaler state: {restored_scaler}")
++        restored_rng = restore_rng_state(checkpoint_remainder.get(RNG_KEY), torch)
++        self.fabric.print(f"Restored Lure-Star RNG state: {restored_rng}")
+ 
+     @staticmethod
+     def _read_scheduler_state_from_checkpoint(
+--- a/train.py
++++ b/train.py
+@@ -30,6 +30,7 @@
+ from data.fineweb import FineWebDataModule
+ from data.countdown import CountdownDataModule
+ from data.manhattan_dataset import ManhattanDataModule
++from lurestar_runtime import configure_deterministic_runtime
+ 
+ DATAMODULES = {
+     "tinystories": TinyStoriesDataModule,
+@@ -168,8 +169,11 @@
+     # Initialize PyTorch settings
+     seed_offset = fabric.global_rank
+     fabric.seed_everything(int(config.seed) + int(seed_offset))
+-    torch.backends.cuda.matmul.allow_tf32 = True  # allow tf32 on matmul
+-    torch.backends.cudnn.allow_tf32 = True  # allow tf32 on cudnn
++    deterministic_runtime = configure_deterministic_runtime(torch)
++    if not deterministic_runtime:
++        torch.backends.cuda.matmul.allow_tf32 = True  # upstream behavior
++        torch.backends.cudnn.allow_tf32 = True  # upstream behavior
++    fabric.print(f"LURESTAR_DETERMINISTIC_RUNTIME={deterministic_runtime}")
+     torch._dynamo.config.cache_size_limit = 16  # allow more recompiles
+ 
+     # Load dataset
+--- a/lurestar_runtime.py
++++ b/lurestar_runtime.py
+@@ -0,0 +1,416 @@
++"""Runtime durability and preregistration gates injected by runtime_bootstrap.py.
++
++This module is generated into the fresh pinned checkout.  Keep its source in the bootstrap
++script so the receipt hashes the complete runtime mutation as one deterministic patch.
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++import os
++import pathlib
++import random
++import re
++import time
++
++CONTRACT_NAME = "h3_full_parameter_next_token_ce_v1"
++
++
++def adaptation_contract_sha256():
++    path = pathlib.Path(__file__).with_name("lurestar_adaptation.py")
++    if not path.is_file():
++        raise RuntimeError("runtime lacks the hash-bound adaptation trainer")
++    return sha256_file(path)
++
++
++RNG_KEY = "lurestar_rng_state_v1"
++SCALER_KEY = "lurestar_amp_scaler_state_v1"
++META_SUFFIX = ".meta.json"
++EXPECTED_STARGRAPH_PARAMS = {
++    "gpt": 21_324_672,
++    "nextlat": 21_915_264,
++    # Derived from the pinned BST config (12 layers, 6 heads, width 384) and
++    # model_bst.py's two independent Block stacks plus TextHead.  See
++    # derive_bst_stargraph_total_params(), which is also exercised before use.
++    "bst": 47_287_296,
++}
++
++
++def configure_deterministic_runtime(torch_module):
++    """Enable the recovery rehearsal's fail-closed CUDA determinism contract."""
++    if os.environ.get("LURESTAR_DETERMINISTIC_RUNTIME") != "1":
++        return False
++    workspace = os.environ.get("CUBLAS_WORKSPACE_CONFIG")
++    if workspace not in (":4096:8", ":16:8"):
++        raise RuntimeError("deterministic runtime requires CUBLAS_WORKSPACE_CONFIG")
++    torch_module.use_deterministic_algorithms(True)
++    torch_module.backends.cudnn.benchmark = False
++    torch_module.backends.cudnn.deterministic = True
++    torch_module.backends.cuda.matmul.allow_tf32 = False
++    torch_module.backends.cudnn.allow_tf32 = False
++    return True
++
++
++def sha256_file(path, chunk=1 << 20):
++    digest = hashlib.sha256()
++    with open(path, "rb") as handle:
++        for block in iter(lambda: handle.read(chunk), b""):
++            digest.update(block)
++    return digest.hexdigest()
++
++
++def _fsync_dir(path):
++    try:
++        fd = os.open(os.fspath(path), os.O_RDONLY)
++    except OSError:
++        return
++    try:
++        os.fsync(fd)
++    finally:
++        os.close(fd)
++
++
++def _atomic_bytes(path, payload):
++    path = pathlib.Path(path)
++    path.parent.mkdir(parents=True, exist_ok=True)
++    partial = path.with_name(path.name + ".partial")
++    with open(partial, "wb") as handle:
++        handle.write(payload)
++        handle.flush()
++        os.fsync(handle.fileno())
++    os.replace(partial, path)
++    _fsync_dir(path.parent)
++
++
++def _atomic_json(path, value):
++    _atomic_bytes(path, (json.dumps(value, indent=2, sort_keys=True) + "\n").encode())
++
++
++def capture_rng_state(torch_module):
++    """Capture every process RNG used by the pinned trainer."""
++    state = {
++        "schema": 1,
++        "python": random.getstate(),
++        "torch_cpu": torch_module.get_rng_state(),
++        "torch_cuda": [],
++    }
++    try:
++        import numpy as np
++        state["numpy"] = np.random.get_state()
++    except ImportError:
++        state["numpy"] = None
++    if torch_module.cuda.is_available():
++        state["torch_cuda"] = torch_module.cuda.get_rng_state_all()
++    return state
++
++
++def restore_rng_state(state, torch_module):
++    """Restore a patched checkpoint's RNG metadata; old upstream checkpoints remain valid."""
++    if state is None:
++        return False
++    if not isinstance(state, dict) or state.get("schema") != 1:
++        raise RuntimeError("checkpoint contains an unsupported Lure-Star RNG state")
++    random.setstate(state["python"])
++    if state.get("numpy") is not None:
++        import numpy as np
++        np.random.set_state(state["numpy"])
++    torch_module.set_rng_state(state["torch_cpu"])
++    if torch_module.cuda.is_available() and state.get("torch_cuda"):
++        if len(state["torch_cuda"]) != torch_module.cuda.device_count():
++            raise RuntimeError("checkpoint CUDA RNG device count differs from this runtime")
++        torch_module.cuda.set_rng_state_all(state["torch_cuda"])
++    return True
++
++
++def capture_amp_scaler_state(fabric):
++    """Capture FP16 loss-scale state without changing BF16 checkpoints."""
++    scaler = getattr(fabric.strategy.precision, "scaler", None)
++    if scaler is None:
++        return None
++    return {"schema": 1, "state_dict": scaler.state_dict()}
++
++
++def restore_amp_scaler_state(state, fabric):
++    """Restore a saved FP16 loss scale before the next optimizer update."""
++    scaler = getattr(fabric.strategy.precision, "scaler", None)
++    if state is None:
++        if scaler is not None:
++            raise RuntimeError("FP16 checkpoint lacks AMP GradScaler state")
++        return False
++    if not isinstance(state, dict) or state.get("schema") != 1:
++        raise RuntimeError("checkpoint contains an unsupported AMP GradScaler state")
++    if scaler is None:
++        raise RuntimeError("checkpoint has AMP GradScaler state but runtime precision does not")
++    scaler.load_state_dict(state["state_dict"])
++    return True
++
++
++def _torch_load(path):
++    import torch
++    return torch.load(path, map_location="cpu", weights_only=False)
++
++
++def verify_checkpoint(path, *, deserialize=True, require_metadata=True):
++    path = pathlib.Path(path).resolve()
++    if not path.is_file() or path.name.endswith(".partial"):
++        raise RuntimeError("checkpoint is missing or partial: %s" % path)
++    metadata_path = path.with_name(path.name + META_SUFFIX)
++    if require_metadata and not metadata_path.is_file():
++        raise RuntimeError("checkpoint lacks verification metadata: %s" % path)
++    metadata = json.loads(metadata_path.read_text()) if metadata_path.is_file() else {}
++    size = path.stat().st_size
++    digest = sha256_file(path)
++    if metadata:
++        if int(metadata.get("size_bytes", -1)) != size:
++            raise RuntimeError("checkpoint size disagrees with metadata: %s" % path)
++        if metadata.get("sha256") != digest:
++            raise RuntimeError("checkpoint hash disagrees with metadata: %s" % path)
++    state = _torch_load(path) if deserialize else None
++    if deserialize and not isinstance(state, dict):
++        raise RuntimeError("checkpoint did not deserialize to a state mapping: %s" % path)
++    return {"path": str(path), "size_bytes": size, "sha256": digest}, state
++
++
++def atomic_fabric_save(fabric, path, state):
++    """Use Fabric's serializer, but commit the payload only after fsync and read-back."""
++    if int(fabric.world_size) != 1:
++        raise RuntimeError("the hardened checkpoint path is preregistered for one GPU only")
++    path = pathlib.Path(path).resolve()
++    path.parent.mkdir(parents=True, exist_ok=True)
++    partial = path.with_name(path.name + ".partial")
++    if fabric.global_rank == 0:
++        partial.unlink(missing_ok=True)
++    fabric.barrier()
++    fabric.save(str(partial), state)
++    fabric.barrier()
++    if fabric.global_rank == 0:
++        if not partial.is_file():
++            raise RuntimeError("Fabric returned without producing %s" % partial)
++        with open(partial, "rb") as handle:
++            os.fsync(handle.fileno())
++        os.replace(partial, path)
++        _fsync_dir(path.parent)
++        raw = _torch_load(path)
++        if not isinstance(raw, dict):
++            raise RuntimeError("new checkpoint failed deserialize verification: %s" % path)
++        metadata = {
++            "schema": 1,
++            "path": str(path),
++            "sha256": sha256_file(path),
++            "size_bytes": path.stat().st_size,
++            "training_steps": int(raw.get("training_steps", -1)),
++            "rng_state": RNG_KEY in raw,
++            "amp_scaler_state": bool(raw.get(SCALER_KEY)),
++            "verified_at": time.time(),
++        }
++        _atomic_json(path.with_name(path.name + META_SUFFIX), metadata)
++    fabric.barrier()
++
++
++def publish_verified_pointer(pointer, checkpoint):
++    """Deep-verify the target before atomically exposing its absolute path."""
++    pointer = pathlib.Path(pointer).resolve()
++    checkpoint = pathlib.Path(checkpoint).resolve()
++    verify_checkpoint(checkpoint, deserialize=True, require_metadata=True)
++    _atomic_bytes(pointer, str(checkpoint).encode())
++
++
++def _step(path):
++    match = re.search(r"recovery_ckpt_iter_(\d+)\.pt$", pathlib.Path(path).name)
++    return int(match.group(1)) if match else -1
++
++
++def guarded_remove(path, root, *, protected_pointer=None):
++    """Idempotent deletion limited to a direct checkpoint child and never its live pointer."""
++    path = pathlib.Path(path).resolve()
++    root = pathlib.Path(root).resolve()
++    if path.parent != root or path.suffix != ".pt":
++        raise RuntimeError("refusing checkpoint deletion outside the exact run directory: %s" % path)
++    if protected_pointer:
++        pointer = pathlib.Path(protected_pointer)
++        if pointer.is_file() and pathlib.Path(pointer.read_text().strip()).resolve() == path:
++            raise RuntimeError("refusing to delete the checkpoint named by %s" % pointer)
++    path.unlink(missing_ok=True)
++    path.with_name(path.name + META_SUFFIX).unlink(missing_ok=True)
++    _fsync_dir(root)
++
++
++def retain_verified_recovery(checkpoint_dir, pointer, *, keep=2):
++    """Keep two deeply verified recovery generations, pruning only after both exist."""
++    if keep < 2:
++        raise ValueError("recovery retention may not be less than two")
++    checkpoint_dir = pathlib.Path(checkpoint_dir).resolve()
++    verified = []
++    for path in sorted(checkpoint_dir.glob("recovery_ckpt_iter_*.pt"), key=_step, reverse=True):
++        try:
++            verify_checkpoint(path, deserialize=True, require_metadata=True)
++        except Exception:
++            continue
++        verified.append(path.resolve())
++    if len(verified) < keep:
++        return [str(path) for path in verified]
++    retained = verified[:keep]
++    for path in verified[keep:]:
++        guarded_remove(path, checkpoint_dir, protected_pointer=pointer)
++    return [str(path) for path in retained]
++
++
++def derive_bst_stargraph_total_params():
++    """Exact parameter arithmetic for pinned model_bst.py and its frozen G(5,5) config."""
++    width, layers, vocab = 384, 12, 106
++    hidden = 128 * round((8 * width / 3) / 128)  # Block MLP: 1024
++    block = (
++        2 * width                              # two RMSNorm weights
++        + width * (3 * width) + width * width # attention
++        + width * (2 * hidden) + hidden * width
++    )
++    encoder = vocab * width + 2 * (layers * block + width)
++    text_input = 2 * width
++    text_hidden = 128 * round((8 * text_input / 3) / 128)  # TextHead MLP: 2048
++    text_head = (
++        text_input * (2 * text_hidden)
++        + text_hidden * text_input
++        + text_input
++        + width * vocab
++    )
++    return encoder + text_head
++
++
++def _model_name(config):
++    enabled = {
++        "bst": bool(config.use_bst),
++        "nextlat": bool(config.use_nextlat),
++        "gpt": not bool(config.use_bst) and not bool(config.use_nextlat)
++               and not bool(config.use_mtp_gloeckle) and not bool(config.use_mtp_jtp),
++    }
++    names = [name for name, value in enabled.items() if value]
++    if len(names) != 1:
++        raise RuntimeError("step-0 gate requires exactly one GPT/NextLat/BST arm")
++    return names[0]
++
++
++def _claim_job_identity(config, model_name):
++    out_dir = pathlib.Path(str(config.trainer.out_dir))
++    if not out_dir.is_absolute():
++        raise RuntimeError("trainer.out_dir must be absolute")
++    out_dir = out_dir.resolve()
++    seed = int(config.seed)
++    experiment = str(config.trainer.experiment_name)
++    seed_marker = "seed%d" % seed
++    # ``launch_train.sh`` uses ``.../seed1234/...`` while MatrixRunner's canonical,
++    # independently collision-checked layout is ``.../1234/...``.  The resolved upstream
++    # experiment name always carries ``seed1234``.  Accept precisely those two directory
++    # encodings rather than coupling the runtime gate to one launcher.
++    if seed_marker not in experiment or not ({str(seed), seed_marker} & set(out_dir.parts)):
++        raise RuntimeError("out_dir and experiment_name must both encode the explicit seed")
++    if model_name not in experiment or model_name not in out_dir.parts:
++        raise RuntimeError("out_dir and experiment_name must both encode the selected model")
++    identity = {
++        "schema": 1,
++        "dataset": str(config.data.dataset),
++        "experiment_name": experiment,
++        "model": model_name,
++        "out_dir": str(out_dir),
++        "seed": seed,
++        "train_batches": int(config.trainer.train_batches),
++    }
++    path = out_dir / ".lurestar_job_identity.json"
++    if path.is_file():
++        existing = json.loads(path.read_text())
++        if existing != identity:
++            raise RuntimeError("out_dir is already claimed by a different job identity")
++    else:
++        _atomic_json(path, identity)
++    return identity
++
++
++def assert_step0_contract(config, model, fabric):
++    """Fail closed on every silent configuration drift before optimizer work begins."""
++    if int(fabric.world_size) != 1:
++        raise RuntimeError("confirmatory contract requires exactly one GPU")
++    if bool(config.trainer.compile):
++        raise RuntimeError("trainer.compile must be false")
++    if float(config.optimizer.grad_clip) != 100.0:
++        raise RuntimeError("optimizer.grad_clip must be 100")
++    seed = config.seed
++    if isinstance(seed, bool) or not isinstance(seed, int):
++        raise RuntimeError("seed must be one explicit integer, not a sweep/list")
++
++    model_name = _model_name(config)
++    identity = _claim_job_identity(config, model_name)
++    dataset = str(config.data.dataset)
++    profile = bool(os.environ.get("PROFILE_PROBE_JSON"))
++    nonconfirmatory = profile or os.environ.get("LURESTAR_NONCONFIRMATORY") == "1"
++    target = int(config.trainer.train_batches)
++    if not nonconfirmatory:
++        expected_target = 3000 if dataset == "hmm_belief" else (
++            20500 if "adapt-" in str(config.trainer.experiment_name) else 20000
++        )
++        if target != expected_target:
++            raise RuntimeError(
++                "trainer.train_batches=%d, expected preregistered target %d" %
++                (target, expected_target)
++            )
++    if target <= int(model.training_steps):
++        raise RuntimeError("training target must exceed the restored/current optimizer step")
++
++    expected_batch = 256 if dataset == "hmm_belief" else 512
++    if int(config.data.effective_batch_size) != expected_batch:
++        raise RuntimeError("effective_batch_size must be %d for %s" % (expected_batch, dataset))
++
++    parameter_count = int(model.get_num_params(non_embedding=False))
++    if dataset == "stargraph":
++        frozen_shape = (12, 6, 384, 106, 69, 62)
++        actual_shape = (
++            int(config.model.n_layer), int(config.model.n_head), int(config.model.n_embd),
++            int(config.model.vocab_size), int(config.model.block_size),
++            int(config.model.context_length),
++        )
++        if actual_shape != frozen_shape:
++            raise RuntimeError("resolved G(5,5) model shape drift: %r" % (actual_shape,))
++        if model_name == "nextlat" and float(config.model.proj_factor) != 0.5:
++            raise RuntimeError("resolved NextLat model.proj_factor must be 0.5")
++        if derive_bst_stargraph_total_params() != EXPECTED_STARGRAPH_PARAMS["bst"]:
++            raise RuntimeError("internal BST parameter derivation drifted")
++        expected_params = EXPECTED_STARGRAPH_PARAMS[model_name]
++        if parameter_count != expected_params:
++            raise RuntimeError(
++                "%s total parameter count %d != frozen %d" %
++                (model_name, parameter_count, expected_params)
++            )
++
++    is_adaptation = "-adapt-" in str(config.trainer.experiment_name)
++    adaptation = None
++    if is_adaptation:
++        if dataset != "stargraph":
++            raise RuntimeError("H3 adaptation contract is stargraph-only")
++        if model_name == "nextlat":
++            coefficients = tuple(float(getattr(config.model, key)) for key in (
++                "lambda_mse", "lambda_kl", "lambda_ce"
++            ))
++            if coefficients != (0.0, 0.0, 0.0):
++                raise RuntimeError("NextLat H3 adaptation auxiliary coefficients must all be zero")
++        adaptation = {
++            "contract": CONTRACT_NAME,
++            "contract_sha256": adaptation_contract_sha256(),
++            "full_parameter": True,
++            "loss": "teacher_forced_next_token_cross_entropy",
++            "bst_dense_prefix_suffix_objective": False if model_name == "bst" else None,
++            "bst_backward_input": "item_independent_lone_eos" if model_name == "bst" else None,
++        }
++
++    receipt = dict(identity)
++    receipt.update({
++        "compile": False,
++        "effective_batch_size": int(config.data.effective_batch_size),
++        "grad_clip": float(config.optimizer.grad_clip),
++        "mode": "nonconfirmatory" if nonconfirmatory else "confirmatory",
++        "parameter_count_total": parameter_count,
++        "proj_factor": float(config.model.proj_factor) if model_name == "nextlat" else None,
++        "world_size": int(fabric.world_size),
++        "adaptation": adaptation,
++    })
++    receipt_path = pathlib.Path(identity["out_dir"]) / "metrics" / "step_0_contract.json"
++    _atomic_json(receipt_path, receipt)
++    fabric.print("LURESTAR_STEP0=" + json.dumps(receipt, sort_keys=True))
++    return receipt
+--- a/lurestar_adaptation.py
++++ b/lurestar_adaptation.py
+@@ -0,0 +1,194 @@
++"""Common confirmatory H3 adaptation objective.
++
++The upstream GPT and NextLat wrappers already expose teacher-forced next-token cross entropy.
++BST does not: its normal :meth:`compute_loss` enumerates dense forward/backward prefix-suffix
++pairs.  H3 is intended to compare what three *already-trained* representations do under one
++common intervention, so adaptation must not continue three different pretraining objectives.
++
++This module is copied, byte-for-byte and SHA-bound, into the pinned runtime by
++``scripts/runtime_bootstrap.py``.  It changes no base-training behavior.  For a job whose name
++contains ``-adapt-`` it:
++
++* leaves GPT on its native next-token loss;
++* requires all NextLat auxiliary coefficients to be exactly zero; and
++* replaces only BST's instance-level ``compute_loss`` with next-token cross entropy through
++  the exact generation-time forward encoder and ``TextHead`` path.  The backward input is a
++  lone EOS for every item, exactly as ``BST.generate`` constructs it.
++
++All model parameters remain trainable.  In particular the constant lone-EOS backward state is
++not detached, so gradients can update the backward encoder as part of the full-parameter
++estimand even though its *input* is item-independent.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import pathlib
++import types
++from contextlib import ExitStack
++from typing import Any
++
++import torch
++import torch.nn.functional as F
++
++
++CONTRACT_NAME = "h3_full_parameter_next_token_ce_v1"
++
++
++class AdaptationContractError(RuntimeError):
++    """An H3 job does not satisfy the frozen common-objective contract."""
++
++
++def contract_sha256(path: str | pathlib.Path | None = None) -> str:
++    """Hash the exact trainer implementation installed in the runtime."""
++    source = pathlib.Path(path) if path is not None else pathlib.Path(__file__)
++    return hashlib.sha256(source.read_bytes()).hexdigest()
++
++
++def is_adaptation_job(config: Any) -> bool:
++    return "-adapt-" in str(config.trainer.experiment_name)
++
++
++def _forward_positions(encoder: Any, batch: torch.Tensor) -> torch.Tensor:
++    positions = encoder.create_position_indices(batch)
++    return positions[0] if isinstance(positions, tuple) else positions
++
++
++def _masked_targets(model: Any, batch: torch.Tensor) -> torch.Tensor:
++    targets = batch[:, 1:].clone()
++    context_length = int(getattr(model.config, "context_length", 0))
++    if context_length > 0:
++        positions = _forward_positions(model.encoder, batch)
++        context_mask = (positions <= context_length + 1) & (positions != 0)
++        targets = targets.masked_fill(context_mask[:, 1:], -100)
++    if not torch.any(targets != -100):
++        raise AdaptationContractError("next-token adaptation batch has no scored targets")
++    return targets
++
++
++def bst_lone_eos_backward_state(model: Any, batch_size: int, device: torch.device) -> torch.Tensor:
++    """Return BST's differentiable, item-independent inference-time backward state."""
++    eos = torch.full(
++        (int(batch_size), 1), int(model.config.eos_token_id), dtype=torch.long, device=device
++    )
++    _, backward = model.encoder(eos, compute_forward=False, compute_backward=True)
++    if backward is None or backward.shape[:2] != (batch_size, 1):
++        raise AdaptationContractError("BST lone-EOS backward encoder returned an invalid shape")
++    return backward
++
++
++def bst_next_token_logits(model: Any, prefixes: torch.Tensor) -> torch.Tensor:
++    """Logits from the same forward-encoder/TextHead route as ``BST.generate``.
++
++    The return shape is ``(batch, sequence, vocabulary)``.  Upstream ``TextHead`` stacks
++    next/previous at dimension 1, so its raw shape is ``(batch, 2, sequence, vocabulary)``.
++    The final sequence position is
++    exactly the one-step generation logit for the supplied prefix.
++    """
++    if prefixes.ndim != 2 or prefixes.shape[1] < 1:
++        raise AdaptationContractError("BST prefixes must have shape (batch, nonempty sequence)")
++    forward, _ = model.encoder(prefixes, compute_forward=True, compute_backward=False)
++    backward = bst_lone_eos_backward_state(model, prefixes.shape[0], prefixes.device)
++    backward = backward.expand(-1, forward.shape[1], -1)
++    next_previous = model.text_head(forward, backward)
++    if next_previous.ndim != 4 or next_previous.shape[1] != 2:
++        raise AdaptationContractError("BST TextHead did not return next/previous logits")
++    return next_previous[:, 0, :, :]
++
++
++def bst_teacher_forced_next_token_loss(
++    model: Any,
++    batch: torch.Tensor,
++    *,
++    backpropagate: bool,
++    no_sync: bool = False,
++    loss_div: int = 1,
++) -> dict[str, torch.Tensor]:
++    """Full-parameter next-token CE for a BST wrapper already set up with Fabric."""
++    model._assert_fabric_is_setup()
++    if batch.ndim != 2 or batch.shape[1] < 2:
++        raise AdaptationContractError("next-token adaptation needs at least two tokens")
++    if isinstance(loss_div, bool) or int(loss_div) <= 0:
++        raise AdaptationContractError("loss_div must be a positive integer")
++
++    inputs = batch[:, :-1]
++    targets = _masked_targets(model, batch)
++    # H3 is preregistered for one device.  Use both Fabric module contexts so the function
++    # remains correct if the wrapped implementation later adds synchronization hooks.
++    with ExitStack() as stack:
++        stack.enter_context(model.fabric.no_backward_sync(model.encoder, no_sync))
++        stack.enter_context(model.fabric.no_backward_sync(model.text_head, no_sync))
++        logits = bst_next_token_logits(model, inputs)
++        loss = F.cross_entropy(
++            logits.reshape(-1, logits.shape[-1]), targets.reshape(-1), ignore_index=-100
++        ) / int(loss_div)
++        if not torch.isfinite(loss):
++            raise AdaptationContractError("BST next-token adaptation loss is nonfinite")
++        if backpropagate:
++            model.fabric.backward(loss)
++    detached = loss.detach()
++    return {"loss": detached, "next_token_loss": detached}
++
++
++def _bst_compute_loss(self: Any, batch: torch.Tensor, backpropagate: bool, no_sync: bool = False,
++                      loss_div: int = 1, **_: Any) -> dict[str, torch.Tensor]:
++    # ``pair_batch_size`` is accepted in **_ solely because the pinned Trainer passes it to
++    # every model family.  It is deliberately unused: invoking pair generation is forbidden.
++    self._lurestar_adaptation_loss_calls += 1
++    return bst_teacher_forced_next_token_loss(
++        self, batch, backpropagate=backpropagate, no_sync=no_sync, loss_div=loss_div
++    )
++
++
++def install_common_adaptation(config: Any, model: Any, fabric: Any) -> dict[str, Any] | None:
++    """Install/validate the frozen H3 objective after checkpoint loading.
++
++    Returns a serializable contract record for adaptation jobs and ``None`` for base jobs.
++    Re-installation is idempotent and refuses a model-family/configuration disagreement.
++    """
++    if not is_adaptation_job(config):
++        return None
++    if str(config.data.dataset) != "stargraph":
++        raise AdaptationContractError("the common H3 adaptation objective is stargraph-only")
++
++    use_bst = bool(config.use_bst)
++    use_nextlat = bool(config.use_nextlat)
++    family = "bst" if use_bst else ("nextlat" if use_nextlat else "gpt")
++    if use_bst and use_nextlat:
++        raise AdaptationContractError("BST and NextLat model flags cannot both be enabled")
++
++    coefficients = {
++        key: float(getattr(config.model, key, 0.0))
++        for key in ("lambda_mse", "lambda_kl", "lambda_ce")
++    }
++    if family == "nextlat" and any(value != 0.0 for value in coefficients.values()):
++        raise AdaptationContractError(
++            "NextLat H3 adaptation requires lambda_mse=lambda_kl=lambda_ce=0"
++        )
++
++    if family == "bst":
++        if getattr(model, "_lurestar_adaptation_contract", None) not in (None, CONTRACT_NAME):
++            raise AdaptationContractError("BST already carries a different adaptation contract")
++        if getattr(model, "_lurestar_dense_compute_loss", None) is None:
++            model._lurestar_dense_compute_loss = model.compute_loss
++            model._lurestar_adaptation_loss_calls = 0
++            model.compute_loss = types.MethodType(_bst_compute_loss, model)
++        # A poisoned/changed instance method must never be accepted as installed.
++        bound = getattr(model.compute_loss, "__func__", None)
++        if bound is not _bst_compute_loss:
++            raise AdaptationContractError("BST dense objective was not replaced")
++        model._lurestar_adaptation_contract = CONTRACT_NAME
++
++    record = {
++        "schema": "nextlat_forgetting/adaptation_trainer/1",
++        "contract": CONTRACT_NAME,
++        "contract_sha256": contract_sha256(),
++        "family": family,
++        "full_parameter": True,
++        "loss": "teacher_forced_next_token_cross_entropy",
++        "bst_backward_input": "item_independent_lone_eos" if family == "bst" else None,
++        "bst_dense_prefix_suffix_objective": False if family == "bst" else None,
++        "nextlat_auxiliary_coefficients": coefficients if family == "nextlat" else None,
++    }
++    fabric.print("LURESTAR_ADAPTATION=" + __import__("json").dumps(record, sort_keys=True))
++    return record

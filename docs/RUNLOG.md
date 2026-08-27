@@ -9,7 +9,7 @@ Timestamps are local (America/Los_Angeles).
 
 **Environment.** macOS host, no local GPU, no local torch. Analysis venv at `.venv`
 (python 3.12, numpy 2.5.2). GPU via Colab Pro+ `colab` CLI: 1788 compute units, H100 /
-A100 / L4 / T4 / G4 available. Durable store: `gs://nextlat-lurestar-project-flash-490419`
+A100 / L4 / T4 / G4 available. Durable store: `gs://YOUR_PRIVATE_BUCKET`
 (us-central1), created for this project.
 
 **Upstream pinned.** `JaydenTeoh/NextLat` @ `3770be6009cea2b3c455a9ce7f2ca88b504bb955`
@@ -20,8 +20,8 @@ match the spec's expected values: `train_batches: 20000`, `effective_batch_size:
 `n_layer: 12`, `n_head: 6`, `n_embd: 384`, `stargraph_max_nodes: 100`, AdamW at 5e-4 with
 betas (0.9, 0.95), weight decay 0.1, grad clip 100, constant schedule (`warmup_iters: 0`,
 `warmdown_iters: 0`). NextLat adds `mtp_horizon: 3`, `lambda_mse: 1.0`, `lambda_kl: 1.0`,
-`proj_factor: 0.5`. The shipped sweep is five seeds `[1234..1238]`; we preregister the
-first three.
+`proj_factor: 0.5`. The shipped sweep is five seeds `[1234..1238]`; all five are
+preregistered confirmatory seeds.
 
 **Two spec-vs-repo deviations already confirmed by reading the source.**
 1. The shipped configs set `compile: true`; the spec requires `false`, and the upstream
@@ -132,7 +132,9 @@ confirmatory path carries no batch-related deviation. `bf16-mixed` is available 
 no precision deviation either.
 
 Measured A100 burn rate is **5.3 CU/h**, against a pre-run prior of 11.77 - the budget was 2.2x too
-pessimistic. Full workload projects to 9.4 GPU-h and **50 compute units, 2.8% of the 1788 balance**.
+pessimistic. After adding BST and extending all arms to five seeds, the full workload projects to
+23.5 GPU-h and **125 compute units, 7.0% of the 1788 balance**, including the 20% interruption
+margin.
 Credits are not the constraint; wall-clock across Colab session limits is, which is what the durable
 resume layer exists for.
 
@@ -512,3 +514,372 @@ the corpus's uniform-shuffle distribution: the pinned edit slots are U-shaped (c
 uniform), a consequence of drawing the slot gap uniformly. It does not bias PSI (see the
 exchangeability test above) but it does shift absolute competence on E_lure relative to the
 held-out corpus, which matters for spec §10's 90% gate.
+
+## 2026-08-23 — Colab CLI rate and identity calibration
+
+After two agreeing `no_runtime` status reads, provisioned one L4 and one A100 sequentially for
+identity/rate calibration only. No trainer or confirmatory metric ran. L4 resolved to `NVIDIA L4`,
+PyTorch `2.11.0+cu128`, CUDA 12.8, BF16 true, with the account reporting 1.54 CU/h. A100 resolved
+to `NVIDIA A100-SXM4-40GB`, 39.49 GiB, the same PyTorch/CUDA build, BF16 true, with the account
+reporting 5.3 CU/h. Each session was stopped and followed by two agreeing `no_runtime` reads plus
+a settled zero burn rate. Exact sessions and balances are in `results/compute_log.csv`.
+
+This clears rate calibration and A100 identity/BF16 only. It does **not** clear paid training:
+the real-trainer atomic/two-deep checkpoint patch, real T4 forced-interruption equivalence test,
+step-0 integrity assertions, BST/HMM profiles, HMM smoke, and peak-VRAM measurement remain gates.
+
+## 2026-08-23 — Immutable HMM and manifest staging
+
+Uploaded the five frozen HMM arrays to `gs://YOUR_PRIVATE_BUCKET/lurestar/corpus/hmm/`
+and the frozen Lure-Star/HMM manifests plus `manifest_inventory.sha256` to the durable manifest
+prefix. Every object was streamed back through host-side `gcloud storage cat` and matched its
+local SHA-256; no Colab runtime was active. The runtime driver now downloads these objects through
+the Python storage client and runs `sha256sum -c manifests/manifest_inventory.sha256` before any
+trainer launch. Future adaptation-bank materialization refreshes this inventory atomically and
+must be uploaded/verified before the confirmatory matrix gate can open.
+
+## 2026-08-23 — T4 recovery-gate attempts and circuit breaker
+
+Two paid T4 recovery rehearsals were stopped before any scientifically useful training result was
+claimed. Both sessions were explicitly torn down and followed by two agreeing `no_runtime` reads;
+the settled account balance remained 1786.482212634042 CU (billing may still settle later). The
+append-only event records, full failure tails, source hashes, fixed non-confirmatory seed 910241,
+and session identities are retained in `results/recovery_gate_receipts.jsonl`.
+
+1. `rg-62f25753f208-1787540074039870000-c3656d0b` reached the verified T4/CUDA environment but
+   failed before training because the runtime storage client did not receive an explicit GCP
+   project. The driver and recovery harness now bind `project-flash-490419` explicitly.
+2. `rg-3bbc405317a2-1787540260217435000-d362144e` passed authentication, source setup, data
+   generation, runtime patching, and the real trainer's step-0 contract. It then failed on the
+   first optimizer step because Lightning Fabric cannot gradient-clip through PyTorch fused AdamW
+   while an FP16 GradScaler is active on T4. Runtime patch v2 keeps the frozen FP16 and
+   `grad_clip=100` settings, selecting non-fused AdamW only when Fabric exposes a live GradScaler;
+   the BF16 A100 path remains fused.
+
+The two-strike circuit breaker is active: no third runtime may be provisioned until runtime patch
+v2 compiles against the pinned source, its FP16/BF16 selection tests pass, the recovery harness
+tests pass, and a read-only audit accepts the fix. A successful next rehearsal must still prove
+clean-300 versus kill-at-150/resume-to-300 equivalence and durable GCS recovery; reaching step 1 is
+not itself a pass.
+
+## 2026-08-23 — First real T4 training progress; forced-kill gate remains closed
+
+Gate `rg-322403f1b51f-1787541480267918000-3dbe0c0d` established that runtime patch v3 fixes the
+T4 FP16 failure: the real trainer passed optimizer step 1 with `grad_clip=100`, completed an
+independent clean 300-step reference, and durably committed its final checkpoint, metadata, and
+state-last record under the gate's GCS prefix. Verified recovery checkpoints were also produced at
+steps 50, 100, and 150. The run cost 0.161765 CU; post-stop balance was
+1786.3204473108256 CU with two agreeing no-runtime reads and zero burn.
+
+The gate is **not passed**. At the deliberate step-150 interruption, `SIGKILL` terminated the
+Fabric launcher/TCP store but rank 0 escaped its process group and continued as an orphan. That
+orphan advanced beyond step 200 and rotated away the step-100 generation while the snapshot code
+was reading it, correctly preventing `state.json` from being committed last. The host then
+manually released the runtime rather than spend further compute on an invalid comparison. GCS
+therefore contains a useful clean reference and an explicitly incomplete resume prefix, never a
+false success marker.
+
+The live run also showed that two separately initialized T4 FP16 lineages diverge before any
+interruption, so comparing their final weights would conflate ordinary CUDA nondeterminism with
+resume error. The preregistered tolerances will not be loosened. Before another paid attempt, the
+harness must (1) kill and verify the entire descendant tree including escaped process groups, and
+(2) compare uninterrupted and recovered continuations from a common hash-identical lineage. The
+transport circuit breaker is active; no further Colab runtime starts until both changes have local
+tests and read-only review.
+
+## 2026-08-24 — Full recovery path works; nondeterministic CUDA replay fails frozen tolerance
+
+Gate `rg-4c510af4abde-1787543838297723000-7a85f244` closed the process-control and durable-restore
+questions left by the preceding rehearsal. The harness killed and verified the complete trainer
+descendant tree at step 150, resumed a reference continuation from that exact checkpoint, deleted
+the local recovery lineage, restored the checkpoint and metadata from immutable GCS objects, and
+resumed a second continuation. Both arms reached exactly step 300 and committed checkpoint,
+metadata, and state-last records under `final/reference/` and `final/recovered/`. The owned T4
+session was released; two status reads reported no runtime and quota reported zero active runtimes
+and zero burn. Cost was 0.174685 CU.
+
+The gate is still **not passed**. Lightning's manual-optimization CSVLogger writes constant
+`step=0`, which exposed a comparison-harness assumption after both final commits. Offline analysis
+of the hash-verified durable artifacts corrected the row identity to `(logger version, row ordinal)`
+without changing any preregistered tolerance. That analysis then exposed genuine replay divergence:
+model maximum absolute delta `0.0265127`, optimizer maximum absolute delta `0.0147252`, and metric
+loss maximum absolute delta `0.0345252`, all beyond the frozen limits. Scheduler and FP16 scaler
+states were exact; the restore path itself was exercised successfully.
+
+Runtime patch v4 now adds an opt-in recovery-only deterministic CUDA contract before model work:
+`CUBLAS_WORKSPACE_CONFIG=:4096:8`, deterministic PyTorch algorithms, cuDNN deterministic mode with
+benchmarking disabled, TF32 disabled, and an explicit runtime receipt. Frozen science tolerances
+remain unchanged. No A100 profile or confirmatory run may start until a new common-parent T4 replay
+passes this gate and the deterministic patch receives read-only review.
+
+## 2026-08-24 — Deterministic T4 replay is exact; independent audit clears A100
+
+Gate `rg-d21e8fee468a-1787545664418856000-9899dbda` exercised the common-parent interruption,
+immutable GCS delete/restore, and two step-150-to-300 continuations under deterministic CUDA.
+Both final checkpoints have SHA-256
+`9b7f2d2edec3d4045ce963a4deb0179ca7f6c662090eb7a35825ec1ca38e7c04`; weights, optimizer,
+scheduler, RNG, FP16 GradScaler, logits, and metrics are exact with maximum absolute and relative
+difference zero. Progress and durability checks pass.
+
+The immutable gate result remains `passed:false`: the host retained only the last 300 process
+lines, so normal per-step output evicted the early `Fast forwarded data to step 150` observation.
+Pinned source and the restored step-150 lineage prove the continuation cannot reach step 300
+without that fast-forward path. An independent read-only audit therefore issued a separate
+posthoc engineering clearance for A100 profiling without changing a tolerance, seed, scientific
+result, or the original gate artifact. The diagnostic buffer is now 5,000 lines with regression
+coverage; a streaming marker latch remains a future robustness improvement. Cost was 0.166697 CU,
+followed by two no-runtime reads and zero active burn.
+
+## 2026-08-24 — First A100 profile attempt fails safe on wrapper import path
+
+Profile `a100-d44f883e387f-8d316efc9c53` provisioned session
+`gpu-a100-s-kkb-usc1f2-e7mlqhd70xv3` and verified an NVIDIA A100-SXM4-40GB, PyTorch
+2.11.0+cu128, CUDA 12.8, and BF16 support against the frozen 24-object input inventory. Both
+50-step HMM GPT and NextLat smoke runs completed and their recovery/final checkpoints were synced.
+The measured Lure-Star jobs then failed before training because Fabric/torchrun executed
+`scripts/profile_entry.py`, and `runpy.run_path` did not expose the upstream trainer directory for
+the sibling `core_train` import. This is an engineering failure, not a scientific result.
+
+The driver committed a generation-3 failure state, terminal receipt, and 45 immutable
+SHA-addressed artifacts to GCS, released the owned A100, and two subsequent checks reported no
+runtime, zero active runtimes, and zero burn. The attempt cost 0.216229 CU. The wrapper now
+prepends the absolute target-trainer directory to `sys.path`; the external sibling-import
+regression and the combined profile suites pass 40/40 before rerun.
+
+## 2026-08-24 — Corrected A100 profile reaches BST step 364 before runtime loss
+
+Profile `a100-b15e1bc9d596-8d316efc9c53` verified the corrected distributed wrapper on the real
+A100 path. Both HMM 50-step smoke jobs completed. The measured 500-step Lure-Star GPT and NextLat
+jobs completed with probes, checkpoints, and observed rates near 8.2 and 7.3 steps/s. The
+47.3M-parameter BST arm ran near 2.2 s/step, wrote recovery checkpoints at steps 125 and 250, and
+reached step 364. The Colab execution stream then ended with EOF and the runtime itself
+disappeared; this was not a trainer exception. Two subsequent status/quota reads reported no
+runtime, zero active runtimes, and zero burn. Cost was 1.402500 CU.
+
+The last committed state is generation 2 with 29 smoke artifacts. Periodic sync correctly refused
+to commit a mixed generation when live GPU telemetry changed during hashing, but that meant the
+state-last pointer did not reference later stable checkpoints. Failed sync attempts nevertheless
+uploaded immutable SHA-addressed objects, including the complete GPT/NextLat profile artifacts and
+BST step-125/250 checkpoints. These objects are retained for a fail-closed salvage/resume audit;
+they are not yet promoted into a successful profile state. No replacement A100 is authorized until
+cross-session profile resume is behaviorally proven and binds unchanged trainer/config/input
+identity across the orchestration-only source change.
+
+The next-run synchronizer now snapshots mutable logs/CSV files privately, defers only files that
+race, carries forward prior immutable versions, and still commits stable checkpoints state-last;
+terminal sync refuses any deferral. The full repository suite after this hardening is 763 passed.
+
+## 2026-08-24 — Recovered A100 profile and strengthened-design budget reconciliation
+
+The fail-closed salvage/resume path completed nonconfirmatory engineering profile
+`a100-be81d2f1e79c-8d316efc9c53` at durable state generation 12 with 108 artifacts. The local
+recovery receipt restored and verified 34 artifacts, retrained no model, and used no additional
+paid compute. It binds `results/profile_summary_recovered.json` at SHA-256
+`ccccea44a5f4ce321b21827a2c8276ac23d906fd538c2e9893f78696b72d0d1a` and the rendered summary at
+SHA-256 `4ba74d9c2772d0e7a62de2526c9edafc5c4551ee93a6199c709a2d6d5999b84b`.
+This evidence is engineering-only: no confirmatory checkpoint or H1/H2/H3/HMM geometry outcome was
+inspected or produced.
+
+The recovered projection predates the 2026-08-24 strengthened design. It gives 66.0096047653
+GPU-h for the already-correct 15 base jobs, 3.3215172269 GPU-h for 30 near/far adaptation
+branches, and 0.1219404929 GPU-h for 10 one-regime HMM cells, including the profiler's measured
+checkpoint treatment but before its 20% interruption margin. Scaling only the changed counts to
+45 near/mid/far branches and exactly 30 three-regime HMM cells gives:
+
+```text
+66.0096047653 + 3.3215172269*(45/30) + 0.1219404929*(30/10)
+  = 71.3577020844 GPU-h subtotal
+  = 85.6292425012 GPU-h with 20% interruption margin
+  = 453.834985256 CU at the measured 5.3 CU/h
+```
+
+The operational planning values are therefore **85.629 GPU-h / 453.835 CU**, correcting the stale
+23.5 GPU-h / ~125 CU entry above without rewriting append-only history. They are not a wall-clock
+promise. They exclude a currently unknown strengthened-evaluation delta for held-out whitening and
+dual-metric extraction, H1/H2 cross-fitting, H3 gradient/actual-update/Jacobian controls, and full
+three-regime evaluation/cache work. That path must be target-profiled; no endpoint, threshold,
+branch, regime, or seed may be changed in response. The recovered BST base timing dominates the
+projection, and no unmeasured BST optimization is budget authority.
+
+The outcome-blind preregistration validator exists and fails closed. Its current receipt at
+`.agent_state/preregistration-freeze-block.json` reports `all_eleven_gates_pass: false`: the
+evidence index is absent, so all eleven gates block. Its authority hashes became stale during this
+documentation reconciliation and must be regenerated against the final immutable source bundle.
+The last recorded full-suite state is also `BLOCK` (827 passed, 10 runtime-bootstrap integration
+failures); independent review and confirmatory GO clearance are pending. Gate 4 has an additional
+explicit blocker: no authoritative pilot architecture/seed/step/checkpoint selection is frozen,
+and `B_mid` plus matched acquisition candidate generators were absent at this snapshot. The
+pre-outcome A100 BST step-500 seed-1234 checkpoint
+`1f5f00611e33ada0ac0a778f9d45bef9e174f1bbeedfaaa3491018a9bf400176` was **not** silently chosen.
+
+Two agreeing Colab status/quota checks during this reconciliation reported no runtime. The latest,
+at 2026-08-24 03:29 EDT, returned `status: no_runtime`, `active_runtimes: 0`,
+`burn_rate_hourly: 0`, and settled `paid_balance: 1783.25765136152`. No runtime is active and no
+compute units are currently burning. Confirmatory launch remains locked until the all-eleven PASS
+receipt, clean full-suite receipt, independent review, immutable source bundle, and GO clearance
+all exist.
+
+## 2026-08-24 — Focused preregistration verification remains fail-closed
+
+After the documentation reconciliation, the focused command
+`.venv/bin/python -m pytest tests/test_validate_preregistration.py
+tests/test_create_confirmatory_clearance.py tests/test_colab_train_loop.py -q` returned 110 passed
+and 2 failed. Both failures are nominal PASS-fixture tests, and both block only at gate 8 because
+the validator now requires a `subject` payload key for `hmm_family_manifest` and
+`hmm_materialization_receipt` while the fixture omits it. This is a live validator/test-schema
+regression, not evidence that the scientific gate passed. The validator remains fail-closed; no
+runtime was launched and no threshold or endpoint was changed.
+
+## 2026-08-24 — Exact three-regime HMM family materialized locally
+
+After the HMM-focused suite passed 102 tests, the model-blind create-only materializer generated
+the exact three frozen regimes locally. It created 31 planned scientific artifacts: corpora,
+posterior arrays, future-distribution-JS thresholds, pair banks, matrices, and manifests. The
+family payload is `e24a883dbc547c99f543433d290b0e228e2191427af041a851a1279d77a68b27`;
+the materialization inventory is
+`079eeaa283a4d91eb4512726195fdc08a291e2020bb97507c8d8380ebc32e8d2`. The receipt records three
+required regimes, 2,000 target pairs, no model inputs, and no inspected model outcomes.
+
+A second create-only invocation completed without changing the frozen receipt or inventory, and
+`sha256sum -c manifests/hmm_family_inventory.sha256` verified every one of the 31 rows. The local
+footprint is about 307 MB of arrays plus 22 MB of family manifests/pair banks. This clears local
+HMM materialization only. The combined runtime inventory must still be refreshed after H3 banks
+are frozen, the exact paths must be uploaded and reverified on the runtime, and no confirmatory
+training is authorized by this CPU-only step.
+
+## 2026-08-24 — Semantic validator and recomputed launch clearance pass focused tests
+
+Every gate 2–11 JSON artifact now requires an exact source-archive-bound attestation envelope,
+canonical finite-JSON payload hash, producer/source/test bindings, and role-specific semantic
+fields. Raw HMM family/materialization subjects retain their native schemas and are wrapped with
+hash-checked attestations. Placeholder schema-only JSON and mutations to status, source hash,
+payload hash, H3 controls, AdamW batch identity, TE certificates, test counts, and review findings
+all fail closed.
+
+The launch clearance was then tightened so a stored PASS is never trusted on shape alone. Before
+any Colab status, quota, upload, or provision action, it loads the exact bound validator source,
+recomputes all eleven gates from the live evidence tree, and requires exact logical equality with
+the stored freeze receipt. A structurally plausible fabricated PASS has a direct regression test.
+The adjacent validator/clearance/Colab suite passes 118 tests; py_compile and `git diff --check`
+also pass. No real PASS or GO receipt exists yet, and no external lifecycle action occurred.
+
+## 2026-08-24 — Frozen H3 pilot scoring completed; fixed caliper is infeasible
+
+The sole prospectively frozen nuisance-selection pilot (BST seed 1234, exact step 500, checkpoint
+SHA-256 `1f5f00611e33ada0ac0a778f9d45bef9e174f1bbeedfaaa3491018a9bf400176`) scored all
+53,000 model-blind candidate rows on one A100. The scientific score job SHA-256 was
+`860aa43623ec07c1e1bf97d0bcd77629b08a1ed3853e3af45640c733d13e0feb`; the immutable
+source archive SHA-256 was `724f1a4f4fef5f08247495b1b6763420ad336418abf339c50ca12d08dcc995a1`
+at GCS generation `1787558668940035`. Scoring completed in 126.6 seconds. Every 1,000-row chunk
+was published create-only as data, scorer receipt, and a generation/SHA-bound commit record before
+the next chunk was credited. The final loss table SHA-256 is
+`a562057ead0852cb2a5dd5e68f3e50b34d9f299e1cabb707b6a269f37bbc7f13`; its receipt SHA-256
+is `9086a322a9ff08985b56d4230eb3739f5734776e9dcf2c5d0300462cb8352908`; complete state was
+published last at generation `1787558930759654`.
+
+The selector then applied D39 unchanged and failed closed: the absolute pilot-loss caliper 0.1
+left 1,115 of 5,000 near items without an eligible middle candidate. No threshold was widened, no
+candidate was regenerated, and no confirmatory checkpoint or outcome was inspected. This is an
+outcome-blind feasibility result. H3 remains blocked pending an explicit prospective scientific
+amendment or a decision to drop the affected hypothesis; independent agents were assigned to
+evaluate defensible remedies and p-hacking risk. The A100 was stopped immediately. Two agreeing
+post-stop reads reported no runtime, zero burn, and a settled balance of 1783.0722580985762 CU;
+the measured debit was 0.185393 CU.
+
+## 2026-08-24 — Prospective D40 one-shot middle-support expansion frozen
+
+Before scoring any new candidate, Decision D40 froze a single uniform model-blind repair for the
+D39 overlap failure. Each of 5,000 near items retains its original three middle candidates and
+adds exactly nine unique candidates in each 1/2/3-rewire stratum: 30 per near, 150,000 total, and
+135,000 new-only rows. Deterministic CPU generation reproduced create-or-verify outputs with no
+paid compute: expanded SHA-256
+`2effd4e13d384786546c71cc61b4138dc97f082e3992bf3cdf398e6bf93264f1`, new-only SHA-256
+`4a8e906bd868c1f751ab32e0af6ad9652cf706e320b366875a21eac63d45df0c`, and generation receipt
+SHA-256 `6c24eee439fcd8de02cd5d487267c408734680aefe197e33ab662b1efb75d909`.
+
+The scorer reuses the exact D39 scientific loss implementation and sole checkpoint, recomputes
+serialized identities, and is wrapped in generation-bound GCS durability with a frozen 1,000-row
+maximum in-flight chunk. Combination requires the scoring receipt and state-last durable receipt;
+selection requires their exact 188,000-row combined lineage. The integrated finalizer produces the
+D40 middle mapping plus unchanged D39 far and three acquisition selections without invoking the
+known-infeasible D39 middle selector. If any middle pair remains unmatched, it writes a permanent
+H3 block and prohibits further amendments. Focused verification passed 62 tests; no GPU was
+launched and no confirmatory input or outcome was inspected during this freeze.
+
+## 2026-08-24 — D40 completed once; frozen rule permanently withdrew H3
+
+The immutable D40 job
+`393c933e9e616cd24a4b7a9b408203b0c22002c39cf97f2d72b03176fe45482a` scored all 135,000 new
+model-blind rows using the frozen BST seed-1234 step-500 checkpoint. The first A100 disappeared
+after 124,000 committed rows; a replacement restored all 124 generation-pinned chunks and finished
+the same job without rescoring them. The new-row loss SHA-256 is
+`f84c73b81d7b9e8cab44e32d89cd272d320d420583bd7badf76f3c0dade7f537`, scoring-receipt SHA-256 is
+`3e487999752871048c6bc71bcf181f048b3d4c897b03a853420a06770960f621`, durable-state SHA-256 is
+`e1ed1d814ea190b1602c31ef82bee86bcd0937dc26dec5963a31d692f8faa0c2`, and state was committed
+last at generation `1787563059069047`. Combining D39 and D40 produced 188,000 rows with loss-table
+SHA-256 `814058a162e12fde36c7204dd30798b63bfbf02294fce768046070672e5afece`.
+
+The unchanged selector left 4/5,000 near identities unmatched. The create-only terminal receipt
+`manifests/h3_selected/PERMANENT_H3_BLOCK.json` has SHA-256
+`82d526ad5cb6ac5fb942790488a6b766e59b816acb27ed405a00852f40925778` and records
+`no_further_amendments_permitted: true`. This executes the prospectively frozen stopping rule:
+H3 is permanently absent from confirmatory training and inference; caliper changes, weighting,
+unmatched restriction, further candidates, pilot substitution, and another matching amendment are
+forbidden. H1, H2, and the exactly three-regime HMM remain confirmatory. The four unmatched pairs
+are a nuisance-bank feasibility result, not a confirmatory model or interference outcome.
+
+The lost and completion runtimes debited 1.569460 and 0.410562 CU respectively, for **1.980022 CU**
+total D40 spend. Two agreeing post-stop reads reported no runtime and zero burn at settled balance
+`1781.092236633952` CU. Every completed scoring artifact survived the disconnection.
+
+## 2026-08-24 — Outcome-blind HMM launch-verifier schema repair
+
+Before HMM compute, the family launch verifier was found to expect a top-level `hmm_sha256` in
+`hmm_thresholds.json`, while the already-frozen schema stores that identity under
+`thresholds.hmm_sha256`. The verifier was corrected to read the existing nested field. No HMM
+matrix, threshold, pair bank, corpus, manifest byte, or model outcome changed.
+
+The exact family preflight
+`.venv/bin/python scripts/run_hmm_matrix.py --root . --snapshot-root . --data-root . --project-root . --upstream upstream/NextLat --family --print-plan`
+completed with schema `nextlat_forgetting/hmm_matrix_plan/1` and exactly 30 jobs, from
+`gpt-seed1234-hmm-persistent_moderate` through
+`nextlat-seed1238-hmm-persistent_high_aliasing`. This print-plan remains mandatory before paid HMM
+compute.
+
+## 2026-08-24 — H3 naming collision resolved without changing the HMM schema
+
+Independent review found that `src/hmm_geometry/aggregate.py` uses legacy metric keys beginning
+`h3_posterior_*` and `h3_future_*`. Those keys name prespecified HMM Bayesian posterior- and
+future-distribution-decoding diagnostics; they are not Lure-Star adaptation/interference H3.
+The permanent D40 block therefore excludes only the Lure-Star adaptation branches, interference
+estimand, and gradient/shadow-update/Jacobian mechanism probes. It does not exclude these HMM
+calibration outputs. The existing metric names remain stable before outcomes; no schema key,
+scientific estimator, artifact byte, or outcome was changed by this documentation clarification.
+
+## 2026-08-24 — First HMM interruption exposed and repaired a ledger/state split
+
+The first confirmatory HMM A100 runtime completed and durably committed all ten
+`persistent_moderate` checkpoints at exactly step 3,000 under source
+`a962cdb94c865e16c2c7c86d5c18b9cc2d3bd301feeea12e42075751f52c9285`, then disconnected.
+The replacement runtime restored the checkpoint objects but trusted a regressed global ledger and
+attempted to resume completed GPT jobs, producing invalid step-3,001 incident artifacts. The host
+stopped that runtime immediately after detecting the mismatch. Two settled status/quota pairs
+reported no runtime, zero burn, and balance `1779.3814353793016` CU.
+
+All ten original step-3,000 checkpoints, sidecars, final summaries, older step-2,500/2,750 recovery
+generations, and telemetry remained recoverable. The five GPT terminal states and their original
+materialized configs were recovered byte-for-byte from exact GCS soft-delete generations. Current
+live state once again reports ten `TRAINED` jobs at step 3,000. Before restoration, every replaced
+live object was copied to a content-addressed incident archive; every restored byte sequence was
+hash-checked and copied to a separate content-addressed recovery archive. The outcome-blind plans
+and receipts are `.agent_state/hmm-soft-delete-recovery-plan.json`,
+`.agent_state/hmm-soft-delete-recovery-receipt.json`, and
+`.agent_state/hmm-exact-target-state-repair.json`. No HMM evaluation metric was opened or used.
+
+Decision D41 freezes an operational-only successor source: exact-target checkpoints terminalize
+without launching the trainer; over-target checkpoints fail closed; recovery can accept only the
+one clearance-bound predecessor source; new state is stamped with the successor source; and HMM
+evaluation representation-cache chunks now cross GCS state-last so an evaluation disconnect loses
+at most one sync interval. Scientific data, models, seeds, steps, estimands, thresholds, endpoints,
+and the exactly thirty-cell aggregation are unchanged. A new full suite, independent review,
+eleven-gate freeze, and job-specific clearance are required before another paid launch.

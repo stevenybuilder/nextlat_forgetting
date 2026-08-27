@@ -4,6 +4,14 @@
   "cuda": "12.8",
   "precision": "bf16-mixed",
   "region": "us-central1 (same as bucket, no cross-region egress)",
+  "profiling_gate_complete": false,
+  "rate_calibration_2026_08_23": {
+    "l4_cu_per_hour": 1.54,
+    "a100_cu_per_hour": 5.3,
+    "a100_bf16": true,
+    "a100_vram_gb": 39.49,
+    "source": "results/compute_log.csv"
+  },
   "steps_profiled": 500,
   "warmup_discarded": 100,
   "config_source": "official config/stargraph/5_5/{gpt,nextlat}_stargraph_5_5.yaml, overriding only step count, out_dir, compile, and corpus paths",
@@ -14,12 +22,14 @@
   "nextlat_overhead_x": 1.16,
   "measured_a100_cu_per_hour": 5.3,
   "projection": {
-    "base_gpu_hours": 7.25, "adapt_gpu_hours": 0.36, "hmm_gpu_hours_est": 0.25,
-    "total_plus_20pct_gpu_hours": 9.44, "total_compute_units": 50.0,
-    "percent_of_balance": 2.8
+    "scope": "5 confirmatory seeds x {GPT, NextLat, BST} for Lure-Star; 5 x {GPT, NextLat} for HMM",
+    "total_plus_20pct_gpu_hours": 23.5, "total_compute_units": 125.0,
+    "percent_of_balance": 7.0
   },
   "known_measurement_gaps": [
+    "BST has not been profiled at the 500-step paper-scale gate.",
+    "GPT and NextLat HMM have not been profiled for 300 steps, and the HMM 50-step trainer smoke is outstanding.",
     "steady_seconds_per_step was parsed from the local log, not in-driver: the driver kept only a 60-line tail so its own estimate returned null (fixed in scripts/colab_profile.py for subsequent runs)",
-    "peak VRAM read torch.cuda stats in the driver process rather than the fabric child, so it reported 0.00 GB (fixed to poll nvidia-smi); peak VRAM is therefore NOT yet measured and must be captured on the first confirmatory run"
+    "peak VRAM read torch.cuda stats in the driver process rather than the fabric child, so it reported 0.00 GB (fixed to poll nvidia-smi); peak VRAM is therefore NOT yet measured and must be captured during the profiling gate"
   ]
 }

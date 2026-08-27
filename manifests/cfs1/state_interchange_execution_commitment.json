@@ -1,0 +1,58 @@
+{
+  "schema": "nextlat_forgetting/cfs1_state_interchange_execution_commitment/1",
+  "recorded_at": "2026-08-24T18:09:55-04:00",
+  "status": "OUTCOME_BLIND_COMMITTED_SECONDARY",
+  "outcome_blind_attestation": {
+    "cfs1_adaptation_branch_outcome_run_or_inspected": false,
+    "cfs1_state_interchange_result_run_or_inspected": false,
+    "cfs1_scientific_metric_run_or_inspected": false,
+    "decision_based_on_observed_effect": false
+  },
+  "scientific_role": {
+    "analysis_class": "secondary_local_readout_intervention",
+    "required_for_full_project_completion": true,
+    "can_change_primary_estimand_or_decision": false,
+    "can_establish_global_causal_mediation": false
+  },
+  "coverage": {
+    "parent_count": 8,
+    "episodes_per_parent": 2,
+    "cells_per_episode": 4,
+    "required_branch_count": 64,
+    "retention_probes_per_branch": 2000,
+    "patched_conditions_per_probe": 3,
+    "minimum_patched_probe_condition_evaluations": 384000,
+    "outcome_based_subsetting_permitted": false
+  },
+  "intervention": {
+    "recipient": "adapted branch on the matching fixed retention probe",
+    "donor": "unadapted parent on the same fixed retention probe",
+    "site": "penultimate-layer state before the final transformer block and output readout",
+    "effect": "change from unpatched adapted computation in correct-first-branch margin",
+    "required_named_effects": [
+      "patch_parent_state_effect",
+      "patch_unrelated_anchor_effect",
+      "patch_norm_matched_random_subspace_effect"
+    ]
+  },
+  "execution_contract": {
+    "required_per_branch_status": "COMPLETE_WITH_NAMED_CONTROLS",
+    "missing_or_failed_cells_are_reported_not_replaced": true,
+    "parent_and_adapted_states_should_be_cached": true,
+    "first_branch_profile_may_open_scientific_outcomes": false,
+    "first_branch_profile_fields": [
+      "runtime_seconds",
+      "peak_memory_bytes",
+      "artifact_size_bytes"
+    ],
+    "implementation_status_at_record_time": "COMMITTED_NOT_YET_IMPLEMENTED"
+  },
+  "bindings": {
+    "decision_document_sha256": "f7c7273bc55cd0254eac1b6a0205b6d0ebe4b458c52a9ca41531a02b3f887975",
+    "preregistration_sha256": "807d1f6f6e93ad4247e1680ceff90896b8ba6d3df1aeb5f1adb00a7955917e70",
+    "protocol_sha256": "0d7660eed453bd5882dc165f891192b5258b6611b47d073ba4198cddd1d21758",
+    "cfs1_update_manifest_sha256": "78e7b5c4fc63199cc3e4c312b49595a7c9b7f533da1ca62176a725116d25786b",
+    "evidence_contract_sha256": "6b3de08f0ae1ebde69b693b71fc69eec459a1028ee9f85d17b78c7f1e554026c",
+    "evaluator_sha256": "e23fa2c967c004fcd4d657b7a29c0dc3161bf6a3a1386cb1944f33d32a186521"
+  }
+}

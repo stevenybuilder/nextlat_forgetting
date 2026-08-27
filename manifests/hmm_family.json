@@ -1,0 +1,3469 @@
+{
+  "schema": "nextlat_forgetting/hmm_family/1",
+  "frozen_date": "2026-08-24",
+  "selection_blinding": {
+    "model_checkpoints_inspected": false,
+    "model_representations_inspected": false,
+    "model_outcomes_inspected": false,
+    "rule": "matrices selected from the unchanged deterministic grid by frozen dwell/entropy rankings and TE gate"
+  },
+  "primary_regime": null,
+  "required_regimes": [
+    "persistent_moderate",
+    "fast_mixing_moderate",
+    "persistent_high_aliasing"
+  ],
+  "primary_manifest_sha256": "99969765d5216fca1098b9a0967cfe13a0e5305de2f849341de05bc53c82f6e0",
+  "selection_rule": {
+    "source": "existing deterministic candidate grid and unchanged acceptance box",
+    "fast_mixing_moderate": "ascending mean dwell, then lexicographic candidate tuple",
+    "persistent_high_aliasing": "among dwell >= median passer: descending mean posterior entropy, then lexicographic tuple",
+    "te_gate": {
+      "rank_te": 4,
+      "sigma_min_te_strictly_greater_than": 0.05
+    },
+    "metadata": {
+      "median_passing_mean_dwell_time": 3.4006913558398666,
+      "fast_mixing_rejections": [],
+      "persistent_high_aliasing_rejections": []
+    }
+  },
+  "passing_candidates_lexicographic": [
+    {
+      "candidate": {
+        "self_transition": 0.6,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "0d38d9992641e39185dac520f1b21e4aa8a1f79d5f75e683a742937781946cd1",
+      "diagnostics": {
+        "mean_dwell_time": 2.528133824872597,
+        "min_self_transition": 0.5599999999999999,
+        "max_self_transition": 0.64,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4975594269318774,
+        "belief_entropy_p25_bits": 0.7708264865846317,
+        "belief_entropy_p50_bits": 1.1392297393196489,
+        "belief_entropy_p75_bits": 1.3639929277065233,
+        "belief_entropy_p95_bits": 1.7531799492229556,
+        "belief_entropy_mean_bits": 1.1131376158194901,
+        "belief_entropy_spread_bits": 1.2556205222910783,
+        "bayes_next_obs_accuracy": 0.3853359375,
+        "chance_next_obs_accuracy": 0.2663984375,
+        "bayes_minus_chance": 0.11893750000000003,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.22600558659217868,
+        "min_stationary_obs": 0.23833798882681562,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.3089864254189716
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.6,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "84232d85c587829778c9977a4e579291e1fe164ba975865d8a386e519fa5538b",
+      "diagnostics": {
+        "mean_dwell_time": 2.6170183982683985,
+        "min_self_transition": 0.52,
+        "max_self_transition": 0.6799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.45745773178808596,
+        "belief_entropy_p25_bits": 0.7610418831870484,
+        "belief_entropy_p50_bits": 1.1284760410991708,
+        "belief_entropy_p75_bits": 1.3699849149306513,
+        "belief_entropy_p95_bits": 1.7489308898298368,
+        "belief_entropy_mean_bits": 1.1025925055371495,
+        "belief_entropy_spread_bits": 1.291473158041751,
+        "bayes_next_obs_accuracy": 0.3898046875,
+        "chance_next_obs_accuracy": 0.28603125,
+        "bayes_minus_chance": 0.10377343750000001,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.20363636363636353,
+        "min_stationary_obs": 0.22818181818181815,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.3037253372144204
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "bb7b73a30d38ebe54bf8835c1772da6910d6e2926d17fa6b894cebd215ff0d59",
+      "diagnostics": {
+        "mean_dwell_time": 2.857142857142857,
+        "min_self_transition": 0.65,
+        "max_self_transition": 0.65,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4996719247106824,
+        "belief_entropy_p25_bits": 0.7919825923208306,
+        "belief_entropy_p50_bits": 1.252424507308723,
+        "belief_entropy_p75_bits": 1.4347965479411564,
+        "belief_entropy_p95_bits": 1.6526431245062376,
+        "belief_entropy_mean_bits": 1.118033982668616,
+        "belief_entropy_spread_bits": 1.1529711997955552,
+        "bayes_next_obs_accuracy": 0.398046875,
+        "chance_next_obs_accuracy": 0.2504921875,
+        "bayes_minus_chance": 0.1475546875,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999994,
+        "min_stationary_obs": 0.24999999999999994,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.3143622077917572
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "d03adf62bc3e3d531776e70caceed8da849d6cb82562c2c69a62f660393e1aaf",
+      "diagnostics": {
+        "mean_dwell_time": 2.857142857142857,
+        "min_self_transition": 0.65,
+        "max_self_transition": 0.65,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4694684862933233,
+        "belief_entropy_p25_bits": 0.7846131863222001,
+        "belief_entropy_p50_bits": 1.1969172277458644,
+        "belief_entropy_p75_bits": 1.4099221595146367,
+        "belief_entropy_p95_bits": 1.714957646423557,
+        "belief_entropy_mean_bits": 1.1064127040913228,
+        "belief_entropy_spread_bits": 1.2454891601302336,
+        "bayes_next_obs_accuracy": 0.3994453125,
+        "chance_next_obs_accuracy": 0.25109375,
+        "bayes_minus_chance": 0.14835156249999998,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999986,
+        "min_stationary_obs": 0.24999999999999994,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.3060762449079968
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "2c2747c7f7451f3650b510f8c3b07fac75b38fdbcc3d09f95de689164876e7fa",
+      "diagnostics": {
+        "mean_dwell_time": 2.8571428571428577,
+        "min_self_transition": 0.65,
+        "max_self_transition": 0.65,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4885805508963931,
+        "belief_entropy_p25_bits": 0.7535388313062403,
+        "belief_entropy_p50_bits": 1.2153456137170233,
+        "belief_entropy_p75_bits": 1.4625420548993686,
+        "belief_entropy_p95_bits": 1.8094029451838676,
+        "belief_entropy_mean_bits": 1.1608606649122073,
+        "belief_entropy_spread_bits": 1.3208223942874744,
+        "bayes_next_obs_accuracy": 0.3942109375,
+        "chance_next_obs_accuracy": 0.25121875,
+        "bayes_minus_chance": 0.14299218750000003,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999958,
+        "min_stationary_obs": 0.24999999999999978,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.3121892055185804
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "a43d16334f0f6f2301384340b17849122adc7dd02cc533201ad4324629b2f80b",
+      "diagnostics": {
+        "mean_dwell_time": 2.8571428571428577,
+        "min_self_transition": 0.65,
+        "max_self_transition": 0.65,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.43456940512717673,
+        "belief_entropy_p25_bits": 0.7726406948522132,
+        "belief_entropy_p50_bits": 1.138725811116196,
+        "belief_entropy_p75_bits": 1.3863154211283464,
+        "belief_entropy_p95_bits": 1.7667204731707415,
+        "belief_entropy_mean_bits": 1.087442519739105,
+        "belief_entropy_spread_bits": 1.3321510680435649,
+        "bayes_next_obs_accuracy": 0.4021328125,
+        "chance_next_obs_accuracy": 0.2509609375,
+        "bayes_minus_chance": 0.151171875,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999958,
+        "min_stationary_obs": 0.24999999999999978,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2956872088622273
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "19bf4d427a163e43b14c2667a12eeedc4bd6a6d049182cc4f74aecf9ba2fed90",
+      "diagnostics": {
+        "mean_dwell_time": 2.899303774023335,
+        "min_self_transition": 0.61,
+        "max_self_transition": 0.6900000000000001,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4865997093031898,
+        "belief_entropy_p25_bits": 0.7922371421015557,
+        "belief_entropy_p50_bits": 1.2348370824715795,
+        "belief_entropy_p75_bits": 1.4315169549953162,
+        "belief_entropy_p95_bits": 1.6542098785318375,
+        "belief_entropy_mean_bits": 1.1115308633534682,
+        "belief_entropy_spread_bits": 1.1676101692286478,
+        "bayes_next_obs_accuracy": 0.401296875,
+        "chance_next_obs_accuracy": 0.2706875,
+        "bayes_minus_chance": 0.13060937499999997,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2227233570449653,
+        "min_stationary_obs": 0.2368002349409386,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.3102486955167152
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "a47c9aeba6be33374dae551056ce762c9547f84acec81131439adde03e72db2b",
+      "diagnostics": {
+        "mean_dwell_time": 2.8993037740233354,
+        "min_self_transition": 0.61,
+        "max_self_transition": 0.6900000000000001,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.49718887445866305,
+        "belief_entropy_p25_bits": 0.7885147276145524,
+        "belief_entropy_p50_bits": 1.2566835289793363,
+        "belief_entropy_p75_bits": 1.5108715099056655,
+        "belief_entropy_p95_bits": 1.763168539064089,
+        "belief_entropy_mean_bits": 1.175761504909935,
+        "belief_entropy_spread_bits": 1.265979664605426,
+        "bayes_next_obs_accuracy": 0.3939453125,
+        "chance_next_obs_accuracy": 0.268421875,
+        "bayes_minus_chance": 0.1255234375,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2227233570449654,
+        "min_stationary_obs": 0.235217124583959,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.318067501137559
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "7c6b3944689d81e66dcdc7b0b5934fd64f2f7d76b870d311b941b7f0b374803a",
+      "diagnostics": {
+        "mean_dwell_time": 2.8993037740233354,
+        "min_self_transition": 0.61,
+        "max_self_transition": 0.6900000000000001,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4614700441034165,
+        "belief_entropy_p25_bits": 0.793209875860063,
+        "belief_entropy_p50_bits": 1.1890040500160834,
+        "belief_entropy_p75_bits": 1.412232877261186,
+        "belief_entropy_p95_bits": 1.7190525432877677,
+        "belief_entropy_mean_bits": 1.1028193263707562,
+        "belief_entropy_spread_bits": 1.2575824991843512,
+        "bayes_next_obs_accuracy": 0.4010234375,
+        "chance_next_obs_accuracy": 0.26946875,
+        "bayes_minus_chance": 0.13155468750000004,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2227233570449654,
+        "min_stationary_obs": 0.23680023494093871,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.3047851917995088
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "48c5db78c6341e45f66bcb88e69f9eebb34eb5823ea0cda3f4d40656d6a803a6",
+      "diagnostics": {
+        "mean_dwell_time": 2.899303774023336,
+        "min_self_transition": 0.61,
+        "max_self_transition": 0.6900000000000001,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.47391454355879786,
+        "belief_entropy_p25_bits": 0.7382305666855778,
+        "belief_entropy_p50_bits": 1.2022158187476917,
+        "belief_entropy_p75_bits": 1.465530513092499,
+        "belief_entropy_p95_bits": 1.79866722909919,
+        "belief_entropy_mean_bits": 1.1555919691374175,
+        "belief_entropy_spread_bits": 1.3247526855403922,
+        "bayes_next_obs_accuracy": 0.396109375,
+        "chance_next_obs_accuracy": 0.267828125,
+        "bayes_minus_chance": 0.12828125,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.22272335704496507,
+        "min_stationary_obs": 0.2352171245839588,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.309678715480374
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "266850e7ae13760650a7fb6510e54da8ed6a5abc92e230bf55aa7262e38fec7e",
+      "diagnostics": {
+        "mean_dwell_time": 2.899303774023336,
+        "min_self_transition": 0.61,
+        "max_self_transition": 0.6900000000000001,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.42254162213817253,
+        "belief_entropy_p25_bits": 0.7611242721512906,
+        "belief_entropy_p50_bits": 1.1357128470324693,
+        "belief_entropy_p75_bits": 1.371462103234138,
+        "belief_entropy_p95_bits": 1.765649539746208,
+        "belief_entropy_mean_bits": 1.0826851216591997,
+        "belief_entropy_spread_bits": 1.3431079176080354,
+        "bayes_next_obs_accuracy": 0.40428125,
+        "chance_next_obs_accuracy": 0.268671875,
+        "bayes_minus_chance": 0.13560937499999998,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.22272335704496507,
+        "min_stationary_obs": 0.23680023494093852,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2931435198030403
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "15ad7c64fb55715d1a20a007ce70b0d38eadc39a2058018df531bc4ea441a0f7",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371747,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.4808556090042585,
+        "belief_entropy_p25_bits": 0.8104895356209131,
+        "belief_entropy_p50_bits": 1.3770563023946756,
+        "belief_entropy_p75_bits": 1.569135326971509,
+        "belief_entropy_p95_bits": 1.6606468027168786,
+        "belief_entropy_mean_bits": 1.2024213481974912,
+        "belief_entropy_spread_bits": 1.17979119371262,
+        "bayes_next_obs_accuracy": 0.39590625,
+        "chance_next_obs_accuracy": 0.2889375,
+        "bayes_minus_chance": 0.10696875,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.19746913992126505,
+        "min_stationary_obs": 0.21848148395275904,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3228824105920944
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "61db05e793cd620f382184dd0edf18ad3f3a6445565e0bd1c142b8c37688ba7c",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371747,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4841237608876758,
+        "belief_entropy_p25_bits": 0.801982889973044,
+        "belief_entropy_p50_bits": 1.3320464262578047,
+        "belief_entropy_p75_bits": 1.5427509474492103,
+        "belief_entropy_p95_bits": 1.646499530398176,
+        "belief_entropy_mean_bits": 1.1774293085866148,
+        "belief_entropy_spread_bits": 1.1623757695105001,
+        "bayes_next_obs_accuracy": 0.3982265625,
+        "chance_next_obs_accuracy": 0.2914765625,
+        "bayes_minus_chance": 0.10675000000000001,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.19746913992126505,
+        "min_stationary_obs": 0.22200480416360843,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.3206811412973258
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "5ca29845be8c9471cc0de23b882bb3a3ea35c18ae652e6f74688035fabb01511",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371747,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.47367004215546504,
+        "belief_entropy_p25_bits": 0.7592567904977494,
+        "belief_entropy_p50_bits": 1.211372719445147,
+        "belief_entropy_p75_bits": 1.4190207088970512,
+        "belief_entropy_p95_bits": 1.610496150894701,
+        "belief_entropy_mean_bits": 1.1010163501408534,
+        "belief_entropy_spread_bits": 1.136826108739236,
+        "bayes_next_obs_accuracy": 0.4066328125,
+        "chance_next_obs_accuracy": 0.2936484375,
+        "bayes_minus_chance": 0.11298437499999997,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.19746913992126505,
+        "min_stationary_obs": 0.22552812437445785,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.310171988669081
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "dcfebc1748cf6e1ed23875a96050f5b9e3cb19ddd8bfd7c6920d9688528d871f",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371756,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.4746173358959914,
+        "belief_entropy_p25_bits": 0.7882093735596665,
+        "belief_entropy_p50_bits": 1.33860879930244,
+        "belief_entropy_p75_bits": 1.5655299810585757,
+        "belief_entropy_p95_bits": 1.717850807732697,
+        "belief_entropy_mean_bits": 1.1945724005462375,
+        "belief_entropy_spread_bits": 1.2432334718367057,
+        "bayes_next_obs_accuracy": 0.3954140625,
+        "chance_next_obs_accuracy": 0.288546875,
+        "bayes_minus_chance": 0.10686718750000002,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.197469139921265,
+        "min_stationary_obs": 0.218481483952759,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3210822897150956
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "5bb86dcd4d2fdc88309d8a2614f5a94517b59f30a2f3fcc38bfb6e620763fabc",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371756,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.47120392768885144,
+        "belief_entropy_p25_bits": 0.806017797723978,
+        "belief_entropy_p50_bits": 1.3136856553728378,
+        "belief_entropy_p75_bits": 1.5447177520801483,
+        "belief_entropy_p95_bits": 1.7052230665516244,
+        "belief_entropy_mean_bits": 1.172040211331091,
+        "belief_entropy_spread_bits": 1.2340191388627728,
+        "bayes_next_obs_accuracy": 0.39778125,
+        "chance_next_obs_accuracy": 0.290953125,
+        "bayes_minus_chance": 0.106828125,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.197469139921265,
+        "min_stationary_obs": 0.2220048041636084,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.3165355586909255
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "e00d92ab99defcb1b84514386818c2b8dd784dc4bb3bbd9c412cc3410d794f73",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371756,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4350306799865938,
+        "belief_entropy_p25_bits": 0.7604121156633524,
+        "belief_entropy_p50_bits": 1.2092757132450926,
+        "belief_entropy_p75_bits": 1.4224483699781016,
+        "belief_entropy_p95_bits": 1.6679959466604444,
+        "belief_entropy_mean_bits": 1.0980133183086027,
+        "belief_entropy_spread_bits": 1.2329652666738506,
+        "bayes_next_obs_accuracy": 0.4055234375,
+        "chance_next_obs_accuracy": 0.2929765625,
+        "bayes_minus_chance": 0.11254687499999999,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.197469139921265,
+        "min_stationary_obs": 0.2255281243744578,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.303949939134251
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "2ce6566be2f97a6423793a746903766132b41d1d0493108b63ad455440d60c90",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371747,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.465734011549075,
+        "belief_entropy_p25_bits": 0.7665707659991122,
+        "belief_entropy_p50_bits": 1.2693387925241917,
+        "belief_entropy_p75_bits": 1.5643866970290803,
+        "belief_entropy_p95_bits": 1.750164333738888,
+        "belief_entropy_mean_bits": 1.1821308713935836,
+        "belief_entropy_spread_bits": 1.284430322189813,
+        "bayes_next_obs_accuracy": 0.3961796875,
+        "chance_next_obs_accuracy": 0.28746875,
+        "bayes_minus_chance": 0.1087109375,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.19746913992126508,
+        "min_stationary_obs": 0.21848148395275904,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.317834911607573
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "a715c18b3d72073feabb52661a932099281dc1d617757d7111becea49f015d30",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371747,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4533042559170982,
+        "belief_entropy_p25_bits": 0.7656972333288535,
+        "belief_entropy_p50_bits": 1.2460608588834454,
+        "belief_entropy_p75_bits": 1.5162739285823092,
+        "belief_entropy_p95_bits": 1.7527837946397729,
+        "belief_entropy_mean_bits": 1.161181031301173,
+        "belief_entropy_spread_bits": 1.2994795387226747,
+        "bayes_next_obs_accuracy": 0.3977421875,
+        "chance_next_obs_accuracy": 0.290171875,
+        "bayes_minus_chance": 0.10757031249999999,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.19746913992126508,
+        "min_stationary_obs": 0.2220048041636084,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.3117408558046437
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "1a719d2c7b66df29a32cbfab29769509dab69f78d624256dd59d500d06642117",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371747,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.40899840640813423,
+        "belief_entropy_p25_bits": 0.7633487645916675,
+        "belief_entropy_p50_bits": 1.1772950501950539,
+        "belief_entropy_p75_bits": 1.4029894648915637,
+        "belief_entropy_p95_bits": 1.7248787286067737,
+        "belief_entropy_mean_bits": 1.0886078856109702,
+        "belief_entropy_spread_bits": 1.3158803221986395,
+        "bayes_next_obs_accuracy": 0.4048984375,
+        "chance_next_obs_accuracy": 0.2925078125,
+        "bayes_minus_chance": 0.11239062499999997,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.19746913992126508,
+        "min_stationary_obs": 0.22552812437445782,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.297514197232525
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "9e69d4d0dcf5b3fe731abd9ccbf03bf52df548b6ef4264c314e8979d2dafbfba",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371747,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.45459846464922077,
+        "belief_entropy_p25_bits": 0.7453321983470322,
+        "belief_entropy_p50_bits": 1.2078672112476114,
+        "belief_entropy_p75_bits": 1.5435272567564824,
+        "belief_entropy_p95_bits": 1.7789436729728403,
+        "belief_entropy_mean_bits": 1.1612270989288653,
+        "belief_entropy_spread_bits": 1.3243452083236196,
+        "bayes_next_obs_accuracy": 0.39784375,
+        "chance_next_obs_accuracy": 0.2863359375,
+        "bayes_minus_chance": 0.11150781249999997,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.19746913992126544,
+        "min_stationary_obs": 0.2184814839527593,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3115882008256858
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "28f00b66d147631db8003acbaae9ae0aba1183d3e551967f5f219b6f38bbd3e0",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371747,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4313833687657442,
+        "belief_entropy_p25_bits": 0.7271204329514807,
+        "belief_entropy_p50_bits": 1.1868075209780853,
+        "belief_entropy_p75_bits": 1.48995765241571,
+        "belief_entropy_p95_bits": 1.7975329274651959,
+        "belief_entropy_mean_bits": 1.1416539363303753,
+        "belief_entropy_spread_bits": 1.3661495586994516,
+        "bayes_next_obs_accuracy": 0.399671875,
+        "chance_next_obs_accuracy": 0.2891328125,
+        "bayes_minus_chance": 0.11053906250000001,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.19746913992126544,
+        "min_stationary_obs": 0.22200480416360868,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.3036768249206798
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.65,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "07aecdd4346e2a6094488fb81f5aa798fb9453d468a6c367facafbde4e211e4c",
+      "diagnostics": {
+        "mean_dwell_time": 3.0346925833371747,
+        "min_self_transition": 0.5700000000000001,
+        "max_self_transition": 0.73,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.37634380921271904,
+        "belief_entropy_p25_bits": 0.7413217692835685,
+        "belief_entropy_p50_bits": 1.129123432163804,
+        "belief_entropy_p75_bits": 1.3791869336068858,
+        "belief_entropy_p95_bits": 1.7640957886493076,
+        "belief_entropy_mean_bits": 1.0699372739307487,
+        "belief_entropy_spread_bits": 1.3877519794365885,
+        "bayes_next_obs_accuracy": 0.40740625,
+        "chance_next_obs_accuracy": 0.2917265625,
+        "bayes_minus_chance": 0.11567968750000002,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.19746913992126544,
+        "min_stationary_obs": 0.22552812437445807,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.287136166676586
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "1bed99a3d94b9b50ee0da880cb26254acdf639bd469e199615f15818d6caaba3",
+      "diagnostics": {
+        "mean_dwell_time": 3.333333333333334,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7000000000000001,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.47894836985609646,
+        "belief_entropy_p25_bits": 0.7607218482630805,
+        "belief_entropy_p50_bits": 1.3567796494470397,
+        "belief_entropy_p75_bits": 1.5743194763566433,
+        "belief_entropy_p95_bits": 1.680960834751218,
+        "belief_entropy_mean_bits": 1.1801107060564635,
+        "belief_entropy_spread_bits": 1.2020124648951214,
+        "bayes_next_obs_accuracy": 0.4070859375,
+        "chance_next_obs_accuracy": 0.251328125,
+        "bayes_minus_chance": 0.15575781249999998,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999997,
+        "min_stationary_obs": 0.25,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3136373479336163
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "fceb7294fb2a29f44156355cb1192b819af98cb4d2cb9d2e6c484b81fbeb900f",
+      "diagnostics": {
+        "mean_dwell_time": 3.333333333333334,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7000000000000001,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.480469356596047,
+        "belief_entropy_p25_bits": 0.7516405872880508,
+        "belief_entropy_p50_bits": 1.3239102922737436,
+        "belief_entropy_p75_bits": 1.5552571328894385,
+        "belief_entropy_p95_bits": 1.6761797055973002,
+        "belief_entropy_mean_bits": 1.1543946559245302,
+        "belief_entropy_spread_bits": 1.1957103490012533,
+        "bayes_next_obs_accuracy": 0.4089140625,
+        "chance_next_obs_accuracy": 0.2509375,
+        "bayes_minus_chance": 0.15797656250000003,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999997,
+        "min_stationary_obs": 0.25,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.310715949774536
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "fc57af080425f09686f55de0c7a3fd24be6e64dd8abf6825771f61733d93a21a",
+      "diagnostics": {
+        "mean_dwell_time": 3.333333333333334,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7000000000000001,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.47999176206336697,
+        "belief_entropy_p25_bits": 0.7078000416217389,
+        "belief_entropy_p50_bits": 1.232209145009682,
+        "belief_entropy_p75_bits": 1.401653529729209,
+        "belief_entropy_p95_bits": 1.6248315093434635,
+        "belief_entropy_mean_bits": 1.077269623965946,
+        "belief_entropy_spread_bits": 1.1448397472800966,
+        "bayes_next_obs_accuracy": 0.418515625,
+        "chance_next_obs_accuracy": 0.25025,
+        "bayes_minus_chance": 0.16826562500000003,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999997,
+        "min_stationary_obs": 0.25,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2985271882558083
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "7388ad9b3886f827df0cc42f81b5c3d7a93dbeb2f7a8718bf9d5c755d0bb555e",
+      "diagnostics": {
+        "mean_dwell_time": 3.333333333333333,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.47480151364769724,
+        "belief_entropy_p25_bits": 0.7632555810490612,
+        "belief_entropy_p50_bits": 1.3473379660545155,
+        "belief_entropy_p75_bits": 1.582330170076165,
+        "belief_entropy_p95_bits": 1.7151601958712799,
+        "belief_entropy_mean_bits": 1.1723419381560911,
+        "belief_entropy_spread_bits": 1.2403586822235826,
+        "bayes_next_obs_accuracy": 0.4080078125,
+        "chance_next_obs_accuracy": 0.2517734375,
+        "bayes_minus_chance": 0.15623437500000004,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999994,
+        "min_stationary_obs": 0.25,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3119817949596912
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "ea72793b3f1cb0e421640afdcc4cdff7eca77942ea93b5f7afda2b135d03472d",
+      "diagnostics": {
+        "mean_dwell_time": 3.333333333333333,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.44790535283049676,
+        "belief_entropy_p25_bits": 0.7700258177828048,
+        "belief_entropy_p50_bits": 1.31118488679715,
+        "belief_entropy_p75_bits": 1.562964752464988,
+        "belief_entropy_p95_bits": 1.7207992216121346,
+        "belief_entropy_mean_bits": 1.1501984858372607,
+        "belief_entropy_spread_bits": 1.2728938687816378,
+        "bayes_next_obs_accuracy": 0.4083671875,
+        "chance_next_obs_accuracy": 0.2514609375,
+        "bayes_minus_chance": 0.15690625000000002,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999994,
+        "min_stationary_obs": 0.25,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.3072524645535382
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "bfac043847a4ddbc28c3ab046d6cbe5e42cc58891937844b79b6885325a62431",
+      "diagnostics": {
+        "mean_dwell_time": 3.333333333333333,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4225481907232961,
+        "belief_entropy_p25_bits": 0.6855542556860302,
+        "belief_entropy_p50_bits": 1.2177276839096076,
+        "belief_entropy_p75_bits": 1.4373467949541856,
+        "belief_entropy_p95_bits": 1.6764213002312263,
+        "belief_entropy_mean_bits": 1.0766327898304284,
+        "belief_entropy_spread_bits": 1.2538731095079303,
+        "bayes_next_obs_accuracy": 0.415953125,
+        "chance_next_obs_accuracy": 0.25175,
+        "bayes_minus_chance": 0.164203125,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999994,
+        "min_stationary_obs": 0.25,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2935728806257385
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "63953b36e2194c9e0e2af676192be11475eff4f408904de79098f68296b408e1",
+      "diagnostics": {
+        "mean_dwell_time": 3.3333333333333335,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.46907197146691976,
+        "belief_entropy_p25_bits": 0.7266524386632367,
+        "belief_entropy_p50_bits": 1.2746038334806553,
+        "belief_entropy_p75_bits": 1.5655024199768144,
+        "belief_entropy_p95_bits": 1.7395621052770325,
+        "belief_entropy_mean_bits": 1.1592544603000328,
+        "belief_entropy_spread_bits": 1.2704901338101127,
+        "bayes_next_obs_accuracy": 0.4095390625,
+        "chance_next_obs_accuracy": 0.2520625,
+        "bayes_minus_chance": 0.15747656249999997,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2499999999999999,
+        "min_stationary_obs": 0.24999999999999994,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3081257233552028
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "d2766df5b0611f20fe8a4aaa2085f4d88604297f680f1c0b6abd5eb9c1212756",
+      "diagnostics": {
+        "mean_dwell_time": 3.3333333333333335,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4306162976312316,
+        "belief_entropy_p25_bits": 0.7410465849055825,
+        "belief_entropy_p50_bits": 1.2472862536728835,
+        "belief_entropy_p75_bits": 1.53207432236206,
+        "belief_entropy_p95_bits": 1.762909543395816,
+        "belief_entropy_mean_bits": 1.1388330465174108,
+        "belief_entropy_spread_bits": 1.3322932457645844,
+        "bayes_next_obs_accuracy": 0.41034375,
+        "chance_next_obs_accuracy": 0.2516640625,
+        "bayes_minus_chance": 0.1586796875,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2499999999999999,
+        "min_stationary_obs": 0.24999999999999992,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.3016480708467408
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "3d22b19b8376d602d6eac876d89468ed7aea88156eea9fb2f057e75cc98307ee",
+      "diagnostics": {
+        "mean_dwell_time": 3.3333333333333335,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3935473333670827,
+        "belief_entropy_p25_bits": 0.6655606912347701,
+        "belief_entropy_p50_bits": 1.1795273524402403,
+        "belief_entropy_p75_bits": 1.4073867627346306,
+        "belief_entropy_p95_bits": 1.7322101741741256,
+        "belief_entropy_mean_bits": 1.0661490984868562,
+        "belief_entropy_spread_bits": 1.338662840807043,
+        "bayes_next_obs_accuracy": 0.4171171875,
+        "chance_next_obs_accuracy": 0.25253125,
+        "bayes_minus_chance": 0.1645859375,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2499999999999999,
+        "min_stationary_obs": 0.24999999999999994,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2856005846466763
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.25
+      },
+      "hmm_sha256": "e391a38da1b776140c6a73a00c34bba67f07b09eee295ac67ec9555d0f2d97ed",
+      "diagnostics": {
+        "mean_dwell_time": 3.333333333333333,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4632893745444791,
+        "belief_entropy_p25_bits": 0.8027461219847876,
+        "belief_entropy_p50_bits": 1.15784139038561,
+        "belief_entropy_p75_bits": 1.413993316157376,
+        "belief_entropy_p95_bits": 1.8034251124983214,
+        "belief_entropy_mean_bits": 1.1303257851156594,
+        "belief_entropy_spread_bits": 1.3401357379538423,
+        "bayes_next_obs_accuracy": 0.394546875,
+        "chance_next_obs_accuracy": 0.25165625,
+        "bayes_minus_chance": 0.142890625,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999964,
+        "min_stationary_obs": 0.24999999999999983,
+        "min_emission_probability": 0.04999999999999999,
+        "mean_conditional_nll_nats": 1.2953428399957918
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "fade1035651901016f4690f95e19cadc57bfdae51bba89a0e1b8fa7c56e0598f",
+      "diagnostics": {
+        "mean_dwell_time": 3.333333333333333,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.45804145665438134,
+        "belief_entropy_p25_bits": 0.694049539189562,
+        "belief_entropy_p50_bits": 1.200400963161853,
+        "belief_entropy_p75_bits": 1.5434622619796354,
+        "belief_entropy_p95_bits": 1.760331207643146,
+        "belief_entropy_mean_bits": 1.1405029211323843,
+        "belief_entropy_spread_bits": 1.3022897509887648,
+        "bayes_next_obs_accuracy": 0.40909375,
+        "chance_next_obs_accuracy": 0.252703125,
+        "bayes_minus_chance": 0.156390625,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999964,
+        "min_stationary_obs": 0.2499999999999998,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3036179319729633
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "810192f2fc1b882dbe33bea7f537c4bde493c75eb58ea328658045ba114f4675",
+      "diagnostics": {
+        "mean_dwell_time": 3.333333333333333,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4099007751749366,
+        "belief_entropy_p25_bits": 0.702868865452241,
+        "belief_entropy_p50_bits": 1.182193022336377,
+        "belief_entropy_p75_bits": 1.4712548502953557,
+        "belief_entropy_p95_bits": 1.7809859460583213,
+        "belief_entropy_mean_bits": 1.1212793891704869,
+        "belief_entropy_spread_bits": 1.3710851708833847,
+        "bayes_next_obs_accuracy": 0.4117578125,
+        "chance_next_obs_accuracy": 0.2523046875,
+        "bayes_minus_chance": 0.15945312499999997,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999964,
+        "min_stationary_obs": 0.24999999999999978,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.2948384763659793
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "c473fa2274e4e2e0f7069c9cc89423efd12dd15fdc37bd57e5a758bf973741fd",
+      "diagnostics": {
+        "mean_dwell_time": 3.333333333333333,
+        "min_self_transition": 0.7,
+        "max_self_transition": 0.7,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3596705685487452,
+        "belief_entropy_p25_bits": 0.6503780478256045,
+        "belief_entropy_p50_bits": 1.1327090910016477,
+        "belief_entropy_p75_bits": 1.383210153695774,
+        "belief_entropy_p95_bits": 1.7776993471237703,
+        "belief_entropy_mean_bits": 1.0490545602023447,
+        "belief_entropy_spread_bits": 1.4180287785750252,
+        "bayes_next_obs_accuracy": 0.4197421875,
+        "chance_next_obs_accuracy": 0.2515625,
+        "bayes_minus_chance": 0.16817968749999995,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999964,
+        "min_stationary_obs": 0.24999999999999978,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2758881261868604
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "df67abdc02020a8e9d02e9544f1c76c70bd5e84eeaac7e2c0c646c56b86465ad",
+      "diagnostics": {
+        "mean_dwell_time": 3.4006913558398666,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.4520576133661853,
+        "belief_entropy_p25_bits": 0.7607121244365775,
+        "belief_entropy_p50_bits": 1.3259476341564527,
+        "belief_entropy_p75_bits": 1.5767303814056017,
+        "belief_entropy_p95_bits": 1.6835099925089079,
+        "belief_entropy_mean_bits": 1.1729810843163493,
+        "belief_entropy_spread_bits": 1.2314523791427225,
+        "bayes_next_obs_accuracy": 0.410359375,
+        "chance_next_obs_accuracy": 0.271625,
+        "bayes_minus_chance": 0.13873437500000002,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298425,
+        "min_stationary_obs": 0.23103740648379054,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3106808331426567
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "f78b9f2538509e431be21a6543a231db817988a557a4f49fc37ada8ff4232ab3",
+      "diagnostics": {
+        "mean_dwell_time": 3.4006913558398666,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4537095025137759,
+        "belief_entropy_p25_bits": 0.7446982284402356,
+        "belief_entropy_p50_bits": 1.2919170983684454,
+        "belief_entropy_p75_bits": 1.5519372732529322,
+        "belief_entropy_p95_bits": 1.6721699123461977,
+        "belief_entropy_mean_bits": 1.148096804595386,
+        "belief_entropy_spread_bits": 1.2184604098324219,
+        "bayes_next_obs_accuracy": 0.4127265625,
+        "chance_next_obs_accuracy": 0.2732578125,
+        "bayes_minus_chance": 0.13946875000000003,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298425,
+        "min_stationary_obs": 0.23291687448046555,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.3082516356294782
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "9731e60e200a9324f847af660f6348d638bdf5469f40be8cdf8e5e372b09668f",
+      "diagnostics": {
+        "mean_dwell_time": 3.4006913558398666,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4530107885558891,
+        "belief_entropy_p25_bits": 0.6810725882923738,
+        "belief_entropy_p50_bits": 1.1763210312381955,
+        "belief_entropy_p75_bits": 1.4074685282450303,
+        "belief_entropy_p95_bits": 1.6264966631509812,
+        "belief_entropy_mean_bits": 1.0712810135698656,
+        "belief_entropy_spread_bits": 1.173485874595092,
+        "bayes_next_obs_accuracy": 0.4212265625,
+        "chance_next_obs_accuracy": 0.2743984375,
+        "bayes_minus_chance": 0.14682812500000003,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298425,
+        "min_stationary_obs": 0.23479634247714054,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2958698630454029
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "c86108087e028097867b95e719b78d9394b7bd5160f593d2fa6f40880e53be49",
+      "diagnostics": {
+        "mean_dwell_time": 3.400691355839867,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.4487444246875819,
+        "belief_entropy_p25_bits": 0.7537875256862593,
+        "belief_entropy_p50_bits": 1.319762965103942,
+        "belief_entropy_p75_bits": 1.5788203029786891,
+        "belief_entropy_p95_bits": 1.7204962480860035,
+        "belief_entropy_mean_bits": 1.1659730392157013,
+        "belief_entropy_spread_bits": 1.2717518233984215,
+        "bayes_next_obs_accuracy": 0.409515625,
+        "chance_next_obs_accuracy": 0.270890625,
+        "bayes_minus_chance": 0.138625,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2183956774729843,
+        "min_stationary_obs": 0.2310374064837906,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3095256604228624
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "b9be27c652d9d5d5de40d8d413e4901b3d633c1ee72e3fb763f9320e7177e1e2",
+      "diagnostics": {
+        "mean_dwell_time": 3.400691355839867,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.42531950451258116,
+        "belief_entropy_p25_bits": 0.7505774915188603,
+        "belief_entropy_p50_bits": 1.2925328637615259,
+        "belief_entropy_p75_bits": 1.561286350653116,
+        "belief_entropy_p95_bits": 1.7148365360178988,
+        "belief_entropy_mean_bits": 1.1450799133896348,
+        "belief_entropy_spread_bits": 1.2895170315053175,
+        "bayes_next_obs_accuracy": 0.4100078125,
+        "chance_next_obs_accuracy": 0.272765625,
+        "bayes_minus_chance": 0.1372421875,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2183956774729843,
+        "min_stationary_obs": 0.23291687448046555,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.3055054315627916
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "66eb0cc9095048183be31c20aece524d717215cae311445d28173c4b15e55834",
+      "diagnostics": {
+        "mean_dwell_time": 3.400691355839867,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4046245443395257,
+        "belief_entropy_p25_bits": 0.6789822278587193,
+        "belief_entropy_p50_bits": 1.1784330826053442,
+        "belief_entropy_p75_bits": 1.4233007896936387,
+        "belief_entropy_p95_bits": 1.681326116259892,
+        "belief_entropy_mean_bits": 1.0707870167396853,
+        "belief_entropy_spread_bits": 1.2767015719203663,
+        "bayes_next_obs_accuracy": 0.418640625,
+        "chance_next_obs_accuracy": 0.273546875,
+        "bayes_minus_chance": 0.14509374999999997,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2183956774729843,
+        "min_stationary_obs": 0.2347963424771405,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2907652536517593
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.25
+      },
+      "hmm_sha256": "47249c8b6f35353d08b47580fdbe8dc92b0c6edf817b6c1f941ff08e6840aec8",
+      "diagnostics": {
+        "mean_dwell_time": 3.4006913558398666,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.484078090335537,
+        "belief_entropy_p25_bits": 0.8171651885783501,
+        "belief_entropy_p50_bits": 1.173724228826702,
+        "belief_entropy_p75_bits": 1.43578399347301,
+        "belief_entropy_p95_bits": 1.7684675881485,
+        "belief_entropy_mean_bits": 1.1428124579982972,
+        "belief_entropy_spread_bits": 1.2843894978129629,
+        "bayes_next_obs_accuracy": 0.393640625,
+        "chance_next_obs_accuracy": 0.2719375,
+        "bayes_minus_chance": 0.12170312500000002,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298425,
+        "min_stationary_obs": 0.2358686616791355,
+        "min_emission_probability": 0.04999999999999999,
+        "mean_conditional_nll_nats": 1.3018528163724667
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "ae30ca978a52d482a2961096042a25da3e9ce88d04341b8748381b4067225904",
+      "diagnostics": {
+        "mean_dwell_time": 3.4006913558398666,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.4444036833450853,
+        "belief_entropy_p25_bits": 0.7072604782331466,
+        "belief_entropy_p50_bits": 1.2670940595034486,
+        "belief_entropy_p75_bits": 1.5652252418223056,
+        "belief_entropy_p95_bits": 1.7466775652748272,
+        "belief_entropy_mean_bits": 1.1532146742974658,
+        "belief_entropy_spread_bits": 1.302273881929742,
+        "bayes_next_obs_accuracy": 0.4113359375,
+        "chance_next_obs_accuracy": 0.26975,
+        "bayes_minus_chance": 0.14158593750000004,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298425,
+        "min_stationary_obs": 0.23103740648379054,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3059283099680257
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "d1028b8eea34cf47f4fd84acf62d5b354306610785f32adeae19dcb721f78a08",
+      "diagnostics": {
+        "mean_dwell_time": 3.4006913558398666,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.41213104181042604,
+        "belief_entropy_p25_bits": 0.7244027540192115,
+        "belief_entropy_p50_bits": 1.2435750319475076,
+        "belief_entropy_p75_bits": 1.529665278738345,
+        "belief_entropy_p95_bits": 1.755182985351126,
+        "belief_entropy_mean_bits": 1.1329633657138425,
+        "belief_entropy_spread_bits": 1.3430519435407,
+        "bayes_next_obs_accuracy": 0.4126171875,
+        "chance_next_obs_accuracy": 0.2715703125,
+        "bayes_minus_chance": 0.14104687499999996,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298425,
+        "min_stationary_obs": 0.2329168744804655,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.2991563792666465
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "e8aa936c0939791e2b6b277742f1ec350b1b0b3589af6dbc4cf825c49a341b77",
+      "diagnostics": {
+        "mean_dwell_time": 3.4006913558398666,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3816785837132113,
+        "belief_entropy_p25_bits": 0.6800437485489199,
+        "belief_entropy_p50_bits": 1.1659090043573146,
+        "belief_entropy_p75_bits": 1.4062515274705136,
+        "belief_entropy_p95_bits": 1.7340228005466944,
+        "belief_entropy_mean_bits": 1.0608452801609933,
+        "belief_entropy_spread_bits": 1.3523442168334832,
+        "bayes_next_obs_accuracy": 0.4196640625,
+        "chance_next_obs_accuracy": 0.272828125,
+        "bayes_minus_chance": 0.1468359375,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298425,
+        "min_stationary_obs": 0.23479634247714046,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.28299250207447
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "ce4b8db71857fc1fdc523973377267386587b638a549c12fb5c0ce2801de208d",
+      "diagnostics": {
+        "mean_dwell_time": 3.400691355839866,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.49658286213572816,
+        "belief_entropy_p25_bits": 0.9128434630151412,
+        "belief_entropy_p50_bits": 1.2601702621482802,
+        "belief_entropy_p75_bits": 1.55435792801725,
+        "belief_entropy_p95_bits": 1.8352937498100246,
+        "belief_entropy_mean_bits": 1.222859155961598,
+        "belief_entropy_spread_bits": 1.3387108876742964,
+        "bayes_next_obs_accuracy": 0.38571875,
+        "chance_next_obs_accuracy": 0.270265625,
+        "bayes_minus_chance": 0.11545312499999999,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298458,
+        "min_stationary_obs": 0.23627680798005002,
+        "min_emission_probability": 0.07499999999999998,
+        "mean_conditional_nll_nats": 1.314233115578977
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.25
+      },
+      "hmm_sha256": "520f8ac60c6ae31837b4191dad0a5b1f9e7361decd1e515911b58423ad4258dc",
+      "diagnostics": {
+        "mean_dwell_time": 3.400691355839866,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4478034692177077,
+        "belief_entropy_p25_bits": 0.8109769559093418,
+        "belief_entropy_p50_bits": 1.1513142870458424,
+        "belief_entropy_p75_bits": 1.4097954447639116,
+        "belief_entropy_p95_bits": 1.8033326109216967,
+        "belief_entropy_mean_bits": 1.1249521174092496,
+        "belief_entropy_spread_bits": 1.355529141703989,
+        "bayes_next_obs_accuracy": 0.396921875,
+        "chance_next_obs_accuracy": 0.2716328125,
+        "bayes_minus_chance": 0.1252890625,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298458,
+        "min_stationary_obs": 0.23586866167913553,
+        "min_emission_probability": 0.04999999999999999,
+        "mean_conditional_nll_nats": 1.2930500255007422
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "83d24e7ffe9273b19db2bab4a8c3e373f2b2afd5fd17605b92ed719f1bc53389",
+      "diagnostics": {
+        "mean_dwell_time": 3.400691355839866,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.4339296730118544,
+        "belief_entropy_p25_bits": 0.6750443487263258,
+        "belief_entropy_p50_bits": 1.2040354997115652,
+        "belief_entropy_p75_bits": 1.5345154275774349,
+        "belief_entropy_p95_bits": 1.7624809927525835,
+        "belief_entropy_mean_bits": 1.134061349800943,
+        "belief_entropy_spread_bits": 1.328551319740729,
+        "bayes_next_obs_accuracy": 0.413421875,
+        "chance_next_obs_accuracy": 0.2696640625,
+        "bayes_minus_chance": 0.14375781249999997,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298458,
+        "min_stationary_obs": 0.23103740648379076,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3010891823616202
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "072ce08eb98392757ceec762b40bed5a46e0bb8b231b27a3f751c633571c598d",
+      "diagnostics": {
+        "mean_dwell_time": 3.400691355839866,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.39591240240332365,
+        "belief_entropy_p25_bits": 0.7041932757518601,
+        "belief_entropy_p50_bits": 1.1840948363554562,
+        "belief_entropy_p75_bits": 1.4863852861570808,
+        "belief_entropy_p95_bits": 1.7829878635938097,
+        "belief_entropy_mean_bits": 1.1155818936646669,
+        "belief_entropy_spread_bits": 1.387075461190486,
+        "bayes_next_obs_accuracy": 0.4143359375,
+        "chance_next_obs_accuracy": 0.2715859375,
+        "bayes_minus_chance": 0.14275,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298458,
+        "min_stationary_obs": 0.23291687448046572,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.292289276877885
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "be5a3a4a38c980854500f807580cbf346e551eb14b239bd9a4e829c608a474d0",
+      "diagnostics": {
+        "mean_dwell_time": 3.400691355839866,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.35386962369324165,
+        "belief_entropy_p25_bits": 0.6547358783459932,
+        "belief_entropy_p50_bits": 1.1265915441830736,
+        "belief_entropy_p75_bits": 1.372295604721071,
+        "belief_entropy_p95_bits": 1.7783279149693312,
+        "belief_entropy_mean_bits": 1.044127704104736,
+        "belief_entropy_spread_bits": 1.4244582912760895,
+        "bayes_next_obs_accuracy": 0.4221171875,
+        "chance_next_obs_accuracy": 0.272765625,
+        "bayes_minus_chance": 0.14935156249999998,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298458,
+        "min_stationary_obs": 0.23479634247714065,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2734310435917313
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "933764dc30f1eb23a964630dcffcb1012609f5f32eaa2fad1287539d85e0433c",
+      "diagnostics": {
+        "mean_dwell_time": 3.6225871986616873,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.3792405395631543,
+        "belief_entropy_p25_bits": 0.7308150651436047,
+        "belief_entropy_p50_bits": 1.2935706457162355,
+        "belief_entropy_p75_bits": 1.5685754631366786,
+        "belief_entropy_p95_bits": 1.696046907805045,
+        "belief_entropy_mean_bits": 1.15256556448743,
+        "belief_entropy_spread_bits": 1.316806368241891,
+        "bayes_next_obs_accuracy": 0.4166875,
+        "chance_next_obs_accuracy": 0.2967265625,
+        "bayes_minus_chance": 0.11996093749999998,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.1893658954584403,
+        "min_stationary_obs": 0.21361953727506416,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3028983246845045
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "0563fda9aaf1cf14f27d89a2adc84d5456588994e5033093b25f33086e8cc720",
+      "diagnostics": {
+        "mean_dwell_time": 3.6225871986616873,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3893311236224387,
+        "belief_entropy_p25_bits": 0.7010194031504746,
+        "belief_entropy_p50_bits": 1.2479529378682424,
+        "belief_entropy_p75_bits": 1.5455741616924148,
+        "belief_entropy_p95_bits": 1.677390492232611,
+        "belief_entropy_mean_bits": 1.1276322653276096,
+        "belief_entropy_spread_bits": 1.2880593686101722,
+        "bayes_next_obs_accuracy": 0.4186015625,
+        "chance_next_obs_accuracy": 0.2997421875,
+        "bayes_minus_chance": 0.11885937500000004,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.1893658954584403,
+        "min_stationary_obs": 0.21788517566409588,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.2997995930795683
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "03d764ff8f391fb7192df36c7c88c73b8e8d00f683007c8dfc0bbd9065e3c3f1",
+      "diagnostics": {
+        "mean_dwell_time": 3.6225871986616873,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3837239001124024,
+        "belief_entropy_p25_bits": 0.6625697727228674,
+        "belief_entropy_p50_bits": 1.1128892806373747,
+        "belief_entropy_p75_bits": 1.4203457995433306,
+        "belief_entropy_p95_bits": 1.640016093959007,
+        "belief_entropy_mean_bits": 1.0516635450207739,
+        "belief_entropy_spread_bits": 1.2562921938466045,
+        "bayes_next_obs_accuracy": 0.42825,
+        "chance_next_obs_accuracy": 0.302375,
+        "bayes_minus_chance": 0.12587500000000001,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.1893658954584403,
+        "min_stationary_obs": 0.22158868894601558,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2865706106862353
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.25
+      },
+      "hmm_sha256": "57d79c6ab96f2daf4695e05e87194ea9abb881fad567f3c230f3511280332c47",
+      "diagnostics": {
+        "mean_dwell_time": 3.622587198661687,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.45511318892891667,
+        "belief_entropy_p25_bits": 0.8007944137459782,
+        "belief_entropy_p50_bits": 1.1673675115007194,
+        "belief_entropy_p75_bits": 1.4508232663797795,
+        "belief_entropy_p95_bits": 1.7304538716703963,
+        "belief_entropy_mean_bits": 1.1320706031490704,
+        "belief_entropy_spread_bits": 1.2753406827414797,
+        "bayes_next_obs_accuracy": 0.4001015625,
+        "chance_next_obs_accuracy": 0.29934375,
+        "bayes_minus_chance": 0.10075781249999999,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.1893658954584405,
+        "min_stationary_obs": 0.2200428449014567,
+        "min_emission_probability": 0.04999999999999999,
+        "mean_conditional_nll_nats": 1.2998998447165455
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "e802524450769526034042da84a805131d49eba5205125d3cb0b65f36bb8034f",
+      "diagnostics": {
+        "mean_dwell_time": 3.622587198661687,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.37926766915851395,
+        "belief_entropy_p25_bits": 0.7186355100404072,
+        "belief_entropy_p50_bits": 1.2856786554320008,
+        "belief_entropy_p75_bits": 1.5566393759453427,
+        "belief_entropy_p95_bits": 1.7256647740471636,
+        "belief_entropy_mean_bits": 1.1446194932098566,
+        "belief_entropy_spread_bits": 1.3463971048886496,
+        "bayes_next_obs_accuracy": 0.417921875,
+        "chance_next_obs_accuracy": 0.2967890625,
+        "bayes_minus_chance": 0.12113281250000002,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.1893658954584405,
+        "min_stationary_obs": 0.21361953727506428,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3008827736831154
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "a1378b6ad86cc10163b8a365ac2e87787c9542f3026da55dcca884cbf36bddfc",
+      "diagnostics": {
+        "mean_dwell_time": 3.622587198661687,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3699137498474351,
+        "belief_entropy_p25_bits": 0.7274711707721683,
+        "belief_entropy_p50_bits": 1.2588125700783537,
+        "belief_entropy_p75_bits": 1.5506019286159303,
+        "belief_entropy_p95_bits": 1.7134458567251734,
+        "belief_entropy_mean_bits": 1.123166356587496,
+        "belief_entropy_spread_bits": 1.3435321068777384,
+        "bayes_next_obs_accuracy": 0.419046875,
+        "chance_next_obs_accuracy": 0.300078125,
+        "bayes_minus_chance": 0.11896875000000001,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.1893658954584405,
+        "min_stationary_obs": 0.21788517566409601,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.2957157270552784
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "a06223a6884c19b14603c8227860e743a5c323f81b39aeb557fa7c113c794dcf",
+      "diagnostics": {
+        "mean_dwell_time": 3.622587198661687,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3548806019837748,
+        "belief_entropy_p25_bits": 0.6450954589019986,
+        "belief_entropy_p50_bits": 1.12327869243647,
+        "belief_entropy_p75_bits": 1.42034579954333,
+        "belief_entropy_p95_bits": 1.6868225066083182,
+        "belief_entropy_mean_bits": 1.0509074653151813,
+        "belief_entropy_spread_bits": 1.3319419046245433,
+        "bayes_next_obs_accuracy": 0.4255390625,
+        "chance_next_obs_accuracy": 0.302421875,
+        "bayes_minus_chance": 0.1231171875,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.1893658954584405,
+        "min_stationary_obs": 0.2215886889460154,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2809361527664134
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.25
+      },
+      "hmm_sha256": "bc520c63b8ba59f6ea481bb56a3f635bf5c95c26ae450b0c5d777bfc33600ea0",
+      "diagnostics": {
+        "mean_dwell_time": 3.6225871986616878,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.42278250661997624,
+        "belief_entropy_p25_bits": 0.7910692774490063,
+        "belief_entropy_p50_bits": 1.1608360523165564,
+        "belief_entropy_p75_bits": 1.4289597576306639,
+        "belief_entropy_p95_bits": 1.766359956407301,
+        "belief_entropy_mean_bits": 1.1221758300275706,
+        "belief_entropy_spread_bits": 1.3435774497873247,
+        "bayes_next_obs_accuracy": 0.4006484375,
+        "chance_next_obs_accuracy": 0.2986328125,
+        "bayes_minus_chance": 0.102015625,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.18936589545844032,
+        "min_stationary_obs": 0.2200428449014567,
+        "min_emission_probability": 0.04999999999999999,
+        "mean_conditional_nll_nats": 1.2937790415202157
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "30927a54b24ac2b66bd7a573e6307ccd2baae7a04dc5c72092a87e7f0cc1c12e",
+      "diagnostics": {
+        "mean_dwell_time": 3.6225871986616878,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.3777179683300967,
+        "belief_entropy_p25_bits": 0.6864263462094852,
+        "belief_entropy_p50_bits": 1.2478918269155903,
+        "belief_entropy_p75_bits": 1.543157658912523,
+        "belief_entropy_p95_bits": 1.747397472122057,
+        "belief_entropy_mean_bits": 1.1328509437807948,
+        "belief_entropy_spread_bits": 1.3696795037919605,
+        "bayes_next_obs_accuracy": 0.419015625,
+        "chance_next_obs_accuracy": 0.2956015625,
+        "bayes_minus_chance": 0.12341406249999998,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.18936589545844032,
+        "min_stationary_obs": 0.21361953727506422,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.2978444095240413
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "639750d8283caa243ad9ac1463ce500f457db4f8f46b5d464c3496e6e4b13267",
+      "diagnostics": {
+        "mean_dwell_time": 3.6225871986616878,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3648813932580021,
+        "belief_entropy_p25_bits": 0.7196297814569572,
+        "belief_entropy_p50_bits": 1.2248332121058945,
+        "belief_entropy_p75_bits": 1.5242485627091127,
+        "belief_entropy_p95_bits": 1.7492731887140442,
+        "belief_entropy_mean_bits": 1.1134460573912166,
+        "belief_entropy_spread_bits": 1.384391795456042,
+        "bayes_next_obs_accuracy": 0.4191328125,
+        "chance_next_obs_accuracy": 0.2990078125,
+        "bayes_minus_chance": 0.12012499999999998,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.18936589545844032,
+        "min_stationary_obs": 0.21788517566409593,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.291204278616553
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.6,
+          0.25,
+          0.15
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "1e24fbcef59d9cedc04cc908ce455307a7e428889884bbc234f2a8099ab88465",
+      "diagnostics": {
+        "mean_dwell_time": 3.6225871986616878,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.33568864475198684,
+        "belief_entropy_p25_bits": 0.6370638524862932,
+        "belief_entropy_p50_bits": 1.111255308694817,
+        "belief_entropy_p75_bits": 1.3976122856523634,
+        "belief_entropy_p95_bits": 1.7292686210669317,
+        "belief_entropy_mean_bits": 1.0419700093955422,
+        "belief_entropy_spread_bits": 1.3935799763149448,
+        "bayes_next_obs_accuracy": 0.4261484375,
+        "chance_next_obs_accuracy": 0.3016640625,
+        "bayes_minus_chance": 0.12448437499999998,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.18936589545844032,
+        "min_stationary_obs": 0.22158868894601544,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2740398536407533
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.25
+      },
+      "hmm_sha256": "b36f80389030f56565bff01a2ca2e84956e156add3f1e60e6562c5acdca268fa",
+      "diagnostics": {
+        "mean_dwell_time": 3.6225871986616873,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.39103263297754937,
+        "belief_entropy_p25_bits": 0.7728489875063737,
+        "belief_entropy_p50_bits": 1.1369641613683037,
+        "belief_entropy_p75_bits": 1.3991848412007948,
+        "belief_entropy_p95_bits": 1.788804135716273,
+        "belief_entropy_mean_bits": 1.1048194730810712,
+        "belief_entropy_spread_bits": 1.3977715027387236,
+        "bayes_next_obs_accuracy": 0.40278125,
+        "chance_next_obs_accuracy": 0.2986640625,
+        "bayes_minus_chance": 0.10411718749999999,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.18936589545844038,
+        "min_stationary_obs": 0.2200428449014568,
+        "min_emission_probability": 0.04999999999999999,
+        "mean_conditional_nll_nats": 1.2851670005305222
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "5abdb95533bbc683fac7574f4caaea54f33704151fa8d0854982aa202971ffa5",
+      "diagnostics": {
+        "mean_dwell_time": 3.6225871986616873,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.3722401827190408,
+        "belief_entropy_p25_bits": 0.6585331611302596,
+        "belief_entropy_p50_bits": 1.1860567997198477,
+        "belief_entropy_p75_bits": 1.520276540486941,
+        "belief_entropy_p95_bits": 1.7672523197703254,
+        "belief_entropy_mean_bits": 1.113564244250902,
+        "belief_entropy_spread_bits": 1.3950121370512845,
+        "bayes_next_obs_accuracy": 0.4213515625,
+        "chance_next_obs_accuracy": 0.295359375,
+        "bayes_minus_chance": 0.12599218750000002,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.18936589545844038,
+        "min_stationary_obs": 0.21361953727506422,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.2927810223515783
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "35758bc9f51a17decaba05aacb424cf170a211fb2da15385786fdd4e4bba6cc5",
+      "diagnostics": {
+        "mean_dwell_time": 3.6225871986616873,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3532549628329572,
+        "belief_entropy_p25_bits": 0.6902629167065766,
+        "belief_entropy_p50_bits": 1.1719644669106875,
+        "belief_entropy_p75_bits": 1.49456817881098,
+        "belief_entropy_p95_bits": 1.7782119920532553,
+        "belief_entropy_mean_bits": 1.0955159814351114,
+        "belief_entropy_spread_bits": 1.4249570292202982,
+        "bayes_next_obs_accuracy": 0.4206640625,
+        "chance_next_obs_accuracy": 0.298875,
+        "bayes_minus_chance": 0.12178906249999999,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.18936589545844038,
+        "min_stationary_obs": 0.21788517566409593,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.2838455072165234
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.08,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "50529c637dd1d993bef18e443c8ab09976ed101d6466e8065dd2558bce24699f",
+      "diagnostics": {
+        "mean_dwell_time": 3.6225871986616873,
+        "min_self_transition": 0.62,
+        "max_self_transition": 0.7799999999999999,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.30857503956316634,
+        "belief_entropy_p25_bits": 0.6235279286365658,
+        "belief_entropy_p50_bits": 1.0968076716337192,
+        "belief_entropy_p75_bits": 1.3592866605384482,
+        "belief_entropy_p95_bits": 1.763312764789575,
+        "belief_entropy_mean_bits": 1.025322008055474,
+        "belief_entropy_spread_bits": 1.4547377252264087,
+        "bayes_next_obs_accuracy": 0.4278515625,
+        "chance_next_obs_accuracy": 0.3015234375,
+        "bayes_minus_chance": 0.126328125,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.18936589545844038,
+        "min_stationary_obs": 0.22158868894601552,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.264347592698738
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "55b1266fe4310ff0db13c00c885faccb529304d7193cfcd2007d8bca3c01e89d",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 4.0,
+        "belief_entropy_p05_bits": 0.4990192324880079,
+        "belief_entropy_p25_bits": 0.9424562625788958,
+        "belief_entropy_p50_bits": 1.4670819644082171,
+        "belief_entropy_p75_bits": 1.6405785827533186,
+        "belief_entropy_p95_bits": 1.7851162026780574,
+        "belief_entropy_mean_bits": 1.2709171526030627,
+        "belief_entropy_spread_bits": 1.2860969701900495,
+        "bayes_next_obs_accuracy": 0.3886015625,
+        "chance_next_obs_accuracy": 0.2506953125,
+        "bayes_minus_chance": 0.13790625,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.25,
+        "min_stationary_obs": 0.25,
+        "min_emission_probability": 0.1,
+        "mean_conditional_nll_nats": 1.3243287539861743
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "c76e019447d5695ea722037e031c1a72245ba4ae3f18bc1d4fffb4343254b136",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.3935737271211303,
+        "belief_entropy_p25_bits": 0.649436543771891,
+        "belief_entropy_p50_bits": 1.2692577075844313,
+        "belief_entropy_p75_bits": 1.5561633123235135,
+        "belief_entropy_p95_bits": 1.726682005752351,
+        "belief_entropy_mean_bits": 1.1282841848213365,
+        "belief_entropy_spread_bits": 1.3331082786312207,
+        "bayes_next_obs_accuracy": 0.42396875,
+        "chance_next_obs_accuracy": 0.2514375,
+        "bayes_minus_chance": 0.17253125000000002,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.25,
+        "min_stationary_obs": 0.25000000000000006,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.2936461815938423
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "bb298097cfec777fae097edc1c35dc19d2de7b93889f98fbdbc628f149da6993",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.39511631317494905,
+        "belief_entropy_p25_bits": 0.6534786607464064,
+        "belief_entropy_p50_bits": 1.1981582860677074,
+        "belief_entropy_p75_bits": 1.5567971831608456,
+        "belief_entropy_p95_bits": 1.7129600122010178,
+        "belief_entropy_mean_bits": 1.103349695970659,
+        "belief_entropy_spread_bits": 1.3178436990260687,
+        "bayes_next_obs_accuracy": 0.427765625,
+        "chance_next_obs_accuracy": 0.25090625,
+        "bayes_minus_chance": 0.17685937499999999,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.25,
+        "min_stationary_obs": 0.25,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.2903796415036897
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "95b24523f33e175d003d138923ca97b5fdb7b86e38b9d52f68e56189bebf762d",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3976976467131942,
+        "belief_entropy_p25_bits": 0.6008870328466801,
+        "belief_entropy_p50_bits": 1.129690244990247,
+        "belief_entropy_p75_bits": 1.4102519645405136,
+        "belief_entropy_p95_bits": 1.6600269333372653,
+        "belief_entropy_mean_bits": 1.024754452427377,
+        "belief_entropy_spread_bits": 1.262329286624071,
+        "bayes_next_obs_accuracy": 0.4401875,
+        "chance_next_obs_accuracy": 0.2504765625,
+        "bayes_minus_chance": 0.1897109375,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.25,
+        "min_stationary_obs": 0.25,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2736668757557004
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "f23b09a78adc01fbde38b62ecd2aa13c7437153c3875f973401996bd3302a1e4",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4793851430628053,
+        "belief_entropy_p25_bits": 0.9257353088323037,
+        "belief_entropy_p50_bits": 1.3853040529334302,
+        "belief_entropy_p75_bits": 1.6573179717365008,
+        "belief_entropy_p95_bits": 1.7976374435688633,
+        "belief_entropy_mean_bits": 1.2568856055219808,
+        "belief_entropy_spread_bits": 1.318252300506058,
+        "bayes_next_obs_accuracy": 0.3905625,
+        "chance_next_obs_accuracy": 0.2507421875,
+        "bayes_minus_chance": 0.1398203125,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999994,
+        "min_stationary_obs": 0.24999999999999997,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3201524820464718
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "7c6e44ad253604d1c1a4a5afd81d7a05c138a1c94111d9d360449fdf868e7301",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4644527126195547,
+        "belief_entropy_p25_bits": 0.8154821673074895,
+        "belief_entropy_p50_bits": 1.2667175437708216,
+        "belief_entropy_p75_bits": 1.605171840330573,
+        "belief_entropy_p95_bits": 1.7711925079656403,
+        "belief_entropy_mean_bits": 1.2054291955054652,
+        "belief_entropy_spread_bits": 1.3067397953460858,
+        "bayes_next_obs_accuracy": 0.3954140625,
+        "chance_next_obs_accuracy": 0.25121875,
+        "bayes_minus_chance": 0.1441953125,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999994,
+        "min_stationary_obs": 0.24999999999999997,
+        "min_emission_probability": 0.07499999999999998,
+        "mean_conditional_nll_nats": 1.3101133659314488
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.25
+      },
+      "hmm_sha256": "83078edeeaf49be599a3af1aa0e29ccb9e8e4aa05eec903a9ddc6863dfa70ca6",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.44711786796337777,
+        "belief_entropy_p25_bits": 0.7626592824761198,
+        "belief_entropy_p50_bits": 1.1260497673824033,
+        "belief_entropy_p75_bits": 1.3992933491138408,
+        "belief_entropy_p95_bits": 1.7521370007430366,
+        "belief_entropy_mean_bits": 1.107773330551919,
+        "belief_entropy_spread_bits": 1.3050191327796588,
+        "bayes_next_obs_accuracy": 0.4070625,
+        "chance_next_obs_accuracy": 0.2514609375,
+        "bayes_minus_chance": 0.1556015625,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999994,
+        "min_stationary_obs": 0.24999999999999997,
+        "min_emission_probability": 0.04999999999999999,
+        "mean_conditional_nll_nats": 1.2898574389197541
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "84e0d217a6e149c6e46e2e13f1c1855aa86e0a91f283f05f4b82aca76af55efb",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.3897014941104574,
+        "belief_entropy_p25_bits": 0.6482765047966873,
+        "belief_entropy_p50_bits": 1.2585512113217359,
+        "belief_entropy_p75_bits": 1.5635055731234873,
+        "belief_entropy_p95_bits": 1.7360156301344696,
+        "belief_entropy_mean_bits": 1.1194543111886242,
+        "belief_entropy_spread_bits": 1.346314136024012,
+        "bayes_next_obs_accuracy": 0.4272109375,
+        "chance_next_obs_accuracy": 0.2515703125,
+        "bayes_minus_chance": 0.175640625,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999994,
+        "min_stationary_obs": 0.24999999999999997,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.2908862007186424
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "65af3bd2c140cc033263acb7da57ccda30630b039f660c62a25dcb8c6287fd1b",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3664454475278751,
+        "belief_entropy_p25_bits": 0.6404514304029761,
+        "belief_entropy_p50_bits": 1.171229360338382,
+        "belief_entropy_p75_bits": 1.547634683010269,
+        "belief_entropy_p95_bits": 1.7159351494512312,
+        "belief_entropy_mean_bits": 1.098553160205284,
+        "belief_entropy_spread_bits": 1.349489701923356,
+        "bayes_next_obs_accuracy": 0.4268984375,
+        "chance_next_obs_accuracy": 0.2510859375,
+        "bayes_minus_chance": 0.17581249999999998,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999994,
+        "min_stationary_obs": 0.24999999999999997,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.2854490686923763
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "9b74f6095fef6378cdf6da521ae4691c4666b27833d6a536e87f0a94ad0ad7d9",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.3452190564472925,
+        "belief_entropy_p25_bits": 0.6250661139824957,
+        "belief_entropy_p50_bits": 1.0954408289232056,
+        "belief_entropy_p75_bits": 1.3680554426604052,
+        "belief_entropy_p95_bits": 1.6970601176901414,
+        "belief_entropy_mean_bits": 1.0246983632945068,
+        "belief_entropy_spread_bits": 1.3518410612428489,
+        "bayes_next_obs_accuracy": 0.434640625,
+        "chance_next_obs_accuracy": 0.25121875,
+        "bayes_minus_chance": 0.183421875,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.24999999999999994,
+        "min_stationary_obs": 0.24999999999999994,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2675930100517523
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "a74812e95adef542535888c05d45aca86cfab7b0ede61f1732fe037e3d1d9e75",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 4.0,
+        "belief_entropy_p05_bits": 0.4919396238525479,
+        "belief_entropy_p25_bits": 0.8251970084384072,
+        "belief_entropy_p50_bits": 1.3406364735368828,
+        "belief_entropy_p75_bits": 1.5923533591379826,
+        "belief_entropy_p95_bits": 1.8137791297717305,
+        "belief_entropy_mean_bits": 1.2313970700883419,
+        "belief_entropy_spread_bits": 1.3218395059191825,
+        "bayes_next_obs_accuracy": 0.3968828125,
+        "chance_next_obs_accuracy": 0.2509296875,
+        "bayes_minus_chance": 0.14595312500000002,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2499999999999998,
+        "min_stationary_obs": 0.2499999999999999,
+        "min_emission_probability": 0.1,
+        "mean_conditional_nll_nats": 1.317908125347826
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "174c4519717a57776f36acd5c872027bb0523dd6afde4097c4f97844cd9a1680",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.45227116964991676,
+        "belief_entropy_p25_bits": 0.8733212479866844,
+        "belief_entropy_p50_bits": 1.303664594876163,
+        "belief_entropy_p75_bits": 1.6317990505327613,
+        "belief_entropy_p95_bits": 1.8317172040536542,
+        "belief_entropy_mean_bits": 1.230605100438246,
+        "belief_entropy_spread_bits": 1.3794460344037374,
+        "bayes_next_obs_accuracy": 0.3945703125,
+        "chance_next_obs_accuracy": 0.25034375,
+        "bayes_minus_chance": 0.14422656250000004,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2499999999999998,
+        "min_stationary_obs": 0.2499999999999999,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.313551853131996
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "17fd89be2c49564423fe3d33215808f3f0f58cadb726048fa21c265575f681ad",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.414902604042636,
+        "belief_entropy_p25_bits": 0.8195224320586648,
+        "belief_entropy_p50_bits": 1.2275072230434252,
+        "belief_entropy_p75_bits": 1.5374495282428864,
+        "belief_entropy_p95_bits": 1.826100565620226,
+        "belief_entropy_mean_bits": 1.1804711911122698,
+        "belief_entropy_spread_bits": 1.41119796157759,
+        "bayes_next_obs_accuracy": 0.397578125,
+        "chance_next_obs_accuracy": 0.250546875,
+        "bayes_minus_chance": 0.14703125,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2499999999999998,
+        "min_stationary_obs": 0.2499999999999999,
+        "min_emission_probability": 0.07499999999999998,
+        "mean_conditional_nll_nats": 1.3005109166253193
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.25
+      },
+      "hmm_sha256": "ba50f3f2f5dc00d9dde7011c6a377434affc14a9561d4e1bd0cace5c231d3197",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.37681438367007053,
+        "belief_entropy_p25_bits": 0.7331455633476425,
+        "belief_entropy_p50_bits": 1.1110907884834864,
+        "belief_entropy_p75_bits": 1.3426080735371964,
+        "belief_entropy_p95_bits": 1.8063205655078118,
+        "belief_entropy_mean_bits": 1.0824729280392291,
+        "belief_entropy_spread_bits": 1.4295061818377413,
+        "bayes_next_obs_accuracy": 0.4090390625,
+        "chance_next_obs_accuracy": 0.2505859375,
+        "bayes_minus_chance": 0.15845312499999997,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2499999999999998,
+        "min_stationary_obs": 0.2499999999999999,
+        "min_emission_probability": 0.04999999999999999,
+        "mean_conditional_nll_nats": 1.2760345289433777
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "hmm_sha256": "c5de19696294fab96144b61050201159c0632208594c3e529e4bdf94e80f88b5",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.37701692834207157,
+        "belief_entropy_p25_bits": 0.6444448737189203,
+        "belief_entropy_p50_bits": 1.192675354670807,
+        "belief_entropy_p75_bits": 1.538449635159866,
+        "belief_entropy_p95_bits": 1.7623005064242616,
+        "belief_entropy_mean_bits": 1.0892154018670184,
+        "belief_entropy_spread_bits": 1.38528357808219,
+        "bayes_next_obs_accuracy": 0.4323046875,
+        "chance_next_obs_accuracy": 0.25090625,
+        "bayes_minus_chance": 0.1813984375,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2499999999999998,
+        "min_stationary_obs": 0.24999999999999992,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.283760702099446
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.15
+      },
+      "hmm_sha256": "150235fc055240b39e5087fb871bd1536000fb017e040e1efb87313132eaad35",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.33328119052581445,
+        "belief_entropy_p25_bits": 0.6255314121236696,
+        "belief_entropy_p50_bits": 1.177373118126582,
+        "belief_entropy_p75_bits": 1.4975123327373692,
+        "belief_entropy_p95_bits": 1.7718175347848875,
+        "belief_entropy_mean_bits": 1.0716680185469158,
+        "belief_entropy_spread_bits": 1.438536344259073,
+        "bayes_next_obs_accuracy": 0.4301015625,
+        "chance_next_obs_accuracy": 0.2505390625,
+        "bayes_minus_chance": 0.17956249999999996,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2499999999999998,
+        "min_stationary_obs": 0.2499999999999999,
+        "min_emission_probability": 0.07500000000000002,
+        "mean_conditional_nll_nats": 1.2739916814780812
+      }
+    },
+    {
+      "candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "hmm_sha256": "67ed68b52b3f8a8089708ed24b1d7795637a5a04b171016929c076055d61cc64",
+      "diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.29214927375236804,
+        "belief_entropy_p25_bits": 0.5589276945224797,
+        "belief_entropy_p50_bits": 1.0830408315877103,
+        "belief_entropy_p75_bits": 1.306683116542437,
+        "belief_entropy_p95_bits": 1.770285742678096,
+        "belief_entropy_mean_bits": 1.0012936364797265,
+        "belief_entropy_spread_bits": 1.478136468925728,
+        "bayes_next_obs_accuracy": 0.4378671875,
+        "chance_next_obs_accuracy": 0.2506015625,
+        "bayes_minus_chance": 0.187265625,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.2499999999999998,
+        "min_stationary_obs": 0.2499999999999999,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.2522764063015983
+      }
+    }
+  ],
+  "regimes": {
+    "persistent_moderate": {
+      "order": 0,
+      "role": "equal_weight_calibration_regime",
+      "purpose": "existing frozen persistent/moderate-aliasing grid winner",
+      "hmm": {
+        "n_states": 4,
+        "n_obs": 4,
+        "transition": [
+          [
+            0.6599999999999999,
+            0.23800000000000004,
+            0.06800000000000002,
+            0.03400000000000001
+          ],
+          [
+            0.03133333333333334,
+            0.6866666666666666,
+            0.21933333333333332,
+            0.06266666666666668
+          ],
+          [
+            0.05733333333333335,
+            0.028666666666666674,
+            0.7133333333333333,
+            0.20066666666666672
+          ],
+          [
+            0.182,
+            0.052000000000000005,
+            0.026000000000000002,
+            0.74
+          ]
+        ],
+        "emission": [
+          [
+            0.7000000000000001,
+            0.1,
+            0.10000000000000002,
+            0.10000000000000002
+          ],
+          [
+            0.10000000000000003,
+            0.7000000000000001,
+            0.10000000000000002,
+            0.10000000000000003
+          ],
+          [
+            0.10000000000000002,
+            0.10000000000000002,
+            0.7,
+            0.1
+          ],
+          [
+            0.1,
+            0.10000000000000002,
+            0.10000000000000002,
+            0.7
+          ]
+        ],
+        "initial": [
+          0.21839567747298458,
+          0.2369825436408977,
+          0.2590274314214465,
+          0.2855943474646712
+        ]
+      },
+      "hmm_sha256": "83d24e7ffe9273b19db2bab4a8c3e373f2b2afd5fd17605b92ed719f1bc53389",
+      "selected_candidate": {
+        "self_transition": 0.7,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.1
+      },
+      "selection_diagnostics": {
+        "mean_dwell_time": 3.400691355839866,
+        "min_self_transition": 0.6599999999999999,
+        "max_self_transition": 0.74,
+        "min_states_per_obs_at_0.10": 3.0,
+        "belief_entropy_p05_bits": 0.4339296730118544,
+        "belief_entropy_p25_bits": 0.6750443487263258,
+        "belief_entropy_p50_bits": 1.2040354997115652,
+        "belief_entropy_p75_bits": 1.5345154275774349,
+        "belief_entropy_p95_bits": 1.7624809927525835,
+        "belief_entropy_mean_bits": 1.134061349800943,
+        "belief_entropy_spread_bits": 1.328551319740729,
+        "bayes_next_obs_accuracy": 0.413421875,
+        "chance_next_obs_accuracy": 0.2696640625,
+        "bayes_minus_chance": 0.14375781249999997,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.21839567747298458,
+        "min_stationary_obs": 0.23103740648379076,
+        "min_emission_probability": 0.09999999999999999,
+        "mean_conditional_nll_nats": 1.3010891823616202
+      },
+      "linear_certificate": {
+        "schema": "nextlat_forgetting/hmm_linear_certificate/1",
+        "hmm_sha256": "83d24e7ffe9273b19db2bab4a8c3e373f2b2afd5fd17605b92ed719f1bc53389",
+        "rank_tolerance": 1e-12,
+        "belief_to_one_step_future_map": "row belief b maps to b @ transition @ emission",
+        "predictive_injectivity_certified": true,
+        "matrices": {
+          "transition": {
+            "shape": [
+              4,
+              4
+            ],
+            "rank": 4,
+            "full_rank": true,
+            "singular_values_descending": [
+              1.0013968651896055,
+              0.6868197532954379,
+              0.6513006708267786,
+              0.511043967391986
+            ],
+            "sigma_min": 0.511043967391986,
+            "sigma_max": 1.0013968651896055,
+            "condition_number": 1.959512153719455
+          },
+          "emission": {
+            "shape": [
+              4,
+              4
+            ],
+            "rank": 4,
+            "full_rank": true,
+            "singular_values_descending": [
+              1.0,
+              0.6000000000000001,
+              0.5999999999999999,
+              0.5999999999999999
+            ],
+            "sigma_min": 0.5999999999999999,
+            "sigma_max": 1.0,
+            "condition_number": 1.666666666666667
+          },
+          "transition_times_emission": {
+            "shape": [
+              4,
+              4
+            ],
+            "rank": 4,
+            "full_rank": true,
+            "singular_values_descending": [
+              1.0003606113078927,
+              0.41215023215743435,
+              0.3910095270723044,
+              0.30672069251186057
+            ],
+            "sigma_min": 0.30672069251186057,
+            "sigma_max": 1.0003606113078927,
+            "condition_number": 3.2614708943029975
+          }
+        }
+      },
+      "data_seed": 1105963,
+      "common_random_numbers_across_regimes": false,
+      "artifact_layout": {
+        "data_dir": "data/hmm_family/persistent_moderate",
+        "manifest_dir": "manifests/hmm_family/persistent_moderate"
+      }
+    },
+    "fast_mixing_moderate": {
+      "order": 1,
+      "role": "equal_weight_calibration_regime",
+      "purpose": "lowest-mean-dwell passing grid candidate after the TE gate",
+      "hmm": {
+        "n_states": 4,
+        "n_obs": 4,
+        "transition": [
+          [
+            0.5599999999999999,
+            0.308,
+            0.08800000000000002,
+            0.04400000000000001
+          ],
+          [
+            0.04133333333333333,
+            0.5866666666666667,
+            0.28933333333333333,
+            0.08266666666666667
+          ],
+          [
+            0.07733333333333335,
+            0.038666666666666676,
+            0.6133333333333333,
+            0.27066666666666667
+          ],
+          [
+            0.252,
+            0.072,
+            0.036,
+            0.64
+          ]
+        ],
+        "emission": [
+          [
+            0.7,
+            0.2,
+            0.05000000000000002,
+            0.05000000000000002
+          ],
+          [
+            0.05000000000000002,
+            0.7,
+            0.2,
+            0.05000000000000002
+          ],
+          [
+            0.05000000000000002,
+            0.05000000000000002,
+            0.7,
+            0.2
+          ],
+          [
+            0.2,
+            0.05000000000000002,
+            0.05000000000000002,
+            0.7
+          ]
+        ],
+        "initial": [
+          0.2260055865921787,
+          0.2405865921787712,
+          0.25717877094972036,
+          0.2762290502793298
+        ]
+      },
+      "hmm_sha256": "0d38d9992641e39185dac520f1b21e4aa8a1f79d5f75e683a742937781946cd1",
+      "selected_candidate": {
+        "self_transition": 0.6,
+        "persistence_tilt": 0.04,
+        "offdiag_skew": [
+          0.7,
+          0.2,
+          0.1
+        ],
+        "emission_self": 0.7,
+        "emission_neighbour": 0.2
+      },
+      "selection_diagnostics": {
+        "mean_dwell_time": 2.528133824872597,
+        "min_self_transition": 0.5599999999999999,
+        "max_self_transition": 0.64,
+        "min_states_per_obs_at_0.10": 2.0,
+        "belief_entropy_p05_bits": 0.4975594269318774,
+        "belief_entropy_p25_bits": 0.7708264865846317,
+        "belief_entropy_p50_bits": 1.1392297393196489,
+        "belief_entropy_p75_bits": 1.3639929277065233,
+        "belief_entropy_p95_bits": 1.7531799492229556,
+        "belief_entropy_mean_bits": 1.1131376158194901,
+        "belief_entropy_spread_bits": 1.2556205222910783,
+        "bayes_next_obs_accuracy": 0.3853359375,
+        "chance_next_obs_accuracy": 0.2663984375,
+        "bayes_minus_chance": 0.11893750000000003,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.22600558659217868,
+        "min_stationary_obs": 0.23833798882681562,
+        "min_emission_probability": 0.05000000000000002,
+        "mean_conditional_nll_nats": 1.3089864254189716
+      },
+      "linear_certificate": {
+        "schema": "nextlat_forgetting/hmm_linear_certificate/1",
+        "hmm_sha256": "0d38d9992641e39185dac520f1b21e4aa8a1f79d5f75e683a742937781946cd1",
+        "rank_tolerance": 1e-12,
+        "belief_to_one_step_future_map": "row belief b maps to b @ transition @ emission",
+        "predictive_injectivity_certified": true,
+        "matrices": {
+          "transition": {
+            "shape": [
+              4,
+              4
+            ],
+            "rank": 4,
+            "full_rank": true,
+            "singular_values_descending": [
+              1.0011695438604025,
+              0.5932821926740325,
+              0.557820239908694,
+              0.35438385940386735
+            ],
+            "sigma_min": 0.35438385940386735,
+            "sigma_max": 1.0011695438604025,
+            "condition_number": 2.825099160962173
+          },
+          "emission": {
+            "shape": [
+              4,
+              4
+            ],
+            "rank": 4,
+            "full_rank": true,
+            "singular_values_descending": [
+              1.0,
+              0.6670832032063169,
+              0.6670832032063166,
+              0.49999999999999994
+            ],
+            "sigma_min": 0.49999999999999994,
+            "sigma_max": 1.0,
+            "condition_number": 2.0000000000000004
+          },
+          "transition_times_emission": {
+            "shape": [
+              4,
+              4
+            ],
+            "rank": 4,
+            "full_rank": true,
+            "singular_values_descending": [
+              1.0003876657537514,
+              0.39512044078770825,
+              0.3710655312227743,
+              0.17812247445712653
+            ],
+            "sigma_min": 0.17812247445712653,
+            "sigma_max": 1.0003876657537514,
+            "condition_number": 5.616291087369445
+          }
+        }
+      },
+      "data_seed": 1205963,
+      "common_random_numbers_across_regimes": false,
+      "artifact_layout": {
+        "data_dir": "data/hmm_family/fast_mixing_moderate",
+        "manifest_dir": "manifests/hmm_family/fast_mixing_moderate"
+      }
+    },
+    "persistent_high_aliasing": {
+      "order": 2,
+      "role": "equal_weight_calibration_regime",
+      "purpose": ">=median-dwell passing candidate with highest posterior entropy after the TE gate",
+      "hmm": {
+        "n_states": 4,
+        "n_obs": 4,
+        "transition": [
+          [
+            0.75,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333
+          ],
+          [
+            0.08333333333333333,
+            0.75,
+            0.08333333333333333,
+            0.08333333333333333
+          ],
+          [
+            0.08333333333333333,
+            0.08333333333333333,
+            0.75,
+            0.08333333333333333
+          ],
+          [
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.75
+          ]
+        ],
+        "emission": [
+          [
+            0.65,
+            0.1,
+            0.12499999999999999,
+            0.12499999999999999
+          ],
+          [
+            0.12499999999999999,
+            0.65,
+            0.1,
+            0.12499999999999999
+          ],
+          [
+            0.12499999999999999,
+            0.12499999999999999,
+            0.65,
+            0.1
+          ],
+          [
+            0.1,
+            0.12499999999999999,
+            0.12499999999999999,
+            0.65
+          ]
+        ],
+        "initial": [
+          0.25,
+          0.25000000000000006,
+          0.25000000000000006,
+          0.25000000000000006
+        ]
+      },
+      "hmm_sha256": "55b1266fe4310ff0db13c00c885faccb529304d7193cfcd2007d8bca3c01e89d",
+      "selected_candidate": {
+        "self_transition": 0.75,
+        "persistence_tilt": 0.0,
+        "offdiag_skew": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "emission_self": 0.65,
+        "emission_neighbour": 0.1
+      },
+      "selection_diagnostics": {
+        "mean_dwell_time": 4.0,
+        "min_self_transition": 0.75,
+        "max_self_transition": 0.75,
+        "min_states_per_obs_at_0.10": 4.0,
+        "belief_entropy_p05_bits": 0.4990192324880079,
+        "belief_entropy_p25_bits": 0.9424562625788958,
+        "belief_entropy_p50_bits": 1.4670819644082171,
+        "belief_entropy_p75_bits": 1.6405785827533186,
+        "belief_entropy_p95_bits": 1.7851162026780574,
+        "belief_entropy_mean_bits": 1.2709171526030627,
+        "belief_entropy_spread_bits": 1.2860969701900495,
+        "bayes_next_obs_accuracy": 0.3886015625,
+        "chance_next_obs_accuracy": 0.2506953125,
+        "bayes_minus_chance": 0.13790625,
+        "uniform_chance_accuracy": 0.25,
+        "min_stationary_state": 0.25,
+        "min_stationary_obs": 0.25,
+        "min_emission_probability": 0.1,
+        "mean_conditional_nll_nats": 1.3243287539861743
+      },
+      "linear_certificate": {
+        "schema": "nextlat_forgetting/hmm_linear_certificate/1",
+        "hmm_sha256": "55b1266fe4310ff0db13c00c885faccb529304d7193cfcd2007d8bca3c01e89d",
+        "rank_tolerance": 1e-12,
+        "belief_to_one_step_future_map": "row belief b maps to b @ transition @ emission",
+        "predictive_injectivity_certified": true,
+        "matrices": {
+          "transition": {
+            "shape": [
+              4,
+              4
+            ],
+            "rank": 4,
+            "full_rank": true,
+            "singular_values_descending": [
+              0.9999999999989998,
+              0.666666666667,
+              0.6666666666669999,
+              0.6666666666669999
+            ],
+            "sigma_min": 0.6666666666669999,
+            "sigma_max": 0.9999999999989998,
+            "condition_number": 1.4999999999977498
+          },
+          "emission": {
+            "shape": [
+              4,
+              4
+            ],
+            "rank": 4,
+            "full_rank": true,
+            "singular_values_descending": [
+              0.9999999999999999,
+              0.5500000000000002,
+              0.5255949010407159,
+              0.5255949010407159
+            ],
+            "sigma_min": 0.5255949010407159,
+            "sigma_max": 0.9999999999999999,
+            "condition_number": 1.9026059766179761
+          },
+          "transition_times_emission": {
+            "shape": [
+              4,
+              4
+            ],
+            "rank": 4,
+            "full_rank": true,
+            "singular_values_descending": [
+              0.9999999999990001,
+              0.36666666666685005,
+              0.3503966006939859,
+              0.3503966006939859
+            ],
+            "sigma_min": 0.3503966006939859,
+            "sigma_max": 0.9999999999990001,
+            "condition_number": 2.853908964922683
+          }
+        }
+      },
+      "data_seed": 1305963,
+      "common_random_numbers_across_regimes": false,
+      "artifact_layout": {
+        "data_dir": "data/hmm_family/persistent_high_aliasing",
+        "manifest_dir": "manifests/hmm_family/persistent_high_aliasing"
+      }
+    }
+  },
+  "materialization": {
+    "splits": {
+      "train": [
+        100000,
+        32
+      ],
+      "val": [
+        10000,
+        32
+      ],
+      "lengen": [
+        10000,
+        64
+      ]
+    },
+    "pair_bank_calibration_rows": [
+      0,
+      5000
+    ],
+    "pair_bank_test_rows": [
+      5000,
+      10000
+    ],
+    "thresholds_fit_separately_per_regime": true,
+    "target_pairs_per_type_and_length_band": 2000,
+    "pair_selection_distance": "exact_future_distribution_js_bits",
+    "belief_js_secondary_only": true,
+    "selection_may_use_only_exact_HMM_future_distributions_and_surface_edit_distance": true,
+    "model_outcomes_permitted": false
+  },
+  "payload_sha256": "e24a883dbc547c99f543433d290b0e228e2191427af041a851a1279d77a68b27"
+}

@@ -1,0 +1,69 @@
+{
+  "ranks": {
+    "0": {
+      "aggregate_gradient_equal": false,
+      "gradient_parameter_mismatches": [
+        {
+          "name": "_forward_module.module.token_embedding.weight",
+          "repeat_a": {
+            "dtype": "torch.float32",
+            "l2_fp64": 2.518116334771746,
+            "max_abs_fp64": 0.35675638914108276,
+            "sha256": "d3344eec58e8dddc6ff4cdc9ce437e1ad5dd45e8ce7962a87d250f6ce0372170",
+            "shape": [
+              106,
+              384
+            ],
+            "sum_fp64": 1.2434636377684
+          },
+          "repeat_b": {
+            "dtype": "torch.float32",
+            "l2_fp64": 2.518116340390231,
+            "max_abs_fp64": 0.35675638914108276,
+            "sha256": "c3748bf3a96d62ebc5d4aa8ce955a8ab1ea3539c697121fcdbb88e624a89a3ba",
+            "shape": [
+              106,
+              384
+            ],
+            "sum_fp64": 1.2434640942410624
+          }
+        }
+      ],
+      "initial_parameters_equal": true,
+      "local_batch_equal": true
+    },
+    "1": {
+      "aggregate_gradient_equal": false,
+      "gradient_parameter_mismatches": [
+        {
+          "name": "_forward_module.module.token_embedding.weight",
+          "repeat_a": {
+            "dtype": "torch.float32",
+            "l2_fp64": 2.518116334771746,
+            "max_abs_fp64": 0.35675638914108276,
+            "sha256": "d3344eec58e8dddc6ff4cdc9ce437e1ad5dd45e8ce7962a87d250f6ce0372170",
+            "shape": [
+              106,
+              384
+            ],
+            "sum_fp64": 1.2434636377684
+          },
+          "repeat_b": {
+            "dtype": "torch.float32",
+            "l2_fp64": 2.518116340390231,
+            "max_abs_fp64": 0.35675638914108276,
+            "sha256": "c3748bf3a96d62ebc5d4aa8ce955a8ab1ea3539c697121fcdbb88e624a89a3ba",
+            "shape": [
+              106,
+              384
+            ],
+            "sum_fp64": 1.2434640942410624
+          }
+        }
+      ],
+      "initial_parameters_equal": true,
+      "local_batch_equal": true
+    }
+  },
+  "schema": "nextlat_forgetting/d47_first_gradient_repeat/1"
+}

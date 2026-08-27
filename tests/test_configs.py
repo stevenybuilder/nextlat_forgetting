@@ -91,9 +91,9 @@ def audit() -> dict:
 
 LURESTAR = ["gpt_lurestar.yaml", "nextlat_lurestar.yaml", "bst_lurestar.yaml"]
 BST_CFGS = ["bst_lurestar.yaml"]
-ADAPT = ["adapt_near.yaml", "adapt_far.yaml"]
+ADAPT = ["adapt_near.yaml", "adapt_mid.yaml", "adapt_far.yaml"]
 HMM = ["gpt_hmm.yaml", "nextlat_hmm.yaml"]
-NEXTLAT_CFGS = ["nextlat_lurestar.yaml", "adapt_near.yaml", "adapt_far.yaml",
+NEXTLAT_CFGS = ["nextlat_lurestar.yaml", "adapt_near.yaml", "adapt_mid.yaml", "adapt_far.yaml",
                 "nextlat_hmm.yaml"]
 
 
@@ -187,6 +187,7 @@ def test_every_key_the_trainer_reads_resolves(merged, name: str) -> None:
     ("nextlat_lurestar.yaml", OFFICIAL_NEXTLAT_5_5),
     ("bst_lurestar.yaml", OFFICIAL_BST_5_5),
     ("adapt_near.yaml", OFFICIAL_NEXTLAT_5_5),
+    ("adapt_mid.yaml", OFFICIAL_NEXTLAT_5_5),
     ("adapt_far.yaml", OFFICIAL_NEXTLAT_5_5),
 ])
 def test_no_upstream_key_dropped(name: str, source: str) -> None:
@@ -548,6 +549,7 @@ def test_bst_single_gap_mode_is_inert_at_minimum_gap_two(merged) -> None:
     ("nextlat_lurestar.yaml", OFFICIAL_NEXTLAT_5_5),
     ("bst_lurestar.yaml", OFFICIAL_BST_5_5),
     ("adapt_near.yaml", OFFICIAL_NEXTLAT_5_5),
+    ("adapt_mid.yaml", OFFICIAL_NEXTLAT_5_5),
     ("adapt_far.yaml", OFFICIAL_NEXTLAT_5_5),
     ("gpt_hmm.yaml", OFFICIAL_GPT_5_5),
     ("nextlat_hmm.yaml", OFFICIAL_NEXTLAT_5_5),
@@ -703,12 +705,13 @@ def test_stargraph_runtime_shapes(merged) -> None:
     assert swiglu_hidden_dim(cfg["model"]["n_embd"]) == 1024
 
 
-def test_optimizer_update_count_is_the_upstream_convention(merged) -> None:
-    """core_train.py:564-571 uses an inclusive bound, so train_batches: 20000 runs 20,001
-    updates. Recorded, not corrected: the step count is on the frozen surface."""
-    assert optimizer_updates(20000) == 20001
+def test_optimizer_update_count_is_exact_under_the_guarded_runtime_patch(merged) -> None:
+    """The pinned runtime patch changes the stop predicate to ``>=`` before launch."""
+    assert optimizer_updates(20000) == 20000
+    assert optimizer_updates(3000) == 3000
+    assert optimizer_updates(20500, start_step=20000) == 500
     for name in LURESTAR:
-        assert optimizer_updates(merged[name]["trainer"]["train_batches"]) == 20001
+        assert optimizer_updates(merged[name]["trainer"]["train_batches"]) == 20000
 
 
 def test_effective_batch_divides_on_one_device(merged) -> None:
@@ -744,9 +747,8 @@ def test_adaptation_is_next_token_only(merged) -> None:
         assert m["proj_factor"] == 0.5
 
 
-def test_near_and_far_differ_only_in_the_item_bank_and_output_root() -> None:
-    near = load_yaml(os.path.join(CONFIGS_DIR, "adapt_near.yaml"))
-    far = load_yaml(os.path.join(CONFIGS_DIR, "adapt_far.yaml"))
+def test_near_mid_and_far_differ_only_in_item_bank_and_output_root() -> None:
+    configs = [load_yaml(os.path.join(CONFIGS_DIR, name)) for name in ADAPT]
     allowed = {
         "trainer.out_dir",
         "trainer.experiment_name",
@@ -755,20 +757,22 @@ def test_near_and_far_differ_only_in_the_item_bank_and_output_root() -> None:
         "provenance.note",
     }
     from config_lib import diff_keys
-    differing = {k for k, _, _ in diff_keys(near, far)}
-    assert differing == allowed, f"unexpected near/far differences: {differing ^ allowed}"
+    for left, right in zip(configs, configs[1:]):
+        differing = {k for k, _, _ in diff_keys(left, right)}
+        assert differing == allowed, f"unexpected adaptation differences: {differing ^ allowed}"
 
 
-def test_near_and_far_output_roots_cannot_collide() -> None:
-    near = load_yaml(os.path.join(CONFIGS_DIR, "adapt_near.yaml"))["trainer"]["out_dir"]
-    far = load_yaml(os.path.join(CONFIGS_DIR, "adapt_far.yaml"))["trainer"]["out_dir"]
-    assert near != far
+def test_near_mid_and_far_output_roots_cannot_collide() -> None:
+    roots = [load_yaml(os.path.join(CONFIGS_DIR, name))["trainer"]["out_dir"] for name in ADAPT]
+    assert len(set(roots)) == 3
     # spec section 9: the resume pointer lives at the output root, so neither may be a
     # prefix of the other either
-    assert not near.startswith(far.rstrip("/") + "/")
-    assert not far.startswith(near.rstrip("/") + "/")
+    for left in roots:
+        for right in roots:
+            if left != right:
+                assert not left.startswith(right.rstrip("/") + "/")
     base = load_yaml(os.path.join(CONFIGS_DIR, "nextlat_lurestar.yaml"))["trainer"]["out_dir"]
-    assert base not in (near, far)
+    assert base not in roots
 
 
 def test_adaptation_matches_spec_item_and_update_budget(merged) -> None:
@@ -800,7 +804,11 @@ def test_adaptation_starts_from_the_frozen_parent_not_from_scratch(merged) -> No
 # than going through the generator, so they hold even if the generator is wrong.
 # --------------------------------------------------------------------------------------
 
-BANK_TAG = {"adapt_near.yaml": ("bnear", "bfar"), "adapt_far.yaml": ("bfar", "bnear")}
+BANK_TAG = {
+    "adapt_near.yaml": ("bnear", {"bmid", "bfar"}),
+    "adapt_mid.yaml": ("bmid", {"bnear", "bfar"}),
+    "adapt_far.yaml": ("bfar", {"bnear", "bmid"}),
+}
 RESERVED_POOLS = ("elure", "e_lure", "apair", "a_pair", "stimuli")
 
 
@@ -808,18 +816,16 @@ RESERVED_POOLS = ("elure", "e_lure", "apair", "a_pair", "stimuli")
 def test_adaptation_banks_are_bound_to_their_branch(merged, name: str) -> None:
     """Spec section 6's primary outcome is `erosion_near - erosion_far`; a swapped bank
     negates it exactly and nothing else in this repository can see the swap."""
-    own, other = BANK_TAG[name]
+    own, others = BANK_TAG[name]
     for key in ["stargraph_train_data_path", "stargraph_test_data_path"]:
         base = os.path.basename(merged[name]["data"][key])
         assert own in base, f"{name}: {key} = {base!r} does not carry its branch tag {own!r}"
-        assert other not in base, (
-            f"{name}: {key} = {base!r} carries the OPPOSITE branch tag {other!r}"
+        assert not any(other in base for other in others), (
+            f"{name}: {key} = {base!r} carries another branch tag"
         )
-    # and the two branches must not read the same file
-    near = load_yaml(os.path.join(CONFIGS_DIR, "adapt_near.yaml"))["data"]
-    far = load_yaml(os.path.join(CONFIGS_DIR, "adapt_far.yaml"))["data"]
-    assert near["stargraph_train_data_path"] != far["stargraph_train_data_path"]
-    assert near["stargraph_test_data_path"] != far["stargraph_test_data_path"]
+    data = [load_yaml(os.path.join(CONFIGS_DIR, branch))["data"] for branch in ADAPT]
+    assert len({item["stargraph_train_data_path"] for item in data}) == 3
+    assert len({item["stargraph_test_data_path"] for item in data}) == 3
 
 
 @pytest.mark.parametrize("name", LURESTAR + ADAPT)
@@ -897,8 +903,10 @@ def test_negative_control_a_base_run_pointed_off_the_frozen_corpus_is_refused() 
 HMM_SPEC = {
     "data.dataset": "hmm_belief",
     "data.effective_batch_size": 256,
-    "data.hmm.train_sequences": 100000,
-    "data.hmm.sequence_length": 32,
+    "data.test_generalization": True,
+    "data.hmm_n_obs": 4,
+    "data.hmm_train_sequences": 100000,
+    "data.hmm_sequence_length": 32,
     "model.n_layer": 4,
     "model.n_head": 4,
     "model.n_embd": 128,
@@ -933,7 +941,24 @@ def test_hmm_gpt_and_nextlat_are_architecture_matched(merged) -> None:
                 "optimizer.learning_rate", "optimizer.weight_decay", "optimizer.grad_clip",
                 "lr_scheduler.schedule"]:
         assert get_dotted(gpt, key) == get_dotted(nl, key), key
-    assert get_dotted(gpt, "data.hmm") == get_dotted(nl, "data.hmm")
+    for key in [key for key in gpt["data"] if key.startswith("hmm_")]:
+        assert gpt["data"][key] == nl["data"][key], key
+
+
+def test_hmm_paths_are_the_generated_raw_arrays_and_match_the_datamodule_schema(merged) -> None:
+    expected = {
+        "hmm_train_data_path": "/content/lurestar/data/hmm/hmm4x4_train_len32_100000.npy",
+        "hmm_val_data_path": "/content/lurestar/data/hmm/hmm4x4_val_len32_10000.npy",
+        "hmm_generalization_data_path": [
+            "/content/lurestar/data/hmm/hmm4x4_lengen_len64_10000.npy"
+        ],
+    }
+    for name in HMM:
+        data = merged[name]["data"]
+        assert "hmm" not in data, "the datamodule intentionally rejects the stale nested schema"
+        for key, value in expected.items():
+            assert data[key] == value
+        assert data["hmm_n_obs"] == 4
 
 
 def test_hmm_optimizer_is_the_path_star_optimizer(merged) -> None:
@@ -1044,7 +1069,7 @@ def test_audit_records_the_source_hashes(audit) -> None:
         src = os.path.join(UPSTREAM, entry["source_config"])
         assert entry["source_config_sha256"] == sha256_file(src)
         assert entry["defaults_sha256"] == sha256_file(DEFAULTS_YAML)
-    assert audit["preregistered_seeds"] == [1234, 1235, 1236]
+    assert audit["preregistered_seeds"] == [1234, 1235, 1236, 1237, 1238]
 
 
 def test_every_frozen_exemption_names_a_spec_section(audit) -> None:

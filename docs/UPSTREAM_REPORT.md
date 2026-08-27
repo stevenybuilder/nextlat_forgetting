@@ -1,6 +1,6 @@
 # Upstream Repository Cartography — NextLat @ `3770be6`
 
-**Pinned checkout:** `/Users/stevenyang/Documents/nextlat_forgetting/upstream/NextLat`
+**Pinned checkout:** `<repo-root>/upstream/NextLat`
 **Commit:** `3770be6009cea2b3c455a9ce7f2ca88b504bb955` — "Initial public release", Mon May 25 21:50:04 2026 -0700
 **Spec answered:** `nextlat_v4_predictive_geometry_spec.md` §16 (questions 1–5) plus the four extra reporting items.
 
@@ -448,10 +448,13 @@ Caveats, all verifiable in the tree:
 - With `trainer.compile: true` (`core_train.py:209-211`) the trunk is an `OptimizedModule` and
   submodule paths gain a `_orig_mod` level. **Run with `compile: false`** — which the spec and
   `README.md:117-122` already require — and this problem disappears.
-- For the §7 causal-patching stretch goal, the penultimate-layer state is the **output of
+- For the original Lure-Star §7 causal-patching stretch goal, the penultimate-layer state is the **output of
   `transformer.blocks[10]`** (`n_layer=12`, so index 10 feeds the last block); hook
   `model.model.transformer.blocks[10]`. Do **not** patch `transformer.norm`'s output and call it a
   circuit — `lm_head` consumes that directly, exactly as the spec warns.
+- The later CFS-2 protocol requires the same hook pattern at blocks 3, 7, and 10, always at index
+  63, through `src/cfs2/patching.py`; its lifecycle requirement is defined in
+  `DECISION_CFS2_STIMULUS_REPAIR.md`, not by the older word “stretch.”
 
 ---
 

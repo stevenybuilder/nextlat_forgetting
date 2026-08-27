@@ -39,8 +39,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config_lib import load_yaml_as_trainer_sees_it  # noqa: E402
 
 # Confirmatory matrix sizes, from spec section 11's budget formulas.
-N_SEEDS = 3
-N_MODELS = 2
+N_SEEDS = 5
+LURESTAR_MODELS = ("gpt", "nextlat", "bst")
+HMM_MODELS = ("gpt", "nextlat")
 BASE_STEPS = 20000
 ADAPT_STEPS = 500
 ADAPT_BRANCHES_PER_MODEL = N_SEEDS * 2  # near + far, per seed
@@ -81,6 +82,77 @@ def read_metrics(path: str) -> List[Dict[str, Any]]:
         return list(csv.DictReader(fh))
 
 
+def attach_optimizer_steps(rows: List[Dict[str, Any]], resume_step: int) -> List[Dict[str, Any]]:
+    """Recover optimizer order when the pinned logger writes a constant ``step=0``.
+
+    ``steps_per_sec`` is emitted exactly once per optimizer update.  The pinned upstream
+    currently leaves Lightning's global-step field at zero under manual optimization, so row
+    order is the only valid update index in that case.  Nonconstant step logs retain their
+    original identities.
+    """
+    training = [row for row in rows if _f(row.get("steps_per_sec")) is not None]
+    observed = {_f(row.get("step")) for row in training}
+    constant_zero = bool(training) and observed == {0.0}
+    ordinal = 0
+    normalized = []
+    for original in rows:
+        row = dict(original)
+        if _f(row.get("steps_per_sec")) is not None:
+            row["_optimizer_step"] = (resume_step + ordinal if constant_zero
+                                      else _f(row.get("step")))
+            ordinal += 1
+        else:
+            row["_optimizer_step"] = _f(row.get("step"))
+        normalized.append(row)
+    return normalized
+
+
+def read_checkpoint_consistent_metrics(exp_dir: str, ledger_path: Optional[str]) -> tuple:
+    """Splice logger versions at durable resume boundaries.
+
+    Rows produced after a lost attempt's last durable checkpoint describe an abandoned
+    trajectory. They are excluded; the replacement version supplies rows from that checkpoint
+    onward. A clean one-attempt profile is unchanged.
+    """
+    versions = sorted(
+        glob.glob(os.path.join(exp_dir, "version_*")),
+        key=lambda path: int(re.search(r"version_([0-9]+)$", path).group(1)),
+    )
+    if not versions:
+        return [], [], None
+    if not ledger_path or not os.path.isfile(ledger_path):
+        metrics = os.path.join(versions[-1], "metrics.csv")
+        return (attach_optimizer_steps(read_metrics(metrics), 0)
+                if os.path.isfile(metrics) else [],
+                [0], metrics)
+    with open(ledger_path) as stream:
+        ledger = json.load(stream)
+    attempts = ledger.get("attempts") or []
+    if not attempts:
+        raise ValueError("profile attempt ledger contains no attempts")
+    rows: List[Dict[str, Any]] = []
+    used = []
+    metrics_paths = []
+    for index, attempt in enumerate(attempts):
+        version_index = int(attempt["version_start_index"])
+        if version_index >= len(versions):
+            raise ValueError("profile attempt ledger names a missing logger version")
+        lower = int(attempt["resume_step"])
+        upper = (int(attempts[index + 1]["resume_step"])
+                 if index + 1 < len(attempts) else None)
+        metrics = os.path.join(versions[version_index], "metrics.csv")
+        if not os.path.isfile(metrics):
+            continue
+        for row in attach_optimizer_steps(read_metrics(metrics), lower):
+            step = _f(row.get("_optimizer_step"))
+            if step is None or step < lower or (upper is not None and step >= upper):
+                continue
+            rows.append(row)
+        used.append(lower)
+        metrics_paths.append(metrics)
+    return rows, used, metrics_paths
+
+
 def percentile(values: List[float], q: float) -> float:
     """Linear-interpolation percentile; no numpy dependency in the profiling path."""
     if not values:
@@ -104,7 +176,7 @@ def step_seconds(rows: List[Dict[str, Any]], warmup: int) -> List[float]:
     """
     out = []
     for row in rows:
-        step = _f(row.get("step"))
+        step = _f(row.get("_optimizer_step", row.get("step")))
         rate = _f(row.get("steps_per_sec"))
         if step is None or rate is None or rate <= 0:
             continue
@@ -158,8 +230,7 @@ def read_gpu_samples(path: str) -> Dict[str, Any]:
 
 
 def read_probes(pattern: str) -> Optional[Dict[str, Any]]:
-    """profile_entry.py writes one probe per training process; keep the one that saw the
-    most VRAM (with --devices 1 there is exactly one)."""
+    """Use the terminal successful attempt's internally consistent process probe."""
     files = sorted(glob.glob(pattern))
     probes = []
     for path in files:
@@ -170,7 +241,12 @@ def read_probes(pattern: str) -> Optional[Dict[str, Any]]:
             continue
     if not probes:
         return None
-    return max(probes, key=lambda p: (p.get("peak_allocated_bytes") or 0))
+    successful = [probe for probe in probes
+                  if probe.get("exit") in {"ok", "SystemExit(0)", "SystemExit(None)"}]
+    candidates = successful or probes
+    return max(candidates, key=lambda p: (
+        p.get("process_start_unix") or 0, p.get("peak_allocated_bytes") or 0
+    ))
 
 
 GB = 1024 ** 3
@@ -182,9 +258,8 @@ def summarize_job(job: Dict[str, Any]) -> Dict[str, Any]:
     exp = job["experiment_name"]
     exp_dir = os.path.join(out_dir, exp)
 
-    versions = sorted(glob.glob(os.path.join(exp_dir, "version_*")))
-    metrics_path = os.path.join(versions[-1], "metrics.csv") if versions else None
-    rows = read_metrics(metrics_path) if metrics_path and os.path.isfile(metrics_path) else []
+    rows, resume_steps, metrics_path = read_checkpoint_consistent_metrics(
+        exp_dir, job.get("attempt_ledger"))
 
     resolved_path = os.path.join(exp_dir, "materialized_config.yaml")
     resolved = load_yaml_as_trainer_sees_it(resolved_path) if os.path.isfile(resolved_path) else {}
@@ -221,6 +296,14 @@ def summarize_job(job: Dict[str, Any]) -> Dict[str, Any]:
             "compile": resolved.get("trainer", {}).get("compile"),
         },
         "wall_seconds": job.get("wall_seconds"),
+        "resumed": len(resume_steps) > 1 or any(step > 0 for step in resume_steps),
+        "resume_steps": resume_steps,
+        "measurement_scopes": {
+            "step_timing": "checkpoint-consistent trajectory",
+            "warmup": "global optimizer step >= %d" % warmup,
+            "process_probe": "terminal successful attempt",
+            "gpu_samples": "all preserved attempts",
+        },
         "gpu": gpu,
     }
 
@@ -241,7 +324,10 @@ def summarize_job(job: Dict[str, Any]) -> Dict[str, Any]:
         )
 
     if job.get("wall_seconds") and job["steps"]:
-        rec["wall_seconds_per_step"] = job["wall_seconds"] / job["steps"]
+        terminal_start = resume_steps[-1] if resume_steps else 0
+        terminal_updates = max(int(job["steps"]) - int(terminal_start), 1)
+        rec["wall_seconds_per_step"] = job["wall_seconds"] / terminal_updates
+        rec["wall_seconds_scope"] = "terminal attempt from optimizer step %d" % terminal_start
 
     if probe:
         rec["peak_allocated_gb"] = (
@@ -303,27 +389,27 @@ def gpu_hours(seconds_per_step: float, steps: int, runs: int, ckpt_seconds: floa
 def project(records: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     """Spec section 11's budget arithmetic, per model rather than pooled.
 
-        base GPU-hours       = s/step * 20,000 * 6 base runs / 3600
-        adaptation GPU-hours = s/step * adaptation_steps * 12 branches / 3600
-        HMM GPU-hours        = s/step * 3,000 * 6 runs / 3600
+        base GPU-hours       = s/step * 20,000 * 15 base runs / 3600
+        adaptation GPU-hours = s/step * adaptation_steps * 30 branches / 3600
+        HMM GPU-hours        = s/step * 3,000 * 10 runs / 3600
         + checkpoint overhead + a 20% interruption margin
 
-    The spec writes one `s/step`; GPT and NextLat differ, so each term is split into its two
-    model halves (3 seeds each) and summed. That is the same arithmetic with a tighter
-    estimate, and the pooled form is reported alongside it.
+    Each term is split by model and summed. Lure-Star includes the measured BST arm; HMM
+    includes only GPT and NextLat. A missing arm leaves the gate explicitly incomplete.
     """
     out: Dict[str, Any] = {"assumptions": {
-        "seeds": N_SEEDS, "models": N_MODELS,
+        "seeds": N_SEEDS, "lurestar_models": list(LURESTAR_MODELS),
+        "hmm_models": list(HMM_MODELS),
         "base_steps": BASE_STEPS, "adaptation_steps": ADAPT_STEPS,
-        "adaptation_branches_total": N_MODELS * ADAPT_BRANCHES_PER_MODEL,
+        "adaptation_branches_total": len(LURESTAR_MODELS) * ADAPT_BRANCHES_PER_MODEL,
         "hmm_steps": HMM_STEPS, "interruption_margin": INTERRUPTION_MARGIN,
     }}
     missing = []
     total = 0.0
-    for task, steps, runs_per_model, recovery_every in [
-        ("lurestar", BASE_STEPS, N_SEEDS, 250),
-        ("adapt", ADAPT_STEPS, ADAPT_BRANCHES_PER_MODEL, 100),
-        ("hmm", HMM_STEPS, N_SEEDS, 250),
+    for task, steps, runs_per_model, recovery_every, models in [
+        ("lurestar", BASE_STEPS, N_SEEDS, 250, LURESTAR_MODELS),
+        ("adapt", ADAPT_STEPS, ADAPT_BRANCHES_PER_MODEL, 100, LURESTAR_MODELS),
+        ("hmm", HMM_STEPS, N_SEEDS, 250, HMM_MODELS),
     ]:
         # adaptation throughput is estimated from the Lure-Star base profile: the NextLat
         # adaptation branch still runs the full mtp_horizon=3 rollout (mtp_horizon is on the
@@ -331,7 +417,7 @@ def project(records: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         # base cost.
         src_task = "lurestar" if task in ("lurestar", "adapt") else "hmm"
         term = {}
-        for model in ("gpt", "nextlat"):
+        for model in models:
             rec = records.get(f"{src_task}-{model}")
             if not rec or not rec.get("seconds_per_step_median"):
                 missing.append(f"{src_task}-{model}")

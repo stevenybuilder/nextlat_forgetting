@@ -1,0 +1,15 @@
+{
+  "data_seed": 1234,
+  "elapsed_seconds": 382,
+  "ended_at_unix": 1787697534,
+  "epoch_mode": "reshuffle",
+  "init_seed": 1234,
+  "name": "reshuffle-i1234-d1234",
+  "reported_exact_path_accuracy_percent": [
+    0.01,
+    0.04
+  ],
+  "returncode": 0,
+  "schema": "nextlat_forgetting/d47_sampler_factorial_terminal/1",
+  "started_at_unix": 1787697152
+}

@@ -3,7 +3,7 @@
 #
 #   scripts/profile.sh [--lurestar-only] [--hmm-only] [--out DIR] [--dry-run]
 #
-# "Profile Lure-Star GPT/NextLat for 500 steps and HMM GPT/NextLat for 300 steps. For the
+# "Profile Lure-Star GPT/NextLat/BST for 500 steps and HMM GPT/NextLat for 300 steps. For the
 #  500-step Lure-Star profile, treat the first 100 steps as warmup and summarize the final
 #  400. Record: median and p95 seconds per step; examples and tokens per second; peak
 #  allocated and reserved VRAM; GPU utilization and host-input wait; checkpoint-write
@@ -74,7 +74,7 @@ run_job() {
   local job="$1" task="$2" model="$3" config="$4" steps="$5" warmup="$6"
   local val_interval=$(( steps / 2 ))
   local recovery=$(( steps / 4 ))
-  local out_dir exp probe_glob gpu_csv log t0 t1 rc
+  local out_dir exp probe_glob gpu_csv log t0 t1 rc plan action resume_step ledger attempt
 
   case "$task" in
     lurestar) out_dir="$PROFILE_LURESTAR_ROOT/runs/$model/seed$SEED/base"; exp="$model-seed$SEED-base" ;;
@@ -85,7 +85,44 @@ run_job() {
   probe_glob="$JOBS_DIR/$job.probe.*.json"
   gpu_csv="$JOBS_DIR/$job.gpu.csv"
   log="$JOBS_DIR/$job.log"
-  rm -f $probe_glob "$gpu_csv"
+
+  if [[ $DRY == 1 ]]; then
+    action=run; resume_step=0; attempt=0; ledger="$JOBS_DIR/$job.attempts.json"
+  else
+    plan="$($PYTHON "$SCRIPT_DIR/profile_resume.py" \
+      --jobs-dir "$JOBS_DIR" --job "$job" --out-dir "$out_dir" \
+      --experiment "$exp" --steps "$steps" --warmup "$warmup")"
+    action="$($PYTHON -c 'import json,sys;print(json.load(sys.stdin)["action"])' <<< "$plan")"
+    resume_step="$($PYTHON -c 'import json,sys;print(json.load(sys.stdin)["resume_step"])' <<< "$plan")"
+    ledger="$($PYTHON -c 'import json,sys;print(json.load(sys.stdin)["ledger"])' <<< "$plan")"
+    attempt="$($PYTHON -c 'import json,sys;print(json.load(sys.stdin).get("attempt",0))' <<< "$plan")"
+  fi
+  if [[ "$action" == skip ]]; then
+    echo "=== $job already complete and verified; skipping ==="
+    return 0
+  fi
+  if [[ "$action" == finalize ]]; then
+    "$PYTHON" - "$JOBS_DIR/$job.job.json" <<PY
+import json, os, sys
+record = {
+    "job": "$job", "task": "$task", "model": "$model",
+    "config": "$config", "seed": $SEED,
+    "steps": $steps, "warmup_steps": $warmup,
+    "out_dir": "$out_dir", "experiment_name": "$exp",
+    "probe_glob": "$probe_glob", "gpu_samples_csv": "$gpu_csv",
+    "log": "$log", "returncode": 0,
+    "attempt_ledger": "$ledger", "attempt": $attempt, "resume_step": $resume_step,
+    "wall_seconds": None, "receipt_repaired_after_target_checkpoint": True,
+}
+partial = sys.argv[1] + ".partial"
+with open(partial, "w") as stream:
+    json.dump(record, stream, indent=2)
+    stream.flush(); os.fsync(stream.fileno())
+os.replace(partial, sys.argv[1])
+PY
+    echo "=== $job target checkpoint/probe verified; repaired receipt without training ==="
+    return 0
+  fi
 
   echo
   echo "=== $job: $steps steps, warmup $warmup, config $config ==="
@@ -95,12 +132,23 @@ run_job() {
     "LURESTAR_ROOT=$PROFILE_LURESTAR_ROOT"
     "LURESTAR_ENTRY=$SCRIPT_DIR/profile_entry.py"
     "PROFILE_PROBE_JSON=$JOBS_DIR/$job.probe.{pid}.json"
+    "PROFILE_ATTEMPT=$attempt"
+  )
+  # profile_entry owns the in-process probes. For HMM it executes the external registration
+  # shim instead of pinned train.py; both still run from NEXTLAT_REPO so defaults.yaml resolves
+  # exactly as it does in a confirmatory job.
+  if [[ "$task" == hmm ]]; then cmd+=("PROFILE_TRAIN_PY=$SCRIPT_DIR/train_hmm.py"); fi
+  cmd+=(
     "$SCRIPT_DIR/launch_train.sh" "$config" "$SEED"
     "trainer.train_batches=$steps"
     "trainer.val_interval=$val_interval"
     "trainer.test_interval=$val_interval"
     "trainer.save_recovery_checkpoint=$recovery"
   )
+  if (( resume_step > 0 )); then
+    cmd+=("trainer.init_from=resume")
+    echo "# exact resume  committed optimizer step $resume_step -> $steps"
+  fi
 
   if [[ $DRY == 1 ]]; then
     DRY_RUN=1 "${cmd[@]}"
@@ -110,13 +158,13 @@ run_job() {
   local smi_pid=""
   if [[ $HAVE_NVIDIA_SMI == 1 ]]; then
     nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory,memory.used \
-               --format=csv,noheader,nounits -lms 250 > "$gpu_csv" 2>/dev/null &
+               --format=csv,noheader,nounits -lms 250 >> "$gpu_csv" 2>/dev/null &
     smi_pid=$!
   fi
 
   t0="$($PYTHON -c 'import time;print(repr(time.time()))')"
   set +e
-  "${cmd[@]}" 2>&1 | tee "$log"
+  "${cmd[@]}" 2>&1 | tee -a "$log"
   # NEVER read $? after a pipeline here: it is tee's status. PIPESTATUS[0] is the launcher's.
   rc="${PIPESTATUS[0]}"
   set -e
@@ -125,7 +173,7 @@ run_job() {
   if [[ -n "$smi_pid" ]]; then kill "$smi_pid" 2>/dev/null || true; wait "$smi_pid" 2>/dev/null || true; fi
 
   "$PYTHON" - "$JOBS_DIR/$job.job.json" <<PY
-import json, sys
+import json, os, sys
 record = {
     "job": "$job", "task": "$task", "model": "$model",
     "config": "$config", "seed": $SEED,
@@ -133,10 +181,14 @@ record = {
     "out_dir": "$out_dir", "experiment_name": "$exp",
     "probe_glob": "$probe_glob", "gpu_samples_csv": "$gpu_csv",
     "log": "$log", "returncode": $rc,
+    "attempt_ledger": "$ledger", "attempt": $attempt, "resume_step": $resume_step,
     "wall_seconds": $t1 - $t0,
 }
-with open(sys.argv[1], "w") as fh:
+partial = sys.argv[1] + ".partial"
+with open(partial, "w") as fh:
     json.dump(record, fh, indent=2)
+    fh.flush(); os.fsync(fh.fileno())
+os.replace(partial, sys.argv[1])
 PY
   echo "--- $job finished rc=$rc"
   return 0
@@ -147,20 +199,25 @@ hmm_prerequisites_ok() {
   if [[ ! -f "$repo/train.py" ]]; then
     echo "HMM skipped: no train.py under NEXTLAT_REPO=$repo" >&2; return 1
   fi
-  if ! grep -q "hmm_belief" "$repo/train.py"; then
-    echo "HMM skipped: 'hmm_belief' is not registered in DATAMODULES (train.py:34-42). \
-Apply the datamodule registration to the working copy first." >&2
+  if [[ ! -f "$SCRIPT_DIR/train_hmm.py" || \
+        ! -f "$PROJECT_DIR/src/hmm_geometry/datamodule.py" ]]; then
+    echo "HMM skipped: external train_hmm.py/datamodule integration is missing" >&2
     return 1
   fi
-  local train_npz
-  train_npz="$("$PYTHON" -c "
+  local paths path
+  paths="$("$PYTHON" -c "
 import sys
 sys.path.insert(0, '$SCRIPT_DIR')
 from config_lib import load_yaml_as_trainer_sees_it
-print(load_yaml_as_trainer_sees_it('$PROJECT_DIR/configs/gpt_hmm.yaml')['data']['hmm']['hmm_train_data_path'])")"
-  if [[ ! -f "$train_npz" ]]; then
-    echo "HMM skipped: training sequences missing at $train_npz" >&2; return 1
-  fi
+data = load_yaml_as_trainer_sees_it('$PROJECT_DIR/configs/gpt_hmm.yaml')['data']
+print(data['hmm_train_data_path'])
+print(data['hmm_val_data_path'])
+print(*data['hmm_generalization_data_path'], sep='\\n')")"
+  while IFS= read -r path; do
+    if [[ ! -f "$path" ]]; then
+      echo "HMM skipped: observation array missing at $path" >&2; return 1
+    fi
+  done <<< "$paths"
   return 0
 }
 
@@ -168,6 +225,7 @@ if [[ $RUN_LURESTAR == 1 ]]; then
   # spec section 11: 500 steps, first 100 discarded as warmup, final 400 summarized.
   run_job lurestar-gpt     lurestar gpt     gpt_lurestar.yaml     500 100
   run_job lurestar-nextlat lurestar nextlat nextlat_lurestar.yaml 500 100
+  run_job lurestar-bst     lurestar bst     bst_lurestar.yaml     500 100
 fi
 
 if [[ $RUN_HMM == 1 ]]; then

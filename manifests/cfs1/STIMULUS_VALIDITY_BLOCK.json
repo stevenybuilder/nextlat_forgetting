@@ -1,0 +1,38 @@
+{
+  "schema": "nextlat_forgetting/cfs1_stimulus_validity_block/1",
+  "recorded_at": "2026-08-24T18:23:12-04:00",
+  "status": "BLOCKED_FOR_CONFIRMATORY_CAUSAL_LAUNCH",
+  "scope": {
+    "study": "CFS-1",
+    "frozen_manifest": "cfs1_update_manifest.json",
+    "frozen_manifest_sha256": "78e7b5c4fc63199cc3e4c312b49595a7c9b7f533da1ca62176a725116d25786b"
+  },
+  "outcome_blind_attestation": {
+    "model_outcomes_inspected": false,
+    "training_outcomes_inspected": false,
+    "retention_outcomes_inspected": false,
+    "cfs1_branch_training_started": false
+  },
+  "reason": {
+    "summary": "CFS-1's low-overlap same and different cells are not exactly balanced on shared-edge overlap.",
+    "observed_construction_cells": {
+      "high_same": 18,
+      "high_different": 18,
+      "low_same": 8,
+      "low_different": 7
+    },
+    "causal_risk": "If forgetting changes with overlap, the 8-versus-7 mismatch can contribute directly to the high-by-conflict interaction used as the primary estimand.",
+    "disposition": "Preserve CFS-1 byte-for-byte for provenance; construct a fresh, exactly balanced CFS-2 study before adaptation training."
+  },
+  "allowed_uses": [
+    "provenance audit",
+    "generator diagnostics",
+    "non-outcome construct-validity analysis"
+  ],
+  "prohibited_uses": [
+    "CFS-1 adaptation branch launch",
+    "CFS-1 primary causal inference",
+    "retroactive relabeling of CFS-1 as CFS-2"
+  ],
+  "successor": "CFS-2"
+}

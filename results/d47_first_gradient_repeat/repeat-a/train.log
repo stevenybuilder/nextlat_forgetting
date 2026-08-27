@@ -1,0 +1,223 @@
+wandb: WARNING This integration is tested and supported for lightning Fabric 2.1.3.
+wandb: WARNING             Please report any issues to https://github.com/wandb/wandb/issues with the tag `lightning-fabric`.
+wandb: WARNING This integration is tested and supported for lightning Fabric 2.1.3.
+wandb: WARNING             Please report any issues to https://github.com/wandb/wandb/issues with the tag `lightning-fabric`.
+Using bfloat16 Automatic Mixed Precision (AMP)
+You are using a CUDA device ('NVIDIA GeForce RTX 3090') that has Tensor Cores. To properly utilize them, you should set `torch.set_float32_matmul_precision('medium' | 'high')` which will trade-off precision for performance. For more details, read https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html#torch.set_float32_matmul_precision
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/2
+Initializing distributed: GLOBAL_RANK: 1, MEMBER: 2/2
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 2 processes
+----------------------------------------------------------------------------------------------------
+
+data:
+  dataset: stargraph
+  device_batch_size: 256
+  effective_batch_size: 512
+  goal_range:
+  - 25
+  - 75
+  gradient_accum_steps: 1
+  micro_batch_size: 256
+  num_workers: 0
+  pair_accum_steps: 1
+  pair_batch_size: 32768
+  stargraph_data_path: ''
+  stargraph_generalization_data_path: []
+  stargraph_max_nodes: 100
+  stargraph_test_data_path: /workspace/d47-clean/project/data/stargraph/graph_5_5_test_20000.txt
+  stargraph_train_data_path: /workspace/d47-clean/project/data/stargraph/graph_5_5_sample_200000.txt
+  test_generalization: false
+  tokenizer_eos_id: -1
+  tokenizer_name_or_path: ''
+lr_scheduler:
+  schedule: constant
+  warmdown_iters: 0
+  warmup_iters: 0
+model:
+  bias: false
+  block_size: 1024
+  bst_pair_maximum_gap: -1
+  bst_pair_minimum_gap: 1
+  bst_pair_subsample_rate: 1.0
+  bst_single_gap_prediction_mode: eos
+  compute_hidden_state_rank: false
+  context_length: 0
+  dropout: 0.0
+  gpt_mode: next_token
+  lambda_ce: 0.0
+  lambda_kl: 1.0
+  lambda_mse: 1.0
+  mtp_horizon: 3
+  n_embd: 384
+  n_head: 6
+  n_layer: 12
+  proj_factor: 0.5
+  vocab_size: 0
+optimizer:
+  adjust_lr_fn: null
+  beta1: 0.9
+  beta2: 0.95
+  grad_clip: 100
+  learning_rate: 0.0005
+  mu: 0.95
+  nesterov: true
+  optimizer_type: adam
+  weight_decay: 0.1
+preregistration:
+  confirmatory_seeds:
+  - 1234
+  - 1235
+  - 1236
+  - 1237
+  - 1238
+  primary_distance: centered cosine
+  robustness_distance: whitened Euclidean
+provenance:
+  generator: scripts/materialize_configs.py
+  note: 'Condition 2 of spec sec.8: the architecture-matched transformer trained with
+    the official NextLat objective on G(5,5).'
+  source_config: config/stargraph/5_5/nextlat_stargraph_5_5.yaml
+  source_config_sha256: 6d98ffc681d6574640806f4c5224de466d09b1dc4f9e1e56e2fa6bdf6572a58d
+  upstream_commit: 3770be6009cea2b3c455a9ce7f2ca88b504bb955
+  upstream_repo: JaydenTeoh/NextLat
+seed: 1235
+trainer:
+  always_save_checkpoint: false
+  compile: false
+  deterministic: false
+  epochs: -1
+  experiment_name: d47-first-gradient-repeat-a-seed1235
+  garbage_collect: -1
+  init_from: scratch
+  keep_checkpoint_steps: []
+  log_interval: 1
+  log_to_file: false
+  log_to_wandb: false
+  out_dir: /workspace/d47-first-gradient-repeat/repeat-a/output
+  sampling_mode: AR
+  save_best_checkpoint: false
+  save_last_checkpoint: false
+  save_recovery_checkpoint: -1
+  speculative_gamma: 4
+  test_batches: 1
+  test_interval: 1000
+  top_p: null
+  train_batches: 2
+  train_probe: false
+  use_fused_kernels: false
+  val_batches: 1
+  val_interval: 1000
+  val_only: false
+  val_printsamples: false
+  wandb_project: stargraph
+  wandb_tags:
+  - '5_5'
+use_bst: false
+use_mtp_gloeckle: false
+use_mtp_jtp: false
+use_nextlat: true
+
+World size: 2
+Effective batch size: 512[rank: 1] Seed set to 1236
+
+Per-GPU device batch size: 256
+Batch size per gradient accumulation step: 256
+Batch size to accumulate pairs: 32768
+Tokens per gradient update: 524288
+[rank: 0] Seed set to 1235
+[Stargraph (5, 5)] Prefix Length: 62, Sequence Length: 69
+[Stargraph (5, 5)] Prefix Length: 62, Sequence Length: 69
+Output directory: /workspace/d47-first-gradient-repeat/repeat-a/output/d47-first-gradient-repeat-a-seed1235
+Initializing model with config: {'use_bst': False, 'use_nextlat': True, 'use_mtp_gloeckle': False, 'use_mtp_jtp': False, 'seed': 1235, 'trainer': {'train_batches': 2, 'val_batches': 1, 'val_only': False, 'log_interval': 1, 'val_interval': 1000, 'save_last_checkpoint': False, 'save_best_checkpoint': False, 'always_save_checkpoint': False, 'save_recovery_checkpoint': -1, 'keep_checkpoint_steps': [], 'out_dir': '/workspace/d47-first-gradient-repeat/repeat-a/output', 'init_from': 'scratch', 'log_to_file': False, 'log_to_wandb': False, 'wandb_project': 'stargraph', 'deterministic': False, 'compile': False, 'use_fused_kernels': False, 'garbage_collect': -1, 'sampling_mode': 'AR', 'speculative_gamma': 4, 'top_p': None, 'train_probe': False, 'wandb_tags': ['5_5'], 'epochs': -1, 'test_batches': 1, 'val_printsamples': False, 'test_interval': 1000, 'experiment_name': 'd47-first-gradient-repeat-a-seed1235'}, 'data': {'dataset': 'stargraph', 'effective_batch_size': 512, 'gradient_accum_steps': 1, 'pair_batch_size': 32768, 'num_workers': 0, 'goal_range': [25, 75], 'tokenizer_name_or_path': '', 'tokenizer_eos_id': -1, 'stargraph_data_path': '', 'stargraph_max_nodes': 100, 'pair_accum_steps': 1, 'stargraph_train_data_path': '/workspace/d47-clean/project/data/stargraph/graph_5_5_sample_200000.txt', 'stargraph_test_data_path': '/workspace/d47-clean/project/data/stargraph/graph_5_5_test_20000.txt', 'test_generalization': False, 'stargraph_generalization_data_path': [], 'device_batch_size': 256, 'micro_batch_size': 256}, 'model': {'n_layer': 12, 'n_head': 6, 'n_embd': 384, 'dropout': 0.0, 'bias': False, 'vocab_size': 106, 'block_size': 69, 'context_length': 62, 'bst_pair_minimum_gap': 1, 'bst_pair_maximum_gap': -1, 'bst_pair_subsample_rate': 1.0, 'bst_single_gap_prediction_mode': 'eos', 'gpt_mode': 'next_token', 'compute_hidden_state_rank': False, 'lambda_kl': 1.0, 'lambda_mse': 1.0, 'lambda_ce': 0.0, 'mtp_horizon': 3, 'proj_factor': 0.5}, 'optimizer': {'optimizer_type': 'adam', 'mu': 0.95, 'nesterov': True, 'learning_rate': 0.0005, 'weight_decay': 0.1, 'beta1': 0.9, 'beta2': 0.95, 'grad_clip': 100, 'adjust_lr_fn': None}, 'lr_scheduler': {'schedule': 'constant', 'warmup_iters': 0, 'warmdown_iters': 0}, 'provenance': {'upstream_repo': 'JaydenTeoh/NextLat', 'upstream_commit': '3770be6009cea2b3c455a9ce7f2ca88b504bb955', 'source_config': 'config/stargraph/5_5/nextlat_stargraph_5_5.yaml', 'source_config_sha256': '6d98ffc681d6574640806f4c5224de466d09b1dc4f9e1e56e2fa6bdf6572a58d', 'generator': 'scripts/materialize_configs.py', 'note': 'Condition 2 of spec sec.8: the architecture-matched transformer trained with the official NextLat objective on G(5,5).'}, 'preregistration': {'confirmatory_seeds': [1234, 1235, 1236, 1237, 1238], 'primary_distance': 'centered cosine', 'robustness_distance': 'whitened Euclidean'}}
+Number of parameters (including embedding): 21,915,264
+Number of parameters (excluding embedding): 21,874,560
+_FabricModule(
+  (_forward_module): DistributedDataParallel(
+    (module): NextLatTransformer(
+      (token_embedding): Embedding(106, 384)
+      (transformer): ModuleDict(
+        (blocks): ModuleList(
+          (0-11): 12 x Block(
+            (ln_1): LayerNorm()
+            (attn): CausalSelfAttention(
+              (c_attn): Linear(in_features=384, out_features=1152, bias=False)
+              (c_proj): Linear(in_features=384, out_features=384, bias=False)
+              (attn_dropout): Identity()
+              (resid_dropout): Identity()
+            )
+            (ln_2): LayerNorm()
+            (mlp): MLP(
+              (up): SwiGLU(
+                (gate_up): Linear(in_features=384, out_features=2048, bias=False)
+              )
+              (down): Linear(in_features=1024, out_features=384, bias=False)
+              (dropout): Identity()
+            )
+          )
+        )
+        (norm): LayerNorm()
+      )
+      (lm_head): Linear(in_features=384, out_features=106, bias=False)
+      (dynamics_model): NextLatDynamicsModel(
+        (hidden_state_dropout): Identity()
+        (mlp): Sequential(
+          (0): Linear(in_features=768, out_features=384, bias=False)
+          (1): GELU(approximate='none')
+          (2): Linear(in_features=384, out_features=384, bias=False)
+          (3): GELU(approximate='none')
+          (4): Linear(in_features=384, out_features=384, bias=False)
+        )
+        (norm_x): LayerNorm()
+      )
+    )
+  )
+  (_original_module): NextLatTransformer(
+    (token_embedding): Embedding(106, 384)
+    (transformer): ModuleDict(
+      (blocks): ModuleList(
+        (0-11): 12 x Block(
+          (ln_1): LayerNorm()
+          (attn): CausalSelfAttention(
+            (c_attn): Linear(in_features=384, out_features=1152, bias=False)
+            (c_proj): Linear(in_features=384, out_features=384, bias=False)
+            (attn_dropout): Identity()
+            (resid_dropout): Identity()
+          )
+          (ln_2): LayerNorm()
+          (mlp): MLP(
+            (up): SwiGLU(
+              (gate_up): Linear(in_features=384, out_features=2048, bias=False)
+            )
+            (down): Linear(in_features=1024, out_features=384, bias=False)
+            (dropout): Identity()
+          )
+        )
+      )
+      (norm): LayerNorm()
+    )
+    (lm_head): Linear(in_features=384, out_features=106, bias=False)
+    (dynamics_model): NextLatDynamicsModel(
+      (hidden_state_dropout): Identity()
+      (mlp): Sequential(
+        (0): Linear(in_features=768, out_features=384, bias=False)
+        (1): GELU(approximate='none')
+        (2): Linear(in_features=384, out_features=384, bias=False)
+        (3): GELU(approximate='none')
+        (4): Linear(in_features=384, out_features=384, bias=False)
+      )
+      (norm_x): LayerNorm()
+    )
+  )
+)
+Total number of parameters: 21,874,560
+Initialized a new model from scratch
+[LR Scheduler] using constant learning rate
+Starting training from step=0
+  0%|          | 0/1000 [00:00<?, ?it/s]/venv/main/lib/python3.12/site-packages/torch/autograd/graph.py:869: UserWarning: The AccumulateGrad node's stream does not match the stream of the node that produced the incoming gradient. This may incur unnecessary synchronization and break CUDA graph capture if the AccumulateGrad node's stream is the default stream. This mismatch is caused by an AccumulateGrad node created prior to the current iteration being kept alive. This can happen if the autograd graph is still being kept alive by tensors such as the loss, or if you are using DDP, which will stash a reference to the node. To resolve the mismatch, delete all references to the autograd graph or ensure that DDP initialization is performed under the same stream as subsequent forwards. If the mismatch is intentional, you can use torch.autograd.graph.set_warn_on_accumulate_grad_stream_mismatch(False) to suppress this warning. (Triggered internally at /pytorch/torch/csrc/autograd/input_buffer.cpp:240.)
+  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+/venv/main/lib/python3.12/site-packages/torch/autograd/graph.py:869: UserWarning: The AccumulateGrad node's stream does not match the stream of the node that produced the incoming gradient. This may incur unnecessary synchronization and break CUDA graph capture if the AccumulateGrad node's stream is the default stream. This mismatch is caused by an AccumulateGrad node created prior to the current iteration being kept alive. This can happen if the autograd graph is still being kept alive by tensors such as the loss, or if you are using DDP, which will stash a reference to the node. To resolve the mismatch, delete all references to the autograd graph or ensure that DDP initialization is performed under the same stream as subsequent forwards. If the mismatch is intentional, you can use torch.autograd.graph.set_warn_on_accumulate_grad_stream_mismatch(False) to suppress this warning. (Triggered internally at /pytorch/torch/csrc/autograd/input_buffer.cpp:240.)
+  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+2026-08-25 23:01:13.919662 Step: 0 Epoch: 0 Train loss: 0.0000:   0%|          | 0/1000 [00:01<?, ?it/s]2026-08-25 23:01:13.919662 Step: 0 Epoch: 0 Train loss: 0.0000:   0%|          | 1/1000 [00:01<31:48,  1.91s/it]2026-08-25 23:01:14.078927 Step: 1 Epoch: 0 Train loss: 9.2981:   0%|          | 1/1000 [00:02<31:48,  1.91s/it]2026-08-25 23:01:14.078927 Step: 1 Epoch: 0 Train loss: 9.2981:   0%|          | 2/1000 [00:02<14:38,  1.14it/s]2026-08-25 23:01:14.251269 Step: 2 Epoch: 0 Train loss: 5.1797:   0%|          | 2/1000 [00:02<14:38,  1.14it/s]2026-08-25 23:01:14.251269 Step: 2 Epoch: 0 Train loss: 5.1797:   0%|          | 3/1000 [00:02<09:15,  1.80it/s]                                                                                                                Training complete, running final validation
+Step: 3 Epoch: 0 Train loss: 5.179694175720215 Validation loss: 4.743576526641846

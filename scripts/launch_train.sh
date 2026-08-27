@@ -3,7 +3,7 @@
 #
 #   scripts/launch_train.sh <config> <seed> [extra dotlist overrides...]
 #
-# <config> is one of the six deliverables in configs/ (name or path). The script derives the
+# <config> is one of the eight deliverables in configs/ (name or path). The script derives the
 # per-job output root and experiment name, checks the preconditions that upstream fails
 # silently on, prints the exact command, and execs it.
 #
@@ -19,11 +19,12 @@
 #   LURESTAR_PRECISION fabric --precision                         (default bf16-mixed)
 #   LURESTAR_STRATEGY  extra `--strategy X`; empty by default     (see docs/CONFIG_DEVIATIONS.md
 #                      "Sampler determinism" before setting this to ddp)
-#   LURESTAR_MODEL     gpt|nextlat, required for adapt_near/adapt_far
+#   LURESTAR_MODEL     gpt|nextlat|bst, required for adapt_near/adapt_mid/adapt_far
 #   LURESTAR_PARENT_CKPT  absolute path to the step-rebased frozen parent checkpoint; on the
 #                      FIRST launch of an adaptation branch this seeds {out_dir}/latest_ckpt
-#   LURESTAR_ENTRY     script fabric launches; scripts/profile.sh points this at
-#                      scripts/profile_entry.py                  (default train.py)
+#   LURESTAR_ENTRY     override the script fabric launches; scripts/profile.sh points this at
+#                      scripts/profile_entry.py (default train.py, or the external
+#                      scripts/train_hmm.py shim for HMM configs)
 #   DRY_RUN=1          print the command and exit 0
 
 set -euo pipefail
@@ -35,7 +36,7 @@ NEXTLAT_REPO="${NEXTLAT_REPO:-/content/nextlat}"
 LURESTAR_ROOT="${LURESTAR_ROOT:-/content/lurestar}"
 LURESTAR_PRECISION="${LURESTAR_PRECISION:-bf16-mixed}"
 LURESTAR_STRATEGY="${LURESTAR_STRATEGY:-}"
-PREREGISTERED_SEEDS=(1234 1235 1236)
+PREREGISTERED_SEEDS=(1234 1235 1236 1237 1238)
 
 die() { echo "launch_train.sh: $*" >&2; exit 2; }
 
@@ -69,22 +70,29 @@ case "$CONFIG_NAME" in
   bst_lurestar.yaml)
     # Spec sec.8 arm 3: the competence-matched control (docs/DECISION_D20_competence_gate.md).
     MODEL=bst;     OUT_DIR="$LURESTAR_ROOT/runs/bst/seed$SEED/base";     EXP="bst-seed$SEED-base" ;;
-  adapt_near.yaml|adapt_far.yaml)
+  adapt_near.yaml|adapt_mid.yaml|adapt_far.yaml)
     BRANCH="${CONFIG_NAME#adapt_}"; BRANCH="${BRANCH%.yaml}"
     MODEL="${LURESTAR_MODEL:-}"
-    [[ -n "$MODEL" ]] || die "adapt_$BRANCH.yaml needs LURESTAR_MODEL=gpt or LURESTAR_MODEL=nextlat"
-    [[ "$MODEL" == gpt || "$MODEL" == nextlat ]] || die "LURESTAR_MODEL must be gpt or nextlat"
+    [[ -n "$MODEL" ]] || die "adapt_$BRANCH.yaml needs LURESTAR_MODEL=gpt, nextlat, or bst"
+    [[ "$MODEL" == gpt || "$MODEL" == nextlat || "$MODEL" == bst ]] || \
+      die "LURESTAR_MODEL must be gpt, nextlat, or bst"
     OUT_DIR="$LURESTAR_ROOT/runs/$MODEL/seed$SEED/adapt-$BRANCH"
     EXP="$MODEL-seed$SEED-adapt-$BRANCH"
     # The file is derived from the NextLat G(5,5) YAML (its key set is a superset of the
     # GPT one), so the GPT branch is the same file with the model flag flipped.
-    if [[ "$MODEL" == gpt ]]; then EXTRA_OVERRIDES+=("use_nextlat=false"); fi
+    if [[ "$MODEL" == gpt ]]; then
+      EXTRA_OVERRIDES+=("use_nextlat=false")
+    elif [[ "$MODEL" == bst ]]; then
+      # The runtime adapter replaces BST's dense pair objective with the common next-token CE.
+      # Pair-gap knobs are intentionally absent from the H3 adaptation estimand.
+      EXTRA_OVERRIDES+=("use_nextlat=false" "use_bst=true")
+    fi
     ;;
   gpt_hmm.yaml)
     MODEL=gpt;     OUT_DIR="$LURESTAR_ROOT/runs/hmm/gpt/seed$SEED/base";     EXP="gpt-seed$SEED-hmm" ;;
   nextlat_hmm.yaml)
     MODEL=nextlat; OUT_DIR="$LURESTAR_ROOT/runs/hmm/nextlat/seed$SEED/base"; EXP="nextlat-seed$SEED-hmm" ;;
-  *) die "unknown config '$CONFIG_NAME'; expected one of the seven deliverables in configs/" ;;
+  *) die "unknown config '$CONFIG_NAME'; expected one of the eight deliverables in configs/" ;;
 esac
 
 # --- preconditions upstream fails silently on ------------------------------------------
@@ -100,6 +108,27 @@ esac
 SEED_POINTER=""
 
 if [[ "$CONFIG_NAME" == adapt_* ]]; then
+  # A plain pinned checkout would silently run its native loss. Require the guarded v5 patch
+  # receipt and verify the exact adaptation source hash before allocating GPU compute.
+  if ! python3 - "$NEXTLAT_REPO" <<'PY'
+import hashlib, json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+receipt_path = root / ".lurestar_runtime_patch_receipt.json"
+source = root / "lurestar_adaptation.py"
+if not receipt_path.is_file() or not source.is_file():
+    raise SystemExit("missing runtime-patch receipt or adaptation trainer")
+receipt = json.loads(receipt_path.read_text())
+if receipt.get("patch_version") != 5:
+    raise SystemExit("runtime patch is not v5")
+if receipt.get("adaptation_contract") != "h3_full_parameter_next_token_ce_v1":
+    raise SystemExit("runtime patch does not declare the common H3 objective")
+digest = hashlib.sha256(source.read_bytes()).hexdigest()
+if receipt.get("adaptation_trainer_sha256") != digest:
+    raise SystemExit("adaptation trainer hash disagrees with runtime receipt")
+PY
+  then
+    die "adaptation launch requires the verified v5 common-objective runtime patch"
+  fi
   # core_train.py:139-168: init_from=resume prefers {out_dir}/recovery_ckpt, falls back to
   # {out_dir}/latest_ckpt, and if NEITHER exists it prints two "Could not find" lines and
   # builds a SCRATCH model. For an adaptation branch that would silently train a fresh
@@ -121,18 +150,20 @@ $OUT_DIR/latest_ckpt upstream would train from scratch"
 fi
 
 if [[ "$CONFIG_NAME" == *hmm.yaml ]]; then
-  # train.py:176-178 asserts config.data.dataset is a key of DATAMODULES (train.py:34-42).
-  # `hmm_belief` is not registered at the pinned commit; the runtime working copy carries a
-  # one-line registration recorded as an uncommitted diff (spec section 9).
-  if ! grep -q "hmm_belief" "$NEXTLAT_REPO/train.py"; then
-    die "$NEXTLAT_REPO/train.py has no 'hmm_belief' entry in DATAMODULES. Apply the \
-datamodule registration to the working copy first (see docs/CONFIG_DEVIATIONS.md)."
-  fi
+  # The shim performs in-memory registration and delegates to the pinned trainer. Neither the
+  # runtime checkout nor the vendored upstream tree needs (or is allowed) an on-disk edit.
+  [[ -f "$SCRIPT_DIR/train_hmm.py" ]] || die "HMM trainer shim missing: $SCRIPT_DIR/train_hmm.py"
+  [[ -f "$PROJECT_DIR/src/hmm_geometry/datamodule.py" ]] || \
+    die "HMM datamodule missing: $PROJECT_DIR/src/hmm_geometry/datamodule.py"
 fi
 
 CMD=(fabric run --devices 1 --precision "$LURESTAR_PRECISION")
 if [[ -n "$LURESTAR_STRATEGY" ]]; then CMD+=(--strategy "$LURESTAR_STRATEGY"); fi
-CMD+=("${LURESTAR_ENTRY:-train.py}" --config "$CONFIG_PATH"
+ENTRY="${LURESTAR_ENTRY:-}"
+if [[ -z "$ENTRY" ]]; then
+  if [[ "$CONFIG_NAME" == *hmm.yaml ]]; then ENTRY="$SCRIPT_DIR/train_hmm.py"; else ENTRY="train.py"; fi
+fi
+CMD+=("$ENTRY" --config "$CONFIG_PATH"
       "seed=$SEED" "trainer.out_dir=$OUT_DIR" "trainer.experiment_name=$EXP")
 CMD+=(${EXTRA_OVERRIDES[@]+"${EXTRA_OVERRIDES[@]}"})
 CMD+=("$@")

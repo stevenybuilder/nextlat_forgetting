@@ -1,0 +1,49 @@
+{
+  "schema": "nextlat_forgetting/hmm_dataset/1",
+  "hmm_sha256": "55b1266fe4310ff0db13c00c885faccb529304d7193cfcd2007d8bca3c01e89d",
+  "hmm_manifest_sha256": "1fad1a4a9041899a4658ec17de17509f56998e44a64fb3da89eb8241a188a58c",
+  "data_seed": 1305963,
+  "seed_scheme": "numpy.random.SeedSequence(data_seed).spawn(3) -> train, val, lengen",
+  "splits": {
+    "train": {
+      "n_sequences": 100000,
+      "length": 32,
+      "spawn_index": 0,
+      "observations_file": "data/hmm_family/persistent_high_aliasing/hmm4x4_train_len32_100000.npy",
+      "observations_sha256": "0d9d3804de8d46811c029294a3c3f7708e3aed5c641323e8cd96256e3c2908d5",
+      "observations_dtype": "int8",
+      "seconds": 0.47
+    },
+    "val": {
+      "n_sequences": 10000,
+      "length": 32,
+      "spawn_index": 1,
+      "observations_file": "data/hmm_family/persistent_high_aliasing/hmm4x4_val_len32_10000.npy",
+      "observations_sha256": "6bd843862ecc64bfeac9c60a7e177c19052a4780d7c6fd293f77ac5b62dd9837",
+      "observations_dtype": "int8",
+      "posteriors_file": "data/hmm_family/persistent_high_aliasing/hmm4x4_val_posteriors.npz",
+      "posteriors_sha256": "ad1dbd7043d68af782f16184e454568e23a40c7db859f72652f041c6119475b9",
+      "mean_belief_entropy_bits": 1.267838107337801,
+      "bayes_next_obs_accuracy": 0.39186875,
+      "mean_conditional_nll_nats": 1.3221164670265455,
+      "seconds": 0.25
+    },
+    "lengen": {
+      "n_sequences": 10000,
+      "length": 64,
+      "spawn_index": 2,
+      "observations_file": "data/hmm_family/persistent_high_aliasing/hmm4x4_lengen_len64_10000.npy",
+      "observations_sha256": "8bbdc54293b664f5edc09488263e50571d1a186bce89201d5285754838224705",
+      "observations_dtype": "int8",
+      "posteriors_file": "data/hmm_family/persistent_high_aliasing/hmm4x4_lengen_posteriors.npz",
+      "posteriors_sha256": "0ba758c54cadea68b34898baf76c94ca9beb7d8bd50255c740412a6e802e75b0",
+      "mean_belief_entropy_bits": 1.263150338180608,
+      "bayes_next_obs_accuracy": 0.393815625,
+      "mean_conditional_nll_nats": 1.3210150448509959,
+      "seconds": 0.48
+    }
+  },
+  "pair_bank_split_rule": "both evaluation splits are cut in half by sequence index. val[0:5000] and lengen[0:5000] are the pair-bank calibration pools that thresholds are frozen from; val[5000:10000] and lengen[5000:10000] are the test pools those frozen thresholds are applied to, unchanged. The length-64 band is calibrated from its own half because the high-edit-distance cut is a per-length quantile and no length in 33..64 appears in the length-32 band.",
+  "train_posteriors": "not stored; recomputable exactly with forward_batch(load_frozen_hmm()[0], obs)",
+  "generated_at_unix": 1787556636
+}

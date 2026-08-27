@@ -7,6 +7,40 @@ Frozen 2026-08-23, **before any confirmatory model exists**. Every claim is cite
 Implementation: `src/lurestar/representations.py`. Tests: `tests/test_representations.py`.
 Adversarial review and the two P0 corrections it forced: `docs/review/representations.md`.
 
+**Analysis amendment:** `docs/PREREGISTRATION_AMENDMENT_2026-08-24.md` promotes held-out whitened
+Mahalanobis to co-primary with centered cosine and freezes `E_white`/`E_score`, `nPSI`, H2's nested
+decision rule, and H3's gradient/Jacobian controls. That amendment supersedes the older
+"robustness check" label below; the extraction identities and index contract remain unchanged.
+
+**Terminal D40 scope change:** the prospectively frozen one-shot feasibility rule subsequently
+left four H3 pairs unmatched. The canonical permanent-block receipt therefore retires the
+Lure-Star H3 analysis rather than changing matching after feasibility was known. The operative
+confirmatory extractor is now base-checkpoint-only and emits H1/H2 `E_score` evidence. It refuses
+adaptation checkpoints, near/mid/far H3 inputs, gradient/Jacobian mechanism probes, and H3 analysis
+controls. Historical H3 motivation and formulas later in this document explain the retired design;
+they are not accepted inputs or endpoints of the confirmatory pipeline.
+
+The reduced, fail-closed schema chain is:
+
+| Artifact | Exact schema |
+|---|---|
+| Extraction job | `nextlat_forgetting/lurestar_evidence_extraction_job/3` |
+| Restart progress | `nextlat_forgetting/lurestar_evidence_progress/1` |
+| Evidence NPZ | `nextlat_forgetting/lurestar_evidence/4` |
+| Evidence receipt | `nextlat_forgetting/lurestar_evidence/4` |
+| Evaluation manifest | `nextlat_forgetting/lurestar_evaluation_manifest/4` |
+| Confirmatory report | `nextlat_forgetting/lurestar_confirmatory_report/4` |
+| Evaluation receipt | `nextlat_forgetting/lurestar_evaluation_receipt/4` |
+
+Every evidence NPZ binds the base checkpoint, H1 item-order hash, canonical permanent-H3-block
+hash, and its sidecar hash. Every evaluation manifest contains only the complete arm-by-seed base
+matrix, the H1 identity domain, `E_lure`, and those same block bindings. Missing H1/H2 metrics or
+any mandatory secondary/provenance field, and any extra H3/adaptation/mechanism field, is a refusal
+rather than a nullable compatibility path. Decision D42 operationalizes the amendment's
+intermediate-layer requirement as the complete fixed set of forward-block outputs 0–11 at indices
+62 and 63, and requires generated five-token paths for all five lure conditions. These
+secondaries are always labeled non-promotable.
+
 ---
 
 ## 1. The state
@@ -267,7 +301,7 @@ tokenizer change before any geometry is computed.
 
 ## 5. Distances
 
-**Primary: centered cosine.** `1 - cos(a - m, b - m)`.
+**Co-primary 1: centered cosine.** `1 - cos(a - m, b - m)`.
 
 The centering mean `m` is computed over the **full E_lure evaluation pool for one
 (model, seed, extraction_index) cell** — all base, repeat, near-safe, near-critical and
@@ -302,7 +336,7 @@ pool = CenteringPool.from_conditions(
 distance is invariant to a translation of the whole pool, and is **not** invariant to
 translating one condition only — plus the five pool-construction tests above.
 
-**Declared robustness check: whitened Euclidean.** `||W(a - b)||` with `W @ W = Sigma^-1`,
+**Co-primary: held-out whitened Mahalanobis.** `||W(a - b)||` with `W @ W = Sigma^-1`,
 equal to the Mahalanobis distance under `Sigma` (asserted in the tests against an
 independent `np.linalg.solve` reference).
 
@@ -321,6 +355,12 @@ Three properties are enforced by `representations.Whitener`:
   `psi_distances_whitened`, being a *reported* metric, refuses both an unchecked whitener and
   a missing id list.
 
+The 2,000 canonical base IDs are sorted by SHA-256: the first 400 are `E_white` and the remaining
+1,600 are `E_score`. The whitener fits only `E_white`; both co-primary metrics score exactly
+`E_score`. Every metric cell also emits the amendment's aggregate dimensionless `nPSI`. A zero or
+nonfinite denominator invalidates the cell. Co-primary disagreement is reported as metric-dependent
+evidence and cannot be resolved by a secondary metric, index, layer, or BST state.
+
 ## 6. Inferential units
 
 | quantity | unit resampled | function |
@@ -331,12 +371,12 @@ Three properties are enforced by `representations.Whitener`:
 | any cross-model PSI contrast | **training seed** | `evaluate.model_contrast_seed_level`, `evaluate.three_arm_contrasts` |
 
 The model contrast takes a `Mapping {seed_id: statistic}`, not an array — so an item-level
-array of 20,000 quartets cannot be passed where three seeds belong; it raises `TypeError`.
+array of 20,000 quartets cannot be passed where five seeds belong; it raises `TypeError`.
 Seeds are paired (the same seed trains all three arms, spec §8), the estimator is the mean
 of the per-seed differences, and the report carries every per-seed value, the interval, the
 exact two-sided sign-flip randomization p over all `2^n` assignments, and the smallest p
-that `n` seeds could attain (`2^{1-n}` = 0.25 for three seeds). That floor is the honest
-statement of what three seeds can show, and the function warns when `n < 5`.
+that `n` seeds could attain (`2^{1-n}` = 0.0625 for five seeds). That floor is still above
+0.05, so the exact sign-flip test cannot reject at the conventional threshold even with all five.
 
 ### The three preregistered contrasts
 
@@ -345,7 +385,7 @@ statement of what three seeds can show, and the function warns when `n < 5`.
 
 | # | contrast | role | how to read it |
 |---|---|---|---|
-| 1 | NextLat − BST | **primary**, competence-matched | both arms solve `G(5,5)` (~99.8% / ~99.9%) and differ only in objective, so a gap is attributable to the objective |
+| 1 | NextLat − BST | **primary**, competence-matched | both arms solve `G(5,5)` (~99.8% / ~99.9%); a gap is not competence-confounded, but BST's second transformer, parameter count, and O(T²) gradient structure remain differences |
 | 2 | NextLat − GPT | secondary, competence-**confounded** | GPT is at 1/d chance (~18.6%); report the number and the confound in the same breath |
 | 3 | BST − GPT | reference, competence only | the size of the effect that solving the task alone buys; the yardstick contrast 1 is read against |
 
@@ -362,10 +402,11 @@ do not fix that either (floor 0.0625), six is the first `n` that can. `MDEResult
 `randomization_test_can_reject` so this cannot be quietly omitted. Every null reported from
 this design has to be stated as "not detectable at this resolution", not as "no effect".
 
-## 7. H2's model
+## 7. H2's nested models
 
 ```
-critical_correct_branch_margin ~ base_critical_distance + base_correct_branch_margin
+M0: critical_correct_branch_margin ~ base_correct_branch_margin
+M1: critical_correct_branch_margin ~ base_correct_branch_margin + base_critical_distance
 ```
 
 Two-fold cross-fitting (`evaluate.fit_h2` → `evaluate.crossfit_linear`): each fold is
@@ -374,8 +415,10 @@ on the training complement too, because rescaling by a full-sample mean and sd i
 leak. Reported: held-out `R²` (pooled out-of-fold, full-sample-mean baseline, so it can go
 negative), per-fold `R²`, Spearman correlation of held-out prediction against outcome, the
 marginal Spearman of each predictor, and the standardized coefficient sign in every fold
-with a `sign_consistent` flag. Margin is primary because accuracy may be at ceiling
-(spec §6/H2). Every margin is taken from index **63**.
+with a `sign_consistent` flag. Report `Delta R2 = R2(M1) - R2(M0)` for both co-primary metrics on
+identical `E_score` rows. Geometry adds predictive value only when `Delta R2 > 0` and the distance
+coefficient is positive in both folds under both metrics. Margin is primary because accuracy may be
+at ceiling (spec §6/H2). Every margin is taken from index **63**.
 
 ## 8. Layering
 

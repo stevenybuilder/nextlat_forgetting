@@ -2,8 +2,8 @@
 
 Recon date: 2026-08-23. Host: darwin 24.6.0, no local GPU, no local torch.
 Upstream pinned at `3770be6009cea2b3c455a9ce7f2ca88b504bb955` ("Initial public release", 2026-05-25)
-in `/Users/stevenyang/Documents/nextlat_forgetting/upstream/NextLat` (read-only).
-Spec authority: `/Users/stevenyang/Documents/nextlat_forgetting/nextlat_v4_predictive_geometry_spec.md`.
+in `<repo-root>/upstream/NextLat` (read-only).
+Spec authority: `<repo-root>/nextlat_v4_predictive_geometry_spec.md`.
 
 Every command output quoted below was actually run on this host. Claims about the CLI's
 internals come from `strings(1)` over the shipped Mach-O binary; claims about upstream code
@@ -87,7 +87,7 @@ be written.
 | `colab` binary | `/Users/stevenyang/.local/bin/colab`, **v0.2.0**, Mach-O x86_64 (Go) | `colab -v`, `file` |
 | Free tier balance | `free_remaining: 0` — **there is no free fallback**; every runtime-second is paid CU | quota JSON |
 | Balance movement | `1788.7765366264678` → `1788.6077848662667` = **−0.16875 CU** over the accidental T4 (§0, §8.3) | two `quota --json` reads |
-| GCS bucket | `gs://nextlat-lurestar-project-flash-490419` exists, **US-CENTRAL1**, currently empty | `gcloud storage buckets describe` → `nextlat-lurestar-project-flash-490419  US-CENTRAL1` |
+| GCS bucket | `gs://YOUR_PRIVATE_BUCKET` exists, **US-CENTRAL1**, currently empty | `gcloud storage buckets describe` → `YOUR_PRIVATE_BUCKET  US-CENTRAL1` |
 | Local gcloud | Google Cloud SDK **562.0.0**, active account `<redacted-account>` | `gcloud version`, `gcloud auth list` |
 | Local ADC | `/Users/stevenyang/.config/gcloud/application_default_credentials.json`, 397 bytes, mode `0600`, `type=authorized_user`, `quota_project_id=project-flash-490419` | direct JSON parse |
 
@@ -273,6 +273,27 @@ if consecutive_fast_failures >= 2:
 Two strikes, not three. The first fast return is plausibly a preemption; the second with no
 durable progress is a bug in your code, and no amount of fresh hardware will fix it.
 
+### (v) Compute-value invariant
+
+Paid time must leave a recoverable training state or an auditable diagnostic artifact. The
+production driver therefore publishes three independent layers on a bounded cadence:
+
+1. **Telemetry before the first checkpoint.** The exact materialized config and metrics log are
+   uploaded with hash metadata and a `runtime_telemetry/1` receipt marked `resumable: false`.
+   A very early timeout still establishes what ran and how far it reached without masquerading as
+   a restart point.
+2. **Recoverable state.** Atomic checkpoint payloads, metadata, and two verified generations are
+   uploaded first; `state.json` is replaced last and is the only resume authority. A partially
+   uploaded checkpoint has no operational meaning.
+3. **Failure evidence.** Append-only host receipts, bounded log tails, quota deltas, terminal or
+   stalled reason, and teardown verification survive even when training itself cannot resume.
+
+The initial checkpoint interval is 250 updates and the GCS sync interval is 60 seconds. The A100
+profiling gate must convert the checkpoint interval to at most ten measured minutes before the
+confirmatory sweep. A CLI timeout never triggers immediate reprovisioning: the host continues to
+monitor an owned, advancing runtime. Only verified disappearance or a bounded stall can authorize a
+fresh runtime, and deterministic no-progress failures trip the two-strike circuit breaker above.
+
 ---
 
 ## 4. Exact command sequence for a long-running resumable training session
@@ -292,14 +313,14 @@ gcloud auth application-default login   # only if the ADC file is missing or its
 ```bash
 colab quota  --json         # confirm paid_balance and that active_runtimes == 0
 colab status --json         # must be {"status":"no_runtime"} before you start
-gcloud storage ls gs://nextlat-lurestar-project-flash-490419/lurestar/runs/
+gcloud storage ls gs://YOUR_PRIVATE_BUCKET/lurestar/runs/
 ```
 
 Build the payload locally. **Nothing large is uploaded through the CLI**; the source snapshot
 goes to GCS from the host and is pulled by the runtime.
 
 ```bash
-GCS=gs://nextlat-lurestar-project-flash-490419/lurestar
+GCS=gs://YOUR_PRIVATE_BUCKET/lurestar
 RUN_ID=nextlat-s1234-base
 
 # source snapshot: pinned tree + uncommitted diff (spec s9 "persist before training")
@@ -502,7 +523,7 @@ GCS list   : HTTP 200
 
 Produced by loading `google.auth.default(scopes=[".../devstorage.read_write"])` with
 `GOOGLE_APPLICATION_CREDENTIALS` set to the ADC path, calling `creds.refresh()`, and issuing a
-real `storage.objects.list` against `nextlat-lurestar-project-flash-490419`.
+real `storage.objects.list` against `YOUR_PRIVATE_BUCKET`.
 
 Three things follow, and the third is why this pattern is right for a weekend-long job:
 
@@ -517,7 +538,7 @@ So the runtime pattern is exactly:
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/content/adc.json"
 from google.cloud import storage
 client = storage.Client()                      # project inferred from quota_project_id
-bucket = client.bucket("nextlat-lurestar-project-flash-490419")
+bucket = client.bucket("YOUR_PRIVATE_BUCKET")
 bucket.blob(f"lurestar/runs/{run_id}/ckpt.pt").upload_from_filename(local)
 ```
 
@@ -530,7 +551,7 @@ This is a real negative result, not an inference. With a fresh empty `CLOUDSDK_C
 `GOOGLE_APPLICATION_CREDENTIALS` pointing at the ADC file:
 
 ```
-$ gcloud storage ls gs://nextlat-lurestar-project-flash-490419/
+$ gcloud storage ls gs://YOUR_PRIVATE_BUCKET/
 ERROR: (gcloud.storage.ls) You do not currently have an active account selected.
 Please run:
   $ gcloud auth login
@@ -586,7 +607,7 @@ Mandatory handling:
 * the driver must not echo the file, and `job.json` must not contain credentials.
 
 **Preferred alternative if a few minutes can be spent:** create a dedicated service account
-with `roles/storage.objectAdmin` on `nextlat-lurestar-project-flash-490419` *only*, download
+with `roles/storage.objectAdmin` on `YOUR_PRIVATE_BUCKET` *only*, download
 its key, and upload that instead. It works with the identical
 `GOOGLE_APPLICATION_CREDENTIALS` pattern (service-account keys are the ADC type that env var
 was designed for), it is revocable independently of the human account, and its blast radius
@@ -689,30 +710,30 @@ and record peak allocated/reserved either way.
 With `active_runtimes: 0`, `burn_rate_hourly` reads `0`.
 
 `burn_rate_hourly` is the authoritative per-GPU rate, and it is populated **only while a
-runtime is live**. One value — T4 — was captured during recon (§8.3); L4 and A100 still need
-measuring.
+runtime is live**. T4 was captured during recon (§8.3); L4 and A100 were subsequently calibrated
+on 2026-08-23 with identity/BF16 probes only and no trainer execution.
 
 ### 8.2 Rate table
 
 | GPU | `--gpu` value | CLI-selectable at v0.2.0 | CU/h — prior (unverified) | CU/h — **measured here** | Peak bf16/fp16 dense | VRAM |
 |---|---|---|---|---|---|---|
 | T4 | `t4` | yes (default) | ~1.76 | **1.54** ✅ | 65 TFLOP/s (fp16; **no bf16** — Turing) | 16 GB |
-| L4 | `l4` | yes | ~4.82 | *(pending)* → ~4.2 if scaled by T4 ratio | 121 TFLOP/s | 24 GB |
-| A100 | `a100` | yes | ~11.77 | *(pending)* → ~10.3 if scaled by T4 ratio | 312 TFLOP/s | 40/80 GB |
+| L4 | `l4` | yes | ~4.82 | **1.54** ✅ | 121 TFLOP/s | 24 GB |
+| A100 | `a100` | yes | ~11.77 | **5.3** ✅ | 312 TFLOP/s | 40 GB assigned |
 | H100 | — | **no** (help lists t4\|l4\|a100 only) | unknown | *(pending, §2)* | 990 TFLOP/s | 80 GB |
 | G4 | — | **no** | unknown | — | — | — |
 
-The **T4 rate is measured on this account**: `burn_rate_hourly: 1.54` was returned by
-`colab quota --json` while a T4 assignment was live (§8.3). It lands 13% *below* the published
-1.76 prior, which is a useful validation that the priors are the right shape. The L4 and A100
-"scaled" figures apply that same 0.875 ratio and are shown only as a plausibility check —
-**they are still inferences, not measurements.** The §9 budget deliberately uses the higher,
-unscaled priors, so measured rates should only make the run cheaper.
+All three selectable rates are now measured on this account. T4 and L4 each reported
+`burn_rate_hourly: 1.54`; A100 reported `5.3`. The A100 runtime identified itself as
+`NVIDIA A100-SXM4-40GB` with BF16 support. These are account/CLI observations rather than a
+general Colab rate card; `results/compute_log.csv` is the append-only calibration record. The §9
+budget may retain the higher priors as a conservative ceiling until end-to-end profiles replace
+the throughput assumptions.
 
-### 8.3 The one real billing measurement, and what it implies
+### 8.3 Billing measurements and what they imply
 
-The accidental T4 (§0) is the only billed event on this account during recon. Sequence, all
-from real command output:
+The accidental T4 (§0) established the short-session floor. Later L4/A100 calibration rows are in
+`results/compute_log.csv`. Sequence below is the original T4 event, all from real command output:
 
 | When | `paid_balance` | `active_runtimes` | `burn_rate_hourly` | `status` |
 |---|---|---|---|---|
@@ -739,11 +760,11 @@ Three findings, each with direct design consequences:
    `colab status`; and why teardown must be **`colab stop` plus a re-check**, not a single
    status poll.
 
-### 8.4 Calibration procedure for the two remaining rates
+### 8.4 Calibration procedure used
 
-Run this before committing the sweep. Each iteration is one assignment, so §8.3's ~0.17 CU
-floor applies: total cost ~0.5 CU. Note the `sleep 60` and the re-read — §8.3 finding 3 means
-a single immediate poll can return a stale zero.
+This procedure was completed on 2026-08-23. Each iteration is one assignment, so §8.3's ~0.17 CU
+floor applies. The actual workflow also used two agreeing stopped-state reads; a single immediate
+poll can return a stale zero.
 
 ```bash
 for G in l4 a100; do
@@ -758,9 +779,9 @@ for G in l4 a100; do
 done
 ```
 
-Fold the results into §8.2 and recompute §9.3 before spending. Also record, for each: the GPU
-name from `colab exec -c "import torch;print(torch.cuda.get_device_name(0))"` — `colab status`
-reported `gpu: "Unknown"` during recon and cannot be relied on to identify the device.
+The measured rates are folded into §8.2. End-to-end profiling still must recompute §9.3 before
+confirmatory spend. GPU names came from runtime PyTorch rather than `colab status`, which reported
+`gpu: "Unknown"` during recon and cannot be relied on for device identity.
 
 ---
 
@@ -771,11 +792,11 @@ reported `gpu: "Unknown"` during recon and cannot be relied on to identify the d
 Straight from spec §11:
 
 ```
-base       = 6 runs  × 20,000 steps  = 120,000 optimizer steps   (3 seeds × {GPT, NextLat})
-adaptation = 12 branches × 500 steps =   6,000 optimizer steps   (2 models × 3 seeds × {near, far})
-HMM        = 6 runs  ×  3,000 steps  =  18,000 optimizer steps   (3 seeds × {GPT, NextLat}, small model)
+base       = 15 runs × 20,000 steps  = 300,000 optimizer steps   (5 seeds × {GPT, NextLat, BST})
+adaptation = 30 branches × 500 steps =  15,000 optimizer steps   (3 models × 5 seeds × {near, far})
+HMM        = 10 runs × 3,000 steps   =  30,000 optimizer steps   (5 seeds × {GPT, NextLat}, small model)
                                        -------
-                                        144,000 optimizer steps
+                                        345,000 optimizer steps
 ```
 
 ### 9.2 Model and its assumptions
@@ -880,7 +901,7 @@ and `parent_checkpoint_sha256`.
 | GAC does **not** authenticate `gcloud` | empty `CLOUDSDK_CONFIG` + GAC → `ERROR: (gcloud.storage.ls) You do not currently have an active account selected.` |
 | `CLOUDSDK_AUTH_ACCESS_TOKEN` does | same empty config dir + 256-char `ya29.a…` token → `rc=0`; REST `objects.list` → HTTP 200 |
 | `--cred-file` rejects authorized_user | `gcloud auth login --help`: accepts workload-identity config or service-account key JSON only |
-| bucket exists, region | `gcloud storage buckets describe` → `nextlat-lurestar-project-flash-490419  US-CENTRAL1` |
+| bucket exists, region | `gcloud storage buckets describe` → `YOUR_PRIVATE_BUCKET  US-CENTRAL1` |
 | T=69, vocab=106, 21.24 M params | upstream `Tokenizer` (`data/stargraph.py:9-57`) replayed on a G(5,5) line built by `data/stargraph/prepare.py:8-35`; param count from `config/stargraph/5_5/gpt_stargraph_5_5.yaml:33-38` |
 | T4 burn rate = 1.54 CU/h | `colab quota --json` while a T4 assignment was live |
 | short-session billing floor ≈ 0.17 CU | balance `1788.7765366264678` → `1788.6077848662667` across one sub-minute T4 |

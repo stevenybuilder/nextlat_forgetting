@@ -1,0 +1,40 @@
+{
+  "analysis_id": "H1-BD-1",
+  "branch_decision_extraction_index": 63,
+  "co_primary_metrics": [
+    {
+      "critical_array": "secondary_index63_d_critical_centered_cosine",
+      "metric": "centered_cosine",
+      "safe_array": "secondary_index63_d_safe_centered_cosine",
+      "whitener_prefix": "secondary_index63_whitener"
+    },
+    {
+      "critical_array": "secondary_index63_d_critical_whitened",
+      "metric": "whitened_euclidean",
+      "safe_array": "secondary_index63_d_safe_whitened",
+      "whitener_prefix": "secondary_index63_whitener"
+    }
+  ],
+  "contrast": "nextlat_minus_bst",
+  "decision_rule": "both co-primary paired-seed means positive and both two-sided 95% paired Student-t lower bounds above zero",
+  "h1_legacy_control": {
+    "classification_unmodified": true,
+    "extraction_index": 62,
+    "role": "originally_registered_delimiter_state_control"
+  },
+  "h1bd_role": "new_prospective_mechanistic_confirmatory_analysis",
+  "metric_name_mapping": {
+    "centered_cosine": "centered cosine distance",
+    "whitened_euclidean": "held-out-whitened Mahalanobis distance (Euclidean norm after the held-out whitening transform)"
+  },
+  "npsi_role": "diagnostic_only_cannot_rescue_co_primary_metrics",
+  "outcomes_inspected_before_freeze": false,
+  "population": {
+    "calibration_base_count": 400,
+    "calibration_condition_qualified_row_count": 2000,
+    "scored_base_count": 1600,
+    "source": "frozen_E_lure"
+  },
+  "schema": "nextlat_forgetting/h1_branch_decision_analysis_declaration/1",
+  "status": "FROZEN_PRE_OUTCOME"
+}

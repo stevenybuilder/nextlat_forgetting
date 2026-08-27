@@ -1,0 +1,72 @@
+# CFS-2 execution template.  The runner injects one manifest-hashed CFS-2 stream;
+# this unbound template must never be launched directly.
+use_nextlat: true
+use_bst: false
+trainer:
+  epochs: -1
+  train_batches: 500
+  val_batches: 200
+  test_batches: 200
+  val_only: false
+  val_printsamples: false
+  log_interval: 1
+  val_interval: 100
+  test_interval: 100
+  out_dir: /content/cfs2/UNBOUND_OUTPUT_FORBIDDEN
+  init_from: resume
+  wandb_project: stargraph
+  compile: false
+  experiment_name: cfs2-unbound
+  wandb_tags: ['5_5']
+  save_last_checkpoint: true
+  save_best_checkpoint: true
+  log_to_file: true
+  save_recovery_checkpoint: 50
+  log_to_wandb: false
+data:
+  dataset: stargraph
+  effective_batch_size: 512
+  gradient_accum_steps: 1
+  pair_accum_steps: 1
+  num_workers: 0
+  stargraph_train_data_path: /content/cfs2/UNBOUND_CFS2_UPDATE_BANK_FORBIDDEN.txt
+  stargraph_test_data_path: /content/cfs2/UNBOUND_CFS2_UPDATE_BANK_FORBIDDEN.txt
+  stargraph_max_nodes: 100
+  test_generalization: false
+  stargraph_generalization_data_path: []
+model:
+  n_layer: 12
+  n_head: 6
+  n_embd: 384
+  dropout: 0.0
+  bias: false
+  vocab_size: 0
+  block_size: 1024
+  context_length: 0
+  gpt_mode: next_token
+  lambda_kl: 0.0
+  mtp_horizon: 3
+  lambda_mse: 0.0
+  proj_factor: 0.5
+  lambda_ce: 0.0
+optimizer:
+  optimizer_type: adam
+  learning_rate: 5e-4
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  grad_clip: 100
+lr_scheduler:
+  warmup_iters: 0
+  warmdown_iters: 0
+seed: 1234
+cfs2:
+  schema: nextlat_forgetting/cfs2_config/1
+  adaptation_steps: 500
+  parent_seeds: [1234, 1235, 1236, 1237, 1238, 2234, 2235, 2236]
+  episodes: [0, 1]
+  recovery_interval: 50
+  full_parameter: true
+  loss: teacher_forced_next_token_cross_entropy
+  unbound_bank_sentinel: /content/cfs2/UNBOUND_CFS2_UPDATE_BANK_FORBIDDEN.txt
+  cfs_only_alias_requires_hash_bound_lineage_receipt: true

@@ -3,7 +3,9 @@
   "preregistered_seeds": [
     1234,
     1235,
-    1236
+    1236,
+    1237,
+    1238
   ],
   "frozen_keys": [
     "use_bst",
@@ -109,7 +111,7 @@
           "value": 1234,
           "category": "SEED",
           "authority": "spec sec.8 'Configuration authority' permitted-change list",
-          "reason": "One of the three preregistered confirmatory seeds. Stated explicitly instead of via `sweep:`, whose experiment-directory name is built by iterating a Python set (train.py:280,322) and therefore varies with PYTHONHASHSEED.",
+          "reason": "One of the five preregistered confirmatory seeds. Stated explicitly instead of via `sweep:`, whose experiment-directory name is built by iterating a Python set (train.py:280,322) and therefore varies with PYTHONHASHSEED.",
           "inert_ok": true
         },
         {
@@ -189,7 +191,9 @@
             "confirmatory_seeds": [
               1234,
               1235,
-              1236
+              1236,
+              1237,
+              1238
             ],
             "primary_distance": "centered cosine",
             "robustness_distance": "whitened Euclidean"
@@ -237,7 +241,7 @@
           "value": 1234,
           "category": "SEED",
           "authority": "spec sec.8 'Configuration authority' permitted-change list",
-          "reason": "One of the three preregistered confirmatory seeds. Stated explicitly instead of via `sweep:`, whose experiment-directory name is built by iterating a Python set (train.py:280,322) and therefore varies with PYTHONHASHSEED.",
+          "reason": "One of the five preregistered confirmatory seeds. Stated explicitly instead of via `sweep:`, whose experiment-directory name is built by iterating a Python set (train.py:280,322) and therefore varies with PYTHONHASHSEED.",
           "inert_ok": true
         },
         {
@@ -317,7 +321,9 @@
             "confirmatory_seeds": [
               1234,
               1235,
-              1236
+              1236,
+              1237,
+              1238
             ],
             "primary_distance": "centered cosine",
             "robustness_distance": "whitened Euclidean"
@@ -373,7 +379,7 @@
           "value": 1234,
           "category": "SEED",
           "authority": "spec sec.8 'Configuration authority' permitted-change list",
-          "reason": "One of the three preregistered confirmatory seeds. Stated explicitly instead of via `sweep:`, whose experiment-directory name is built by iterating a Python set (train.py:280,322) and therefore varies with PYTHONHASHSEED.",
+          "reason": "One of the five preregistered confirmatory seeds. Stated explicitly instead of via `sweep:`, whose experiment-directory name is built by iterating a Python set (train.py:280,322) and therefore varies with PYTHONHASHSEED.",
           "inert_ok": true
         },
         {
@@ -440,7 +446,7 @@
             "source_config": "config/stargraph/5_5/bst_stargraph_5_5.yaml",
             "source_config_sha256": "158a848e436a1e6e4c682f740266fe6c89b9a074f18909152302ceda84a06269",
             "generator": "scripts/materialize_configs.py",
-            "note": "Condition 3 of spec sec.8: the architecture-matched Belief State Transformer, the competence-matched control. The paper's Figure 6 puts BST at ~99.9% on G(5,5) against GPT at ~18.6% (1/d chance), so BST solves Path-Star WITHOUT a latent-transition objective and a NextLat-vs-BST PSI gap is attributable to the objective rather than to task success. See docs/DECISION_D20_competence_gate.md."
+            "note": "Condition 3 of spec sec.8: the width/depth-matched Belief State Transformer, the competence-matched control. The paper's Figure 6 puts BST at ~99.9% on G(5,5) against GPT at ~18.6% (1/d chance), so BST solves Path-Star WITHOUT a latent-transition objective. A NextLat-vs-BST PSI gap is not competence-confounded, but BST's second transformer, parameter count, and O(T^2) gradient structure remain differences. See docs/DECISION_D20_competence_gate.md."
           },
           "category": "PROVENANCE",
           "authority": "spec sec.9 'Colab interruption and recovery contract'",
@@ -453,7 +459,9 @@
             "confirmatory_seeds": [
               1234,
               1235,
-              1236
+              1236,
+              1237,
+              1238
             ],
             "primary_distance": "centered cosine",
             "robustness_distance": "whitened Euclidean"
@@ -537,7 +545,7 @@
           "value": "/content/lurestar/runs/nextlat/seed1234/adapt-near",
           "category": "OUTPUT",
           "authority": "spec sec.9 'Colab interruption and recovery contract'",
-          "reason": "Separate output root per branch. Spec sec.9: 'Give every base/near/far job a separate output root; the official resume pointer lives at the output-root level and must never cross branches.'",
+          "reason": "Separate output root per branch. Spec sec.9: 'Give every base/near/mid/far job a separate output root; the official resume pointer lives at the output-root level and must never cross branches.'",
           "inert_ok": false
         },
         {
@@ -561,7 +569,7 @@
           "value": 500,
           "category": "H3",
           "authority": "spec sec.6 H3 'similarity-dependent interference' + spec sec.8 'Start H3 with 5,000 adaptation items and 500 updates'",
-          "reason": "Adaptation length. Under core_train.py:564-571 this executes 501 optimizer updates from a step-0 parent - the same inclusive-bound convention by which the shipped train_batches: 20000 executes 20,001. Identical for near, far, GPT and NextLat, so the near-minus-far contrast is unaffected.",
+          "reason": "Adaptation length is exactly 500 optimizer updates. Production applies the source-hash/commit-guarded runtime stop-rule patch (`step >= train_batches`). MatrixRunner converts the relative 500-update request to the absolute target parent_step + 500 (20,500 for a 20,000-step parent).",
           "inert_ok": false
         },
         {
@@ -617,7 +625,7 @@
           "value": "/content/lurestar/manifests/adapt/graph_5_5_bnear_5000.txt",
           "category": "MANIFEST",
           "authority": "spec sec.6 H3 'similarity-dependent interference'",
-          "reason": "The immutable B_near adaptation item bank (5,000 items). This is the ONLY scientific difference between the near and far branches.",
+          "reason": "The immutable B_near adaptation item bank (5,000 items). This is the ONLY scientific difference between the near, mid, and far branches.",
           "inert_ok": false
         },
         {
@@ -625,7 +633,7 @@
           "value": "/content/lurestar/manifests/adapt/graph_5_5_bnearval_2000.txt",
           "category": "MANIFEST",
           "authority": "spec sec.6 H3 'similarity-dependent interference'",
-          "reason": "Independent B_near validation set; spec sec.6 requires acquisition on 'independent near/far validation sets'.",
+          "reason": "Independent B_near validation set; spec sec.6 requires acquisition on 'independent near/mid/far validation sets'.",
           "inert_ok": false
         },
         {
@@ -649,7 +657,191 @@
             "confirmatory_seeds": [
               1234,
               1235,
-              1236
+              1236,
+              1237,
+              1238
+            ],
+            "primary_distance": "centered cosine",
+            "robustness_distance": "whitened Euclidean"
+          },
+          "category": "PROVENANCE",
+          "authority": "spec sec.8 'Configuration authority' permitted-change list",
+          "reason": "Additive block recording the preregistration inside the artifact that the run archives. Read by nothing.",
+          "inert_ok": false
+        }
+      ],
+      "hoists": [
+        {
+          "key": "use_bst",
+          "reason": "defaults.yaml:2 false. Restated so this file is a complete config for the GPT branch too (use_nextlat=false at launch)."
+        },
+        {
+          "key": "trainer.save_last_checkpoint",
+          "reason": "defaults.yaml:18 true."
+        },
+        {
+          "key": "trainer.save_best_checkpoint",
+          "reason": "defaults.yaml:20 true."
+        },
+        {
+          "key": "trainer.log_to_file",
+          "reason": "defaults.yaml:33 true."
+        },
+        {
+          "key": "model.proj_factor",
+          "reason": "sweep-only upstream; must be pinned or the dynamics MLP silently widens to 768. The parent checkpoint was trained at 0.5, so a mismatch would also make the state_dict load fail."
+        },
+        {
+          "key": "model.lambda_ce",
+          "reason": "defaults.yaml:116 is 0.0; required to be 0 for the loss to reduce to next-token-only."
+        }
+      ],
+      "drops": []
+    },
+    {
+      "config": "adapt_mid.yaml",
+      "family": "adapt",
+      "source_config": "config/stargraph/5_5/nextlat_stargraph_5_5.yaml",
+      "source_config_sha256": "6d98ffc681d6574640806f4c5224de466d09b1dc4f9e1e56e2fa6bdf6572a58d",
+      "defaults_sha256": "f3b0fc3ddd38809a36ade1804d9eb3b4a539353ab11ab1b89b2503f1e0176231",
+      "upstream_commit": "3770be6009cea2b3c455a9ce7f2ca88b504bb955",
+      "overrides": [
+        {
+          "key": "seed",
+          "value": 1234,
+          "category": "SEED",
+          "authority": "spec sec.8 'Configuration authority' permitted-change list",
+          "reason": "Preregistered confirmatory seed.",
+          "inert_ok": true
+        },
+        {
+          "key": "trainer.compile",
+          "value": false,
+          "category": "CORRECTION",
+          "authority": "docs/RUNLOG.md session 1 (established correction)",
+          "reason": "As for the base runs.",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.out_dir",
+          "value": "/content/lurestar/runs/nextlat/seed1234/adapt-mid",
+          "category": "OUTPUT",
+          "authority": "spec sec.9 'Colab interruption and recovery contract'",
+          "reason": "Separate output root per branch. Spec sec.9: 'Give every base/near/mid/far job a separate output root; the official resume pointer lives at the output-root level and must never cross branches.'",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.experiment_name",
+          "value": "nextlat-seed1234-adapt-mid",
+          "category": "OUTPUT",
+          "authority": "spec sec.9 'Colab interruption and recovery contract'",
+          "reason": "Deterministic job id, contains 'seed'.",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.init_from",
+          "value": "resume",
+          "category": "CKPT",
+          "authority": "spec sec.9 'Colab interruption and recovery contract'",
+          "reason": "The branch is started by pre-seeding {out_dir}/latest_ckpt with the step-rebased frozen parent checkpoint, so init_from: resume both starts and restarts the branch through one upstream code path (core_train.py:139-163). PRECONDITION: the pointer must exist before the first launch, or upstream falls through to a scratch model (core_train.py:164-168).",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.train_batches",
+          "value": 500,
+          "category": "H3",
+          "authority": "spec sec.6 H3 'similarity-dependent interference' + spec sec.8 'Start H3 with 5,000 adaptation items and 500 updates'",
+          "reason": "Adaptation length is exactly 500 optimizer updates. Production applies the source-hash/commit-guarded runtime stop-rule patch (`step >= train_batches`). MatrixRunner converts the relative 500-update request to the absolute target parent_step + 500 (20,500 for a 20,000-step parent).",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.val_interval",
+          "value": 100,
+          "category": "CKPT",
+          "authority": "spec sec.6 H3 'similarity-dependent interference'",
+          "reason": "Five in-run acquisition measurements over a 500-step branch; val_interval 1000 would produce none.",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.test_interval",
+          "value": 100,
+          "category": "CKPT",
+          "authority": "spec sec.6 H3 'similarity-dependent interference'",
+          "reason": "Exact-path accuracy on the branch validation set at the same cadence (core_train.py:671 gates the accuracy eval on this key).",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.save_recovery_checkpoint",
+          "value": 100,
+          "category": "CKPT",
+          "authority": "spec sec.9 'Colab interruption and recovery contract'",
+          "reason": "Recovery cadence scaled to a 500-step job; 250 would give two points.",
+          "inert_ok": false
+        },
+        {
+          "key": "trainer.log_to_wandb",
+          "value": false,
+          "category": "EXEC",
+          "authority": "execution environment necessity (no scientific surface)",
+          "reason": "As for the base runs.",
+          "inert_ok": false
+        },
+        {
+          "key": "model.lambda_mse",
+          "value": 0.0,
+          "category": "H3",
+          "authority": "spec sec.6 H3 'similarity-dependent interference'",
+          "reason": "Spec sec.6: 'Use full-parameter next-token-only adaptation for both GPT and NextLat. Set lambda_mse=0 and lambda_kl=0 during the primary NextLat adaptation branch.' With lambda_mse = lambda_kl = lambda_ce = 0 the total loss at model_nextlat.py:488-497 reduces exactly to ntp_loss.",
+          "inert_ok": false
+        },
+        {
+          "key": "model.lambda_kl",
+          "value": 0.0,
+          "category": "H3",
+          "authority": "spec sec.6 H3 'similarity-dependent interference'",
+          "reason": "See lambda_mse.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.stargraph_train_data_path",
+          "value": "/content/lurestar/manifests/adapt/graph_5_5_bmid_5000.txt",
+          "category": "MANIFEST",
+          "authority": "spec sec.6 H3 'similarity-dependent interference'",
+          "reason": "The immutable B_mid adaptation item bank (5,000 items). This is the ONLY scientific difference between the near, mid, and far branches.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.stargraph_test_data_path",
+          "value": "/content/lurestar/manifests/adapt/graph_5_5_bmidval_2000.txt",
+          "category": "MANIFEST",
+          "authority": "spec sec.6 H3 'similarity-dependent interference'",
+          "reason": "Independent B_mid validation set; spec sec.6 requires acquisition on 'independent near/mid/far validation sets'.",
+          "inert_ok": false
+        },
+        {
+          "key": "provenance",
+          "value": {
+            "upstream_repo": "JaydenTeoh/NextLat",
+            "upstream_commit": "3770be6009cea2b3c455a9ce7f2ca88b504bb955",
+            "source_config": "config/stargraph/5_5/nextlat_stargraph_5_5.yaml",
+            "source_config_sha256": "6d98ffc681d6574640806f4c5224de466d09b1dc4f9e1e56e2fa6bdf6572a58d",
+            "generator": "scripts/materialize_configs.py",
+            "note": "Spec sec.6 H3 adaptation, mid branch. Derived from the NextLat G(5,5) YAML because its key set is a superset of the GPT G(5,5) YAML's, so the SAME file drives the GPT branch when launched with the dotlist override `use_nextlat=false`."
+          },
+          "category": "PROVENANCE",
+          "authority": "spec sec.9 'Colab interruption and recovery contract'",
+          "reason": "Additive block, read by nothing. It lands in materialized_config.yaml with every run (train.py:192-194), which is what spec sec.9 requires to be persisted before training.",
+          "inert_ok": false
+        },
+        {
+          "key": "preregistration",
+          "value": {
+            "confirmatory_seeds": [
+              1234,
+              1235,
+              1236,
+              1237,
+              1238
             ],
             "primary_distance": "centered cosine",
             "robustness_distance": "whitened Euclidean"
@@ -717,7 +909,7 @@
           "value": "/content/lurestar/runs/nextlat/seed1234/adapt-far",
           "category": "OUTPUT",
           "authority": "spec sec.9 'Colab interruption and recovery contract'",
-          "reason": "Separate output root per branch. Spec sec.9: 'Give every base/near/far job a separate output root; the official resume pointer lives at the output-root level and must never cross branches.'",
+          "reason": "Separate output root per branch. Spec sec.9: 'Give every base/near/mid/far job a separate output root; the official resume pointer lives at the output-root level and must never cross branches.'",
           "inert_ok": false
         },
         {
@@ -741,7 +933,7 @@
           "value": 500,
           "category": "H3",
           "authority": "spec sec.6 H3 'similarity-dependent interference' + spec sec.8 'Start H3 with 5,000 adaptation items and 500 updates'",
-          "reason": "Adaptation length. Under core_train.py:564-571 this executes 501 optimizer updates from a step-0 parent - the same inclusive-bound convention by which the shipped train_batches: 20000 executes 20,001. Identical for near, far, GPT and NextLat, so the near-minus-far contrast is unaffected.",
+          "reason": "Adaptation length is exactly 500 optimizer updates. Production applies the source-hash/commit-guarded runtime stop-rule patch (`step >= train_batches`). MatrixRunner converts the relative 500-update request to the absolute target parent_step + 500 (20,500 for a 20,000-step parent).",
           "inert_ok": false
         },
         {
@@ -797,7 +989,7 @@
           "value": "/content/lurestar/manifests/adapt/graph_5_5_bfar_5000.txt",
           "category": "MANIFEST",
           "authority": "spec sec.6 H3 'similarity-dependent interference'",
-          "reason": "The immutable B_far adaptation item bank (5,000 items). This is the ONLY scientific difference between the near and far branches.",
+          "reason": "The immutable B_far adaptation item bank (5,000 items). This is the ONLY scientific difference between the near, mid, and far branches.",
           "inert_ok": false
         },
         {
@@ -805,7 +997,7 @@
           "value": "/content/lurestar/manifests/adapt/graph_5_5_bfarval_2000.txt",
           "category": "MANIFEST",
           "authority": "spec sec.6 H3 'similarity-dependent interference'",
-          "reason": "Independent B_far validation set; spec sec.6 requires acquisition on 'independent near/far validation sets'.",
+          "reason": "Independent B_far validation set; spec sec.6 requires acquisition on 'independent near/mid/far validation sets'.",
           "inert_ok": false
         },
         {
@@ -829,7 +1021,9 @@
             "confirmatory_seeds": [
               1234,
               1235,
-              1236
+              1236,
+              1237,
+              1238
             ],
             "primary_distance": "centered cosine",
             "robustness_distance": "whitened Euclidean"
@@ -881,7 +1075,7 @@
           "value": 1234,
           "category": "SEED",
           "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
-          "reason": "Same three preregistered seeds as Lure-Star.",
+          "reason": "Same five preregistered seeds as Lure-Star.",
           "inert_ok": true
         },
         {
@@ -972,7 +1166,7 @@
           "value": "hmm_belief",
           "category": "HMM",
           "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
-          "reason": "Spec sec.12 config block. REQUIRES an hmm_belief datamodule registered in the DATAMODULES dict at train.py:34-42; train.py:176-178 asserts membership. That registration is a one-line addition applied to the runtime working copy and recorded as an uncommitted diff (spec sec.9); upstream/ itself is never edited.",
+          "reason": "Spec sec.12 config block. scripts/train_hmm.py registers the external datamodule in memory before delegating to pinned train.do_train; upstream/ stays untouched.",
           "inert_ok": false
         },
         {
@@ -981,6 +1175,14 @@
           "category": "HMM",
           "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
           "reason": "Spec sec.12 config block.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.test_generalization",
+          "value": true,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Makes HMMBeliefDataModule include the frozen length-64 split when it sets model.block_size=65. Pinned core_train does not validate this dataset's generalization loader; length-64 evaluation remains offline.",
           "inert_ok": false
         },
         {
@@ -1008,23 +1210,93 @@
           "inert_ok": false
         },
         {
-          "key": "data.hmm",
-          "value": {
-            "hmm_train_data_path": "/content/lurestar/data/hmm/hmm-train-100000-len32.npz",
-            "hmm_val_data_path": "/content/lurestar/data/hmm/hmm-val-10000-len32.npz",
-            "hmm_generalization_data_path": "/content/lurestar/data/hmm/hmm-gen-10000-len64.npz",
-            "hmm_matrices_path": "/content/lurestar/manifests/hmm-matrices.json",
-            "hmm_num_states": 4,
-            "hmm_num_observations": 4,
-            "train_sequences": 100000,
-            "val_sequences": 10000,
-            "generalization_sequences": 10000,
-            "sequence_length": 32,
-            "generalization_sequence_length": 64
-          },
+          "key": "data.hmm_train_data_path",
+          "value": "/content/lurestar/data/hmm/hmm4x4_train_len32_100000.npy",
           "category": "HMM",
           "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
-          "reason": "Dataset sizes and immutable manifest paths for the 4-state/4-observation HMM: 100,000 train and 10,000 validation sequences of length 32 plus 10,000 length-64 generalization sequences, and the frozen transition/emission matrices. Namespaced under data.hmm so it cannot collide with an upstream key.",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_val_data_path",
+          "value": "/content/lurestar/data/hmm/hmm4x4_val_len32_10000.npy",
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_generalization_data_path",
+          "value": [
+            "/content/lurestar/data/hmm/hmm4x4_lengen_len64_10000.npy"
+          ],
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_n_obs",
+          "value": 4,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_matrices_path",
+          "value": "/content/lurestar/manifests/hmm_matrices.json",
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_num_states",
+          "value": 4,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_train_sequences",
+          "value": 100000,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_val_sequences",
+          "value": 10000,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_generalization_sequences",
+          "value": 10000,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_sequence_length",
+          "value": 32,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_generalization_sequence_length",
+          "value": 64,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
           "inert_ok": false
         },
         {
@@ -1048,7 +1320,9 @@
             "confirmatory_seeds": [
               1234,
               1235,
-              1236
+              1236,
+              1237,
+              1238
             ],
             "primary_distance": "centered cosine",
             "robustness_distance": "whitened Euclidean"
@@ -1100,7 +1374,7 @@
         },
         {
           "key": "data.stargraph_generalization_data_path",
-          "reason": "read only at data/stargraph.py:203 under data.test_generalization, and the generalization dataloader is built only for stargraph/countdown/manhattan (core_train.py:344-349). test_generalization stays false here."
+          "reason": "read only by StarGraphDataModule. HMMBeliefDataModule reads its own flat data.hmm_generalization_data_path instead."
         }
       ]
     },
@@ -1117,7 +1391,7 @@
           "value": 1234,
           "category": "SEED",
           "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
-          "reason": "Same three preregistered seeds as Lure-Star.",
+          "reason": "Same five preregistered seeds as Lure-Star.",
           "inert_ok": true
         },
         {
@@ -1208,7 +1482,7 @@
           "value": "hmm_belief",
           "category": "HMM",
           "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
-          "reason": "Spec sec.12 config block. REQUIRES an hmm_belief datamodule registered in the DATAMODULES dict at train.py:34-42; train.py:176-178 asserts membership. That registration is a one-line addition applied to the runtime working copy and recorded as an uncommitted diff (spec sec.9); upstream/ itself is never edited.",
+          "reason": "Spec sec.12 config block. scripts/train_hmm.py registers the external datamodule in memory before delegating to pinned train.do_train; upstream/ stays untouched.",
           "inert_ok": false
         },
         {
@@ -1217,6 +1491,14 @@
           "category": "HMM",
           "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
           "reason": "Spec sec.12 config block.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.test_generalization",
+          "value": true,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Makes HMMBeliefDataModule include the frozen length-64 split when it sets model.block_size=65. Pinned core_train does not validate this dataset's generalization loader; length-64 evaluation remains offline.",
           "inert_ok": false
         },
         {
@@ -1244,23 +1526,93 @@
           "inert_ok": false
         },
         {
-          "key": "data.hmm",
-          "value": {
-            "hmm_train_data_path": "/content/lurestar/data/hmm/hmm-train-100000-len32.npz",
-            "hmm_val_data_path": "/content/lurestar/data/hmm/hmm-val-10000-len32.npz",
-            "hmm_generalization_data_path": "/content/lurestar/data/hmm/hmm-gen-10000-len64.npz",
-            "hmm_matrices_path": "/content/lurestar/manifests/hmm-matrices.json",
-            "hmm_num_states": 4,
-            "hmm_num_observations": 4,
-            "train_sequences": 100000,
-            "val_sequences": 10000,
-            "generalization_sequences": 10000,
-            "sequence_length": 32,
-            "generalization_sequence_length": 64
-          },
+          "key": "data.hmm_train_data_path",
+          "value": "/content/lurestar/data/hmm/hmm4x4_train_len32_100000.npy",
           "category": "HMM",
           "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
-          "reason": "Dataset sizes and immutable manifest paths for the 4-state/4-observation HMM: 100,000 train and 10,000 validation sequences of length 32 plus 10,000 length-64 generalization sequences, and the frozen transition/emission matrices. Namespaced under data.hmm so it cannot collide with an upstream key.",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_val_data_path",
+          "value": "/content/lurestar/data/hmm/hmm4x4_val_len32_10000.npy",
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_generalization_data_path",
+          "value": [
+            "/content/lurestar/data/hmm/hmm4x4_lengen_len64_10000.npy"
+          ],
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_n_obs",
+          "value": 4,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_matrices_path",
+          "value": "/content/lurestar/manifests/hmm_matrices.json",
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_num_states",
+          "value": 4,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_train_sequences",
+          "value": 100000,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_val_sequences",
+          "value": 10000,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_generalization_sequences",
+          "value": 10000,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_sequence_length",
+          "value": 32,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
+          "inert_ok": false
+        },
+        {
+          "key": "data.hmm_generalization_sequence_length",
+          "value": 64,
+          "category": "HMM",
+          "authority": "spec sec.12 'Required experiment B: HMM belief geometry'",
+          "reason": "Flat external-datamodule input or prefixed HMM provenance metadata; paths name the immutable generated arrays/manifests and never an upstream corpus.",
           "inert_ok": false
         },
         {
@@ -1284,7 +1636,9 @@
             "confirmatory_seeds": [
               1234,
               1235,
-              1236
+              1236,
+              1237,
+              1238
             ],
             "primary_distance": "centered cosine",
             "robustness_distance": "whitened Euclidean"
@@ -1360,7 +1714,7 @@
         },
         {
           "key": "data.stargraph_generalization_data_path",
-          "reason": "read only at data/stargraph.py:203 under data.test_generalization, and the generalization dataloader is built only for stargraph/countdown/manhattan (core_train.py:344-349). test_generalization stays false here."
+          "reason": "read only by StarGraphDataModule. HMMBeliefDataModule reads its own flat data.hmm_generalization_data_path instead."
         }
       ]
     }

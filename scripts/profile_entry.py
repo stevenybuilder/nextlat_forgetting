@@ -48,6 +48,7 @@ PROBE_PATH = PROBE_PATH.replace("{pid}", str(os.getpid()))
 
 _probe = {
     "pid": os.getpid(),
+    "profile_attempt": int(os.environ.get("PROFILE_ATTEMPT", "0")),
     "argv": list(sys.argv),
     "process_start_unix": time.time(),
     "process_start_perf": time.perf_counter(),
@@ -174,11 +175,21 @@ if not os.path.isfile(TRAIN_PY):
         f"relative to the CWD (train.py:348), so run this with the repo root as CWD."
     )
 
+# Unlike executing ``python /path/to/train.py``, runpy does not put the target script's
+# directory on sys.path.  Fabric/torchrun starts this wrapper as the real script, so without
+# this insertion the pinned trainer's sibling imports (notably ``import core_train``) resolve
+# against scripts/ and fail even when the working directory is the upstream repository.
+TRAIN_DIR = os.path.dirname(os.path.abspath(TRAIN_PY))
+if TRAIN_DIR not in sys.path:
+    sys.path.insert(0, TRAIN_DIR)
+
 sys.argv[0] = TRAIN_PY
 try:
     runpy.run_path(TRAIN_PY, run_name="__main__")
 except SystemExit as exc:
-    _probe["exit"] = f"SystemExit({exc.code})"
+    # Some valid trainer entry points use ``raise SystemExit(main())``.  Exit 0/None is a
+    # successful process, not a failed probe; preserve nonzero exits verbatim for diagnosis.
+    _probe["exit"] = "ok" if exc.code in (0, None) else f"SystemExit({exc.code})"
     raise
 except BaseException as exc:  # noqa: BLE001 - record the failure, then re-raise
     _probe["exit"] = f"{type(exc).__name__}: {exc}"

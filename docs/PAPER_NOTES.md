@@ -9,7 +9,7 @@ something the paper has already claimed, and never mis-states a paper number.
 * Retrieved 2026-08-23 by direct HTTP fetch (no model summarization in the loop) of the LaTeXML
   HTML of the paper:
   * `https://arxiv.org/html/2511.05963v4` → archived at
-    `/Users/stevenyang/Documents/nextlat_forgetting/docs/paper_source/v4.html`
+    `<repo-root>/docs/paper_source/v4.html`
     (sha256 `572bb951092ef764db4838c4af880a3bf9b6bdf80ec395ed0dc9f6678bddcae2`)
   * `https://arxiv.org/abs/2511.05963` → archived at `docs/paper_source/abs.html`
     (sha256 `ccd869a2780c906f655e8c0e0c25f48f4fd51bddd5f0c1007a5559524546b4ff`)
@@ -48,7 +48,7 @@ something the paper has already claimed, and never mis-states a paper number.
 | Code | `https://github.com/JaydenTeoh/NextLat` (stated in the Abstract) |
 
 Note for our project: the pinned upstream checkout
-`/Users/stevenyang/Documents/nextlat_forgetting/upstream/NextLat` is at commit
+`<repo-root>/upstream/NextLat` is at commit
 `3770be6009cea2b3c455a9ce7f2ca88b504bb955`, "Initial public release", dated **Mon May 25
 21:50:04 2026 -0700** — i.e. contemporaneous with paper **v3**, three weeks before **v4**. Treat
 the repo as the v3-era code release; do not assume it contains anything added in v4.

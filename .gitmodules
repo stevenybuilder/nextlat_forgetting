@@ -1,0 +1,3 @@
+[submodule "upstream/NextLat"]
+	path = upstream/NextLat
+	url = https://github.com/JaydenTeoh/NextLat.git

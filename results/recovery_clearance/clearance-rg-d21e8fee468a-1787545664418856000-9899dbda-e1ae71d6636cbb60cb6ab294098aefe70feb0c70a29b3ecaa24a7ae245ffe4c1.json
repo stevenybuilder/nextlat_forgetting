@@ -1,0 +1,92 @@
+{
+  "audit": {
+    "policy": "mechanical_fail_closed_recovery_clearance_v1",
+    "rationale": "The common-parent reference and GCS-restored arms produced byte-identical step-300 checkpoints, and every serialized-state, logits, and metrics domain was exactly equal (max_abs=max_rel=0). The only original false check was a missing human-readable log marker in both bounded tails.",
+    "verdict": "GO"
+  },
+  "caveats_and_follow_up": {
+    "current_5000_line_tail_is_not_a_structured_latch": true,
+    "future_latch_hardening_required": true,
+    "no_failed_scientific_result_reclassified": true,
+    "no_tolerance_changed": true,
+    "required_design": "Persist a structured fast-forward event at observation time and compare that latched event, independent of any bounded diagnostic log tail."
+  },
+  "disposition": {
+    "engineering_recovery_equivalence": "GO",
+    "original_schema_v2_gate_passed": false,
+    "repeat_t4_required_for_this_engineering_question": false,
+    "scientific_or_confirmatory_result": false
+  },
+  "exact_replay_evidence": {
+    "domains": {
+      "amp_grad_scaler": {
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "ok": true
+      },
+      "logits": {
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "ok": true
+      },
+      "metrics": {
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "ok": true
+      },
+      "optimizer": {
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "ok": true
+      },
+      "rng": {
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "ok": true
+      },
+      "scheduler": {
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "ok": true
+      },
+      "weights": {
+        "max_abs": 0.0,
+        "max_rel": 0.0,
+        "ok": true
+      }
+    },
+    "durable_state_last_recovered": true,
+    "durable_state_last_reference": true,
+    "final_checkpoint_byte_identical": true,
+    "final_checkpoint_size_bytes": 256007203,
+    "recovered_step_300_sha256": "9b7f2d2edec3d4045ce963a4deb0179ca7f6c662090eb7a35825ec1ca38e7c04",
+    "reference_step_300_sha256": "9b7f2d2edec3d4045ce963a4deb0179ca7f6c662090eb7a35825ec1ca38e7c04",
+    "shared_step_150_parent_sha256": "ec631e5a01f6e64a6564627a58ea18034f9f03b650bb6d7c56d6f8514b72f01b"
+  },
+  "gate_id": "rg-d21e8fee468a-1787545664418856000-9899dbda",
+  "original_result": {
+    "generation": "1787546253389363",
+    "md5_base64": "CxYAyi24ER09S3uJpxIDJA==",
+    "metageneration": 1,
+    "passed": false,
+    "preservation_rule": "This receipt supplements and never replaces result.json.",
+    "sha256": "f9472aacb950437a17d984217d81030ad4b96509448c8d5bcdebd033783ce4e0",
+    "size_bytes": 107031,
+    "uri": "gs://nextlat-lurestar-project-flash-490419/lurestar/recovery-gates/rg-d21e8fee468a-1787545664418856000-9899dbda/result.json"
+  },
+  "schema": "nextlat_forgetting/recovery_clearance/1",
+  "sole_failed_original_check": {
+    "cause": "Both resume markers were emitted near process start, then evicted from the executed harness's 300-line bounded deque before comparison.",
+    "classification": "observation-harness false negative",
+    "name": "data_position.fast_forward_marker_observation",
+    "recovered_marker_observed": false,
+    "reference_marker_observed": false
+  },
+  "source_proof": {
+    "archive_generation": "1787545701151305",
+    "archive_sha256": "d21e8fee468a4c62f34a5384898142bc5bb4bc7a5565da6e0c567076be5ec9e9",
+    "archive_uri": "gs://nextlat-lurestar-project-flash-490419/lurestar/source/project-d21e8fee468a4c62f34a5384898142bc5bb4bc7a5565da6e0c567076be5ec9e9.tar.gz",
+    "executed_bounded_tail": "collections.deque(maxlen=300)",
+    "executed_recovery_harness_sha256": "2000c1b2f8a7f9d14c6eebf817e3fc2d54c2ea523c0c68a9b81eeaa59756d8c1"
+  }
+}

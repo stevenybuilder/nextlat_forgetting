@@ -69,9 +69,15 @@ def centered_cosine_distance(
 
     The center matters. Raw cosine on transformer hidden states is dominated by the population
     mean direction, which is shared by every history and therefore carries no information about
-    which history this is; centering removes it. The center must be estimated once, on the
-    evaluation population, and reused for every pair and both models -- passing a per-condition
-    center would let a model look better simply by having a larger mean offset.
+    which history this is; centering removes it.
+
+    It must be estimated once per model, over the whole evaluation population that model is
+    scored on, and then reused across every pair set within that model. It cannot be shared
+    *between* GPT and NextLat -- those are two unrelated 128-dimensional bases and a common mean
+    vector is not a defined object -- so what makes the comparison fair is that both models get
+    the same *rule*, not the same vector. Estimating the center on one arm only (say the controls)
+    is the failure mode: it shifts the two arms' cosines by different amounts and can create or
+    erase the H1 effect on its own.
     """
     xa = np.asarray(xa, dtype=np.float64)
     xb = np.asarray(xb, dtype=np.float64)
@@ -134,8 +140,20 @@ def bootstrap_ci(
     if values.size == 0:
         return float("nan"), float("nan"), float("nan")
     rng = rng or np.random.default_rng(0)
-    idx = rng.integers(0, values.size, size=(n_boot, values.size))
-    boots = np.array([statistic(values[i]) for i in idx])
+    # Drawn in blocks. The whole (n_boot, N) index matrix is 8 * n_boot * N bytes -- 13.6 GB at
+    # the size H3's probe pool actually is (10,000 sequences x 17 prefix lengths at n_boot=10,000),
+    # so materialising it is not a style question. Blocks of at most ~4e6 indices keep the working
+    # set under 32 MB while drawing exactly the same numbers in the same order from `rng`, so the
+    # result is unchanged and still a deterministic function of the generator alone.
+    block = max(1, min(n_boot, int(4e6 // max(values.size, 1))))
+    boots = np.empty(n_boot, dtype=np.float64)
+    done = 0
+    while done < n_boot:
+        take = min(block, n_boot - done)
+        idx = rng.integers(0, values.size, size=(take, values.size))
+        for r in range(take):
+            boots[done + r] = statistic(values[idx[r]])
+        done += take
     lo, hi = np.percentile(boots, [100 * alpha / 2, 100 * (1 - alpha / 2)])
     return float(statistic(values)), float(lo), float(hi)
 
@@ -204,17 +222,30 @@ def h1_predictive_equivalence(
     if not np.array_equal(equivalent.prefix_len, control.prefix_len):
         raise ValueError("control set is not matched on prefix length")
 
+    # The centering population is part of the estimator, not an implementation detail. Centering
+    # on the control set alone (or on each set separately) shifts every cosine by a different
+    # amount for the two arms and can manufacture or erase the whole H1 effect, so the population
+    # is fixed here to the union of all four state arrays and recorded in the output. A caller
+    # that passes an explicit `center` owns that choice and it is reported as `caller`.
+    center_population = "equivalent_and_control_union" if center is None else "caller"
     if center is None:
         center = np.concatenate(
             [equivalent.a, equivalent.b, control.a, control.b], axis=0
         ).mean(axis=0)
     d_eq = centered_cosine_distance(equivalent.a, equivalent.b, center)
     d_ct = centered_cosine_distance(control.a, control.b, center)
+    # Paired, element by element. Not `d_eq - d_ct.mean()`: the two arms share prefix length and
+    # edit distance pair-for-pair, and it is that pairing which the bootstrap and `cohens_dz`
+    # below are entitled to use. Replacing it with an unpaired contrast leaves the point estimate
+    # identical and silently changes the inferential unit, which PROGRAM.md forbids.
     delta = d_eq - d_ct  # negative means equivalence is respected
 
     out = {
         "n_pairs": int(len(d_eq)),
         "distance": "centered_cosine",
+        "center_population": center_population,
+        "paired": True,
+        "unpaired_delta_sd": float((d_eq - d_ct.mean()).std(ddof=1)),
         "equivalent_distance_mean": float(d_eq.mean()),
         "control_distance_mean": float(d_ct.mean()),
         "paired_delta_mean": float(delta.mean()),
@@ -227,6 +258,7 @@ def h1_predictive_equivalence(
     # Standardised effect size on the paired differences; with three seeds this is the honest
     # summary, not a p-value from thousands of pairs that share a single training run.
     sd = delta.std(ddof=1)
+    out["paired_delta_sd"] = float(sd)
     out["paired_delta_cohens_dz"] = float(delta.mean() / sd) if sd > 0 else float("nan")
 
     if whitener is not None:
@@ -254,7 +286,13 @@ def h1_near_lure_separation(
     rather than merely compressed -- the same argument spec section 6 makes for Lure-Star's PSI.
     """
     if center is None:
-        center = np.concatenate([near_lures.a, near_lures.b], axis=0).mean(axis=0)
+        # Include the control arm when there is one, so both arms are measured from the same
+        # origin; centering on the lures alone and then scoring the controls against that center
+        # is the wrong-pool error this function used to make by default.
+        parts = [near_lures.a, near_lures.b]
+        if control is not None:
+            parts += [control.a, control.b]
+        center = np.concatenate(parts, axis=0).mean(axis=0)
     d = centered_cosine_distance(near_lures.a, near_lures.b, center)
     est, lo, hi = bootstrap_ci(d, rng=rng)
     out = {
@@ -269,6 +307,17 @@ def h1_near_lure_separation(
         d_ct = centered_cosine_distance(control.a, control.b, center)
         out["control_distance_mean"] = float(d_ct.mean())
         out["separation_index"] = float(d.mean() - d_ct.mean())
+        # The shipped bank has no control matched to the near-lures: its only control arm is
+        # matched to the *equivalent* pairs, whose edit distance is ~28 symbols against the
+        # lures' ~1.6. Subtracting those two means is then a surface-distance contrast wearing a
+        # predictive-geometry label, so the mismatch is measured and reported rather than hidden,
+        # and the index must not be read as an effect while `control_is_edit_matched` is false.
+        matched = bool(
+            np.array_equal(near_lures.edit_distance, control.edit_distance)
+            and np.array_equal(near_lures.prefix_len, control.prefix_len)
+        )
+        out["control_is_edit_matched"] = matched
+        out["control_edit_mean"] = float(np.mean(control.edit_distance))
     return out
 
 

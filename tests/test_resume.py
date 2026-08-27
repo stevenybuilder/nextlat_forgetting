@@ -583,6 +583,23 @@ def test_adopt_brings_an_externally_written_checkpoint_under_verification(tmp_pa
     assert [r.step for r in ck.read_index()] == [15000, 14000]
 
 
+def test_adopt_preserves_an_existing_exact_receipt_bound_sidecar(tmp_path):
+    _out, exp, ck = _upstream_layout(tmp_path)
+    checkpoint = exp / "recovery_ckpt_iter_15000.pt"
+    sidecar = checkpoint.with_name(checkpoint.name + ".meta.json")
+    sidecar.write_text(json.dumps({
+        "sha256": sha256_file(checkpoint),
+        "size_bytes": checkpoint.stat().st_size,
+        "training_steps": 15000,
+        "receipt_generation": "immutable-predecessor-generation",
+    }, sort_keys=True) + "\n")
+    original = sidecar.read_bytes()
+
+    ck.adopt(checkpoint)
+
+    assert sidecar.read_bytes() == original
+
+
 def test_adopt_rolls_back_past_a_torn_upstream_checkpoint(tmp_path):
     """`fabric.save` (model_base.py:417) is not atomic, so a kill leaves a truncated .pt."""
     out, exp, ck = _upstream_layout(tmp_path)

@@ -1,18 +1,32 @@
 # FOUNDATIONS — the single brief every later agent reads
 
 **Project:** NextLat × Predictive Geometry (Lure-Star + HMM)
-**Sole specification:** `/Users/stevenyang/Documents/nextlat_forgetting/nextlat_v4_predictive_geometry_spec.md`
-**Pinned upstream:** `/Users/stevenyang/Documents/nextlat_forgetting/upstream/NextLat` @ `3770be6009cea2b3c455a9ce7f2ca88b504bb955` ("Initial public release", Mon 25 May 2026 21:50:04 -0700)
+**Sole specification:** `<repo-root>/nextlat_v4_predictive_geometry_spec.md`
+**Pinned upstream:** `<repo-root>/upstream/NextLat` @ `3770be6009cea2b3c455a9ce7f2ca88b504bb955` ("Initial public release", Mon 25 May 2026 21:50:04 -0700)
 **Paper:** arXiv:2511.05963**v4** [cs.LG], last revised 15 Jun 2026. **The pinned repo is v3-era code, three weeks older than v4.** Never assume the repo contains anything v4 added.
 **Scout reports this brief supersedes for day-to-day use (but not for detail):** `docs/UPSTREAM_REPORT.md`, `docs/PAPER_NOTES.md`, `docs/STYLE_GUIDE.md`, `docs/COLAB_TRANSPORT.md`.
 **Written:** 2026-08-23.
+
+> **Reproducibility correction (2026-08-25):** D47 supersedes this file's earlier claims that
+> one-device DDP matches the paper's sampler regime or repeats a fixed permutation because
+> `core_train.py` does not call `set_epoch()`.  Recorded Lightning Fabric traces advanced sampler
+> epochs automatically.  Do not use the historical DDP1/durability recommendations below as a
+> scientific execution-parity argument.  See
+> `docs/DECISION_D47_NEXTLAT_SEED1235_REPRODUCIBILITY_DIAGNOSTIC.md`.
+
+**Binding pre-outcome amendment:** `docs/PREREGISTRATION_AMENDMENT_2026-08-24.md`. It supersedes
+older language below that calls whitened distance a robustness-only check, uses only near/far H3
+branches, or uses one HMM as a discovery surface. Confirmatory training is blocked until the
+amendment's pre-compute freeze gate passes.
 
 Rules of engagement for every agent downstream:
 
 - Cite `file:line` against the pinned tree for any claim about upstream. Never invent an API.
 - The spec is authoritative on *science*. The repo is authoritative on *code*. Where they disagree, §2 below records the decision, and §2 is the thing you follow.
 - Do not push code, rent compute, or exceed the budget envelope in §4 without explicit approval.
-- Three rows in §2 are `BLOCKED-NEEDS-DECISION`. Two of them must be resolved **before the first confirmatory GPU-hour is spent**, not after.
+- One §2 row remains `BLOCKED-NEEDS-DECISION` (D-36, credential scope). D-20 is resolved by the
+  NextLat/BST competence gates and GPT exemption; D-11 is resolved by the frozen index-62/index-63
+  roles and the 2026-08-24 amendment.
 
 ---
 
@@ -55,7 +69,7 @@ Verbatim example at `--max_nodes 100`:
 
 **Prompt-loss masking** (`model_gpt.py:362-370`, `model_nextlat.py:441-453`): loss is computed on 6 positions per example — the source copy, four path continuations, and EOS.
 
-**Accuracy metric** (`data/stargraph.py:77-162`): `prefix = batch[:, :-6]` → 63 tokens ending exactly on `=`; the logged metric is `val_(5, 5)/test_accuracy` (exact-path) plus `val_(5, 5)/token_{1..5}`. `token_1` is the trivial source copy and will sit at ~100%; **`token_2` is the first-branch accuracy the spec's H2 cares about.** Generation uses `torch.multinomial` (`model_gpt.py:555-557`, `model_nextlat.py:734-736`) with `temperature=1.0, top_k=None` from `getattr` defaults (`data/stargraph.py:126-127`) — **the 90% competence gate is a sampled metric, not greedy.**
+**Accuracy metric** (`data/stargraph.py:77-162`): `prefix = batch[:, :-6]` → 63 tokens ending exactly on `=`; the logged metric is `val_(5, 5)/test_accuracy` (exact-path) plus `val_(5, 5)/token_{1..5}`. `token_1` is the trivial source copy and will sit at ~100%; **`token_2` is the first-branch accuracy the spec's H2 cares about.** Generation uses `torch.multinomial` (`model_gpt.py:555-557`, `model_nextlat.py:734-736`) with `temperature=1.0, top_k=None` from `getattr` defaults (`data/stargraph.py:126-127`), so the paper-comparable in-training metric is sampled. The binding 90% competence gate is a separate hash-bound offline evaluation fixed before outcomes to greedy `top_k=1`, `temperature=0`; both numbers are retained.
 
 ### 1.2 The final post-normalization hidden state
 
@@ -106,9 +120,12 @@ So `logits, h = f(...)` cannot be written once for both. For NextLat, apply the 
 
 **Durability gaps, all confirmed:** non-atomic `.pt` write (`model_base.py:417`) and non-atomic pointer write (`core_train.py:944-948`, `:970-974`); only one recovery checkpoint kept and the old one deleted before the new one is verified (`core_train.py:976-982`); `self.recovery_checkpoint_path` is in-memory only (`core_train.py:334`) so post-resume the pre-crash file leaks; `os.remove` unguarded (`core_train.py:979`); `_read_scheduler_state_from_checkpoint` does a second full `torch.load` and swallows every exception (`model_base.py:440-456`), so a truncated checkpoint resumes **silently with no scheduler state**.
 
-**Data position is replayed, not restored** (`core_train.py:432-452`): exactly `self.step` batches are materialized, collated, and discarded. A resume at step 19,000 re-tokenizes ~9.7 M lines with `num_workers: 0`. Budget minutes and measure it at the profiling gate. Whether the replayed order *matches* depends on the sampler: plain `--devices 1` keeps a `RandomSampler` driven by the global torch RNG (which diverges on resume, because `init_module(empty_init=True)` at `core_train.py:171` skips the weight-init draws), while `--strategy ddp --devices 1` substitutes a `DistributedSampler` whose permutation is a fixed function of its seed — and `set_epoch` is **never called anywhere in `core_train.py`**, so the order is identical every epoch and across resumes.
+**Data position is replayed, not restored** (`core_train.py:432-452`): exactly `self.step` batches are materialized, collated, and discarded. A resume at step 19,000 re-tokenizes ~9.7 M lines with `num_workers: 0`. Budget minutes and measure it at the profiling gate. Plain `--devices 1` keeps a `RandomSampler` driven by the global torch RNG, which can diverge on resume because `init_module(empty_init=True)` skips the scratch run's weight-initialization draws. Historical text here claimed that DDP1 repeated epoch zero because `core_train.py` never calls `set_epoch`; D47's recorded Lightning Fabric traces disproved that claim by showing automatic epoch advancement.
 
-**Off-by-one:** `if self.step > self.config.trainer.train_batches: return` (`core_train.py:569`) → **20,001** optimizer steps for `train_batches: 20000`. Harmless; record it.
+**Exact update count:** pinned upstream uses `step > train_batches`, but production applies a
+source-hash/commit-guarded runtime patch to `step >= train_batches` before launch. The patched
+loop therefore executes exactly 20,000 base updates, exactly 3,000 HMM updates, and exactly 500
+adaptation updates for the absolute target `parent_step + 500` (20,500 from a 20,000-step parent).
 
 ### 1.4 The single-GPU training command
 
@@ -120,7 +137,9 @@ fabric run --strategy ddp --devices 1 --precision bf16-mixed train.py \
   trainer.log_to_wandb=false trainer.compile=false
 ```
 
-`--strategy ddp` is a deliberate addition to the spec's `--devices 1` form: it buys the deterministic `DistributedSampler` order described above, and matches the paper's own sampler regime. CLI overrides are parsed as an OmegaConf dotlist (`train.py:265,349`).
+`--strategy ddp` was added to the spec's `--devices 1` form for recovery determinism.  D47 later
+showed that this is not execution-equivalent to the paper's two-GPU DDP launcher and does not justify
+a scientific parity claim. CLI overrides are parsed as an OmegaConf dotlist (`train.py:265,349`).
 
 Use `--precision 16-mixed` only on hardware without stable BF16 (T4/Turing has none). **That is a precision deviation and must not be on the confirmatory path.**
 
@@ -168,11 +187,11 @@ Verdicts: **ADOPT REPO** = the spec is wrong or imprecise, follow the code. **OV
 | D-16 | `data.train_sequences` / `sequence_length` (§12) | Do not exist. | OVERRIDE PER SPEC | New keys owned by the new datamodule; harmless because OmegaConf merge is non-struct — but only *our* code will read them. |
 | D-17 | §12 HMM YAML block as written | **`trainer.test_interval` is read unconditionally at `core_train.py:671` on every validation and is NOT in `defaults.yaml`.** Same for `trainer.test_batches` and `trainer.experiment_name` (`train.py:95`). | OVERRIDE PER SPEC | The spec's HMM YAML omits `test_interval`. As written, **both HMM runs crash at the first validation (step 300)** with a missing-key error. Every config we emit — Lure-Star and HMM — must carry `experiment_name`, `test_interval`, `test_batches`, `val_batches`. |
 | D-18 | §9: deterministic job ids like `nextlat-s1234-base`, and a runner that predicts checkpoint paths | `train.py:98-99`: `if "seed" not in experiment_name: experiment_name += f"-seed{config.seed}"`, then `config.trainer.experiment_name` is **overwritten** at `train.py:125` and used to build every checkpoint path (`core_train.py:933,959`). | ADOPT REPO | `nextlat-s1234-base` does not contain the substring `seed`, so the on-disk directory is `nextlat-s1234-base-seed1234`. **The runner must predict `{out_dir}/{experiment_name}-seed{seed}/`**, or embed `seed` in the job id, or it will hash the wrong path and mark a good job FAILED. |
-| D-19 | §6/§8: H3 adaptation = 500 updates from a frozen parent | `--checkpoint_path` (`train.py:262-264`, precedence at `core_train.py:130`) restores `training_steps`, and `core_train.py:309` sets `self.step = self.model.training_steps`. `core_train.py:569` returns when `step > train_batches`. | OVERRIDE PER SPEC | Branching a 20,000-step parent starts the adaptation run at step **20,001**. With `train_batches: 500` the loop **returns immediately and the job looks like a clean completion with zero updates.** Set `train_batches: 20500`, or reset `training_steps` before the trainer is constructed. Record which. |
-| D-20 | §8: "If either model fails the base competence gate — initially 90% exact-path accuracy — debug data, configuration, numerical precision, and repository parity" | The paper's own Fig. 6 puts **GPT on G(5,5) at ≈18.6%**, i.e. 1/d chance, versus NextLat ≈99.8% (digitized, ±0.5 pp, `docs/PAPER_NOTES.md`). GPT failing Path-Star **is the paper's headline result**, not a bug. | **BLOCKED-NEEDS-DECISION** | Read literally, spec §10's stop condition ("either model remains below the base competence gate after a reasonable step increase") halts the whole project on a *correct* GPT run. It also hollows out H2/H3: a model at chance has a degenerate correct-branch margin, so "margin erosion" is measured on a capability it never had. **Resolve before launch.** Recommended resolution in §6/R1. |
+| D-19 | §6/§8: H3 adaptation = 500 updates from a frozen parent | `--checkpoint_path` (`train.py:262-264`, precedence at `core_train.py:130`) restores `training_steps`, and `core_train.py:309` seeds `self.step` from that absolute count. Pinned `core_train.py:569` uses `>`, which would add one update at every target. | OVERRIDE PER SPEC | Production applies the source-hash/commit-guarded `>=` stop-rule patch and asks an adaptation branch for the absolute target `parent_step + 500` (20,500 from a 20,000-step parent). MatrixRunner accepts completion only when `final_step - parent_step == 500`; both under- and overruns fail. |
+| D-20 | §8: "If either model fails the base competence gate — initially 90% exact-path accuracy — debug data, configuration, numerical precision, and repository parity" | The paper's own Fig. 6 puts **GPT on G(5,5) at ≈18.6%**, i.e. 1/d chance, versus NextLat ≈99.8% (digitized, ±0.5 pp, `docs/PAPER_NOTES.md`). GPT failing Path-Star **is the paper's headline result**, not a bug. | **RESOLVED — D-20** | The binding 90% threshold applies to NextLat and BST; GPT is measured and reported but threshold-exempt. Every parent must still carry a hash-bound competence receipt before adaptation. See `docs/DECISION_D20_competence_gate.md`. |
 | D-21 | §8: `effective_batch_size: 512` | `512` in the shipped YAML (`gpt_stargraph_5_5.yaml:22`), but `device_batch_size = effective // world_size` (`train.py:143-145`) → **512/GPU on one device, 2× the shipped 2-GPU script's 256**. Accumulation slices an already-loaded batch (`core_train.py:486-499`) and preserves the optimizer-update count. | ADOPT REPO **+ profile** | Do not change 512. This is precisely what the §11 profiling gate exists to test. If it does not fit, `gradient_accum_steps: 2` is a legitimate execution fallback that preserves effective batch and update count — document it as a deviation. |
-| D-22 | §10: 90% exact-path competence gate | `evaluate_stargraph` generates with `torch.multinomial` (`model_gpt.py:555-557`, `model_nextlat.py:734-736`), `temperature=1.0`, `top_k=None` from `getattr` defaults (`data/stargraph.py:126-127`). | ADOPT REPO **+ report both** | The gate is a *sampled* metric and will read lower than greedy. Add `trainer.top_k: 1` to make the in-training metric greedy without touching code, and report sampled and greedy side by side. State which one the gate is evaluated on **before** the first run. |
-| D-23 | §9: "verify … data position" in the forced-interruption test | Data position is not checkpointed; it is replayed (`core_train.py:432-452`), and with plain `--devices 1` the `RandomSampler` order diverges post-resume. `set_epoch` is never called, so `--strategy ddp --devices 1` gives a fixed `DistributedSampler` order. | OVERRIDE PER SPEC | Run confirmatory jobs as `fabric run --strategy ddp --devices 1`. This is an addition to the spec's launch line, adopted because it makes the mandatory recovery test passable without patching the trainer. **Verify empirically with the 300 vs 150+150 test before trusting it**; if it fails, add RNG state to the checkpoint as spec §9 already anticipates. |
+| D-22 | §10: 90% exact-path competence gate | `evaluate_stargraph` generates with `torch.multinomial` (`model_gpt.py:555-557`, `model_nextlat.py:734-736`), `temperature=1.0`, `top_k=None` from `getattr` defaults (`data/stargraph.py:126-127`). | ADOPT REPO **+ separate greedy gate** | Preserve the sampled in-training metric for paper comparability. Evaluate the binding gate offline with a hash-bound deterministic evaluator (`top_k=1`, `temperature=0`) and report both. This regime was frozen before the first outcome. |
+| D-23 | §9: "verify … data position" in the forced-interruption test | Data position is not checkpointed; it is replayed (`core_train.py:432-452`). D47 later showed that Lightning Fabric advances distributed-sampler epochs and that DDP1 is not equivalent to the paper's DDP2 execution. | SUPERSEDED BY D47 | Do not use DDP1 as a confirmatory parity device. Any recovery test must explicitly record sampler state and exact batch hashes in one frozen topology. |
 | D-24 | §9: atomic checkpoints, two verified recovery files | Upstream writes the `.pt` and both pointers non-atomically (`model_base.py:417`, `core_train.py:944-948`, `:970-974`) and deletes the previous recovery checkpoint unverified (`core_train.py:976-979`). | OVERRIDE PER SPEC | Spec §9.2 items 2–4 are real fixes for real bugs, not belt-and-braces. Implement as a **minimal patch on the pinned tree** and archive the diff in `source_snapshot/`. |
 | D-25 | §9: `init_from: resume` is the recovery path | If neither pointer exists, `core_train.py:165-168` **silently initializes from scratch**. A completed run leaves a stale `recovery_ckpt` → next resume hard-fails at `core_train.py:148-150`. | OVERRIDE PER SPEC | The runner must (a) verify the pointer and its target hash **before** passing `init_from=resume`, and (b) clear `recovery_ckpt` when a job reaches DONE. Never treat "training started" as "resume succeeded". |
 | D-26 | §8/§11: bit-comparable reruns, "chosen deterministic tolerance" | `train.py:171-172` force-enables TF32 unconditionally; `trainer.deterministic` (`defaults.yaml:38`) is **never read anywhere** — dead key. `fabric.seed_everything(seed + global_rank)` is called once, at `train.py:170`, and nothing re-seeds on resume. | ADOPT REPO | Bit-exactness is not available out of the box. The spec's "deterministic tolerance" framing is correct; pick and record the tolerance rather than expecting exactness. Do not set `trainer.deterministic` and believe it did something. |
@@ -181,14 +200,15 @@ Verdicts: **ADOPT REPO** = the spec is wrong or imprecise, follow the code. **OV
 | D-29 | §2 / §12: `lambda_mse` is an MSE | The repo's `lambda_mse` is the paper's `λ_next-h`, and the loss is **Smooth L1** (paper Eq. 3; the repo detaches the target at `model_nextlat.py:303`). The metric logged as `mse_loss` is a Huber loss. | ADOPT REPO | Naming only, but the writeup must say Smooth L1. Appendix E of the paper lists "replacing Smooth L1 with MSE" as an *unsuccessful* fix — do not silently swap it. |
 | D-30 | §5: "200,000 fixed training graphs and 20,000 held-out tests" reproducible | No `--seed` flag; seeds are `0…num_samples-1` for train and **continue from `--num_samples`** for test (`prepare.py:52,61-62,90-91`). | ADOPT REPO | The held-out set is only reproducible if `--num_samples` is byte-identical. Pin the full command in the manifest, and hash both files. Disjointness is by seed, never content-checked — add our own content-level disjointness assertion for `E_lure`. |
 | D-31 | §11: "Prefer an A100 40/80 GB, L40S, H100, A6000" | `colab` CLI v0.2.0 accepts `--gpu t4\|l4\|a100` only; H100 appears in `eligible_gpus` but is not a selectable value (`docs/COLAB_TRANSPORT.md` §2). | ADOPT REPO | A100 it is. See §4. One budgeted H100 probe is allowed; do not plan around it. |
-| D-32 | §9: "MyDrive/lurestar/" durable layout | Transport reality: `colab upload`/`download` are base64-over-Jupyter-kernel, not file transfers (`docs/COLAB_TRANSPORT.md` §2). A ~256 MB checkpoint cannot go through them. | OVERRIDE PER SPEC | Keep the spec's *directory schema* but root it at `gs://nextlat-lurestar-project-flash-490419/lurestar/`, with all runtime GCS I/O through the Python client (`GOOGLE_APPLICATION_CREDENTIALS=/content/adc.json`); **`gcloud storage` does not authenticate inside Colab** and is banned in the runtime. |
-| D-33 | §5: "five seeds" (paper config) vs §8: "three preregistered confirmatory seeds" | Repo sweep ships `[1234,1235,1236,1237,1238]` (`nextlat_stargraph_5_5.yaml:56`). | ADOPT REPO **for the values**, spec for the count | Confirmatory = `1234, 1235, 1236` (the first three). The reduction from five to three is a documented deviation from the paper and must be named as such in the writeup, together with what three seeds could not have detected. |
-| D-34 | §7: causal patch of the penultimate-layer state | Penultimate = output of `transformer.blocks[10]` for `n_layer=12`. Patching `transformer.norm`'s output is what the spec explicitly forbids, because `lm_head` consumes it directly (`model_gpt.py:280`). | ADOPT REPO | The spec's warning maps onto a concrete module index. Stretch goal only; drop it before dropping H3 or the HMM. |
+| D-32 | §9: "MyDrive/lurestar/" durable layout | Transport reality: `colab upload`/`download` are base64-over-Jupyter-kernel, not file transfers (`docs/COLAB_TRANSPORT.md` §2). A ~256 MB checkpoint cannot go through them. | OVERRIDE PER SPEC | Keep the spec's *directory schema* but root it at `gs://YOUR_PRIVATE_BUCKET/lurestar/`, with all runtime GCS I/O through the Python client (`GOOGLE_APPLICATION_CREDENTIALS=/content/adc.json`); **`gcloud storage` does not authenticate inside Colab** and is banned in the runtime. |
+| D-33 | §5 and §8: five confirmatory seeds matching the paper config | Repo sweep ships `[1234,1235,1236,1237,1238]` (`nextlat_stargraph_5_5.yaml:56`). | ADOPT REPO | Confirmatory = all five released-config seeds, `1234` through `1238`, decided before any model training. The paper reports five random seeds but does not name their IDs in prose. |
+| D-34 | §7: causal patch of the penultimate-layer state | Penultimate = output of `transformer.blocks[10]` for `n_layer=12`. Patching `transformer.norm`'s output is what the spec explicitly forbids, because `lm_head` consumes it directly (`model_gpt.py:280`). | ADOPT REPO | For the original Lure-Star study this remains a stretch goal. The later CFS-2 decision separately requires blocks 3, 7, and 10; do not use this older lifecycle label to drop CFS-2 patching. |
 | D-35 | §9: `E_lure` and `A_pair` must never enter training | Nothing upstream enforces this; `_measure_index` reads only line 0 and the datamodule has no dedup (`data/stargraph.py:237-247`). | OVERRIDE PER SPEC | Our own hashed-manifest disjointness check is the only guard. It belongs in `src/lurestar/validate.py` and in the acceptance tests, and must run **before** every training launch, not once. |
-| D-36 | §9 security: credentials on the runtime | `/content/adc.json` would be a live `authorized_user` refresh token for `<redacted-account>` with full `cloud-platform` scope. | **BLOCKED-NEEDS-DECISION** | Recommend a dedicated service account with `roles/storage.objectAdmin` on `nextlat-lurestar-project-flash-490419` only. Blast radius one bucket, independently revocable, and it works with the identical `GOOGLE_APPLICATION_CREDENTIALS` pattern. The user-ADC route is the working fallback, not the plan. Needs a yes/no before the first upload. |
+| D-36 | §9 security: credentials on the runtime | `/content/adc.json` would be a live `authorized_user` refresh token for `<redacted-account>` with full `cloud-platform` scope. | **BLOCKED-NEEDS-DECISION** | Recommend a dedicated service account with `roles/storage.objectAdmin` on `YOUR_PRIVATE_BUCKET` only. Blast radius one bucket, independently revocable, and it works with the identical `GOOGLE_APPLICATION_CREDENTIALS` pattern. The user-ADC route is the working fallback, not the plan. Needs a yes/no before the first upload. |
 | D-37 | §13: bottleneck-width ablation "directly addresses the paper's stated uncertainty" | Paper §6 already states the *direction*: "Empirically, we observe that using smaller latent dimensions is beneficial on tasks such as Path-Star graph and Countdown." | ADOPT REPO (paper) | Accuracy-vs-width is **not novel**. Only the effect of width on *geometry* (PSI, predictive-equivalence collapse, posterior decodability) is. Frame it that way or drop it. |
 
-Three rows carry a `BLOCKED-NEEDS-DECISION`-class urgency: **D-20** (GPT competence gate — resolve before launch), **D-36** (credential scope — resolve before first upload), and, at lower cost, **D-11** (which hidden-state index is primary — resolve before the first plot, and it is free to resolve now by preregistering both).
+Only **D-36** remains a human credential-scope decision. D-20 and D-11 are scientifically resolved
+and must not be silently reopened after outcomes.
 
 ---
 
@@ -234,6 +254,13 @@ The paper is arXiv:2511.05963v4. Every quote below is verbatim from `docs/paper_
 
 **What is therefore genuinely open**, and is the only ground we may claim: *which* distinctions the geometry encodes under **matched** future-relevant vs future-irrelevant perturbation; whether that geometry predicts behavior **item by item**; whether it predicts **later interference**; and whether the states respect **exact Bayesian predictive equivalence** when ground truth is available. The paper supplies no pairwise-distance, predictive-equivalence, belief-divergence, posterior-decoding, or forgetting result of any kind.
 
+The mathematical observation that sufficiency does not imply distance alignment is a framing
+constraint, not a novel theorem: invertible re-encodings preserve sufficiency and can alter ordinary
+distances. The contribution must therefore survive the amendment's centered-cosine plus held-out
+Mahalanobis rule and, for H3, add predictive value beyond first-order gradient and Jacobian-overlap
+baselines. HMMs calibrate those measurements across three model-blind regimes; they are not a second
+place to search for a favorable claim.
+
 **Two more guardrails, from the spec and from honesty:**
 
 - **Non-uniqueness.** Definition 3.1 defines sufficiency only up to invertible re-encoding. Nothing in the paper claims the belief state is minimal, unique, or coordinate-aligned to a posterior simplex, and neither may we. Prioritize predictive equivalence, relative divergence, decodability, and future-distribution prediction over literal alignment to the simplex.
@@ -255,13 +282,13 @@ The paper is arXiv:2511.05963v4. Every quote below is verbatim from `docs/paper_
 
 **H100 is not selectable** at `colab` CLI v0.2.0 (`--gpu` accepts `t4|l4|a100`). One budgeted probe is permitted; do not plan around it.
 
-### 4.2 Rates — one measured, two are placeholders
+### 4.2 Rates — measured 2026-08-23
 
 | GPU | CU/h | Status |
 |---|---|---|
 | T4 | **1.54** | **MEASURED** (`colab quota --json` with a live T4 assignment) |
-| L4 | ~4.82 | **PLACEHOLDER — prior, unverified.** Replace at gate 1. |
-| A100 | ~11.77 | **PLACEHOLDER — prior, unverified.** Replace at gate 1. |
+| L4 | **1.54** | **MEASURED** (`results/compute_log.csv`) |
+| A100 | **5.30** | **MEASURED** (`results/compute_log.csv`) |
 
 Short-session billing floor ≈ **0.17 CU** (measured: a sub-minute accidental T4 cost 0.16875 CU). `quota` and `status` are eventually consistent and have returned a phantom record — **drop detection must require two agreeing polls.**
 
@@ -270,12 +297,16 @@ Short-session billing floor ≈ **0.17 CU** (measured: a sub-minute accidental T
 ### 4.3 Workload and modelled budget
 
 ```
-base       = 6 runs  × 20,000 steps = 120,000 optimizer steps   (3 seeds × {GPT, NextLat})
-adaptation = 12 branches × 500 steps =   6,000 optimizer steps   (2 models × 3 seeds × {near, far})
-HMM        = 6 runs  ×  3,000 steps =  18,000 optimizer steps   (3 seeds × {GPT, NextLat}, small)
+base       = 15 runs × 20,000 steps = 300,000 optimizer steps   (5 seeds × {GPT, NextLat, BST})
+adaptation = 45 branches × 500 steps =  22,500 optimizer steps   (3 models × 5 seeds × {near, mid, far})
+HMM        = 30 runs ×  3,000 steps =  90,000 optimizer steps   (3 regimes × 5 seeds × {GPT, NextLat})
                                        ---------
-                                        144,000 optimizer steps
+                                        412,500 optimizer steps
 ```
+
+**The timing/CU table immediately below predates the 2026-08-24 amendment and is not launch
+authority.** Recompute it from exact post-amendment profiles before confirmatory compute; until that
+receipt exists, the budget gate is closed.
 
 Workload constants, derived from the pinned configs: T=69, 512×69 = **35,328 tokens/step**, **4.51 × 10¹² FLOP/step** (6N, fwd+bwd, N=21.24 M non-embedding); HMM model 0.79 M non-embedding, 3.87 × 10¹⁰ FLOP/step; checkpoint ≈ **256 MB**.
 
@@ -316,7 +347,7 @@ Record into `run_ledger.json` for every job: session id, GPU name, zone, `paid_b
 - **Never capture the child's stdout.** Stream line-by-line (`Popen(..., bufsize=1, text=True)`) with a 30 s heartbeat thread, or the websocket dies during a trailing checkpoint write — exactly when results exist and are not yet durable.
 - **`upload`/`download` are base64-over-kernel, not transfers.** Sidecars only. A 256 MB checkpoint goes runtime↔GCS directly.
 - **All runtime GCS I/O through the Python client** with `GOOGLE_APPLICATION_CREDENTIALS`. **`gcloud storage` does not authenticate inside Colab** and is banned in the runtime.
-- Durable root: `gs://nextlat-lurestar-project-flash-490419/lurestar/` (US-CENTRAL1), with spec §9's `source_snapshot/ manifests/ runs/{model}/{seed}/{phase}/{condition}/ results/ run_ledger.json` schema underneath.
+- Durable root: `gs://YOUR_PRIVATE_BUCKET/lurestar/` (US-CENTRAL1), with spec §9's `source_snapshot/ manifests/ runs/{model}/{seed}/{phase}/{condition}/ results/ run_ledger.json` schema underneath.
 
 ---
 
@@ -348,7 +379,9 @@ Copy the shipped 5_5 YAMLs wholesale (D-27), then apply: `compile: false` (D-08)
 ### P4 — Durability and the runner (blocks all GPU spend)
 `src/lurestar/durable_checkpoint.py`, `scripts/run_matrix.py`, `results/run_ledger.json`, `tests/test_resume.py`.
 Minimal patch on the pinned tree for `.partial` + atomic rename, atomic pointer writes, two verified recovery checkpoints, guarded `os.remove` (D-24); runner-side pointer verification before `init_from=resume` and `recovery_ckpt` cleanup on DONE (D-25); path prediction that accounts for the `-seed{seed}` suffix (D-18); the two-strike circuit breaker keyed on GCS `state.json` (§4.4).
-**Exit:** the spec §9 forced-interruption test passes on T4 under `--strategy ddp --devices 1` (D-23), with the divergence tolerance recorded. If it fails, add RNG state to the checkpoint and re-run — do not proceed on a "close enough" resume.
+**Historical exit (superseded by D47):** the former T4/DDP1 recovery gate is not evidence of
+scientific execution parity.  A replacement recovery test must freeze topology and verify exact
+batch hashes plus sampler state; otherwise the downstream run is exploratory only.
 
 ### P5 — Profiling gate
 `scripts/profile.sh`, `results/compute_log.csv`.
@@ -359,31 +392,48 @@ Minimal patch on the pinned tree for `.partial` + atomic rename, atomic pointer 
 New `hmm_belief` datamodule registered in `train.py:34-42` (D-15) implementing `update_config` / `get_tokenizer` / `train_dataloader` / `val_dataloader`; `configs/gpt_hmm.yaml`, `configs/nextlat_hmm.yaml` **including `test_interval` or they crash at step 300** (D-17).
 **Exit:** 50 steps run clean end-to-end including one validation pass.
 
-### P7 — Base training (6 runs)
-3 seeds × {GPT, NextLat}, `1234/1235/1236`, one `out_dir` per job, 20,000 steps.
+### P7 — Base training (15 runs)
+5 seeds × {GPT, NextLat, BST}, `1234/1235/1236/1237/1238`, one `out_dir` per job, 20,000 steps.
 **Exit:** competence gate evaluated per the D-20 decision; `materialized_config.yaml` archived and hashed for every run; checkpoint lineage recorded.
 
 ### P8 — Representations and H1/H2
 `src/lurestar/representations.py`, `src/lurestar/evaluate.py`, `results/metrics/`, `results/metrics.jsonl`.
-Extract **both** `h[62]` and `h[63]` with the asymmetric API of §1.2 (D-11). Centered cosine primary, whitened Euclidean robustness. Two-fold cross-fitting for H2.
-**Exit:** PSI with paired 95% bootstrap intervals, per-seed values plus across-seed spread, and an explicit statement of what magnitude three seeds could not have detected.
+Extract **both** `h[62]` and `h[63]` with the asymmetric API of §1.2 (D-11). Centered cosine and
+held-out whitened Mahalanobis are co-primary on the same frozen `E_score`; `nPSI` is mandatory.
+Two-fold cross-fitting for H2.
+**Exit:** both-metric intersection-union decision, every seed, MDE/sign-flip floor/leave-one-out,
+and an explicit statement of what magnitude five seeds could not have detected.
 
 ### P9 — H3 interference
-`configs/adapt_near.yaml`, `configs/adapt_far.yaml`.
-Both branches from the identical parent checkpoint, same `parent_checkpoint_sha256`, separate `out_dir` per branch. `lambda_mse=0, lambda_kl=0` for the primary NextLat branch (D-28). **`train_batches: 20500`, not 500** (D-19). `B_far` chosen on a model-blind pilot checkpoint and frozen.
-**Exit:** both branches acquire; near/far initial-loss imbalance reported and controlled item-level; near-minus-far computed within each parent, bootstrapped over paired items, every seed reported. **A clean null is an acceptable outcome** — do not force one with an extreme LR or contradictory labels.
+`configs/adapt_near.yaml`, `configs/adapt_mid.yaml`, `configs/adapt_far.yaml`.
+All three branches come from the identical parent checkpoint, share `parent_checkpoint_sha256`, and
+have separate `out_dir`s. `lambda_mse=0, lambda_kl=0` for primary NextLat adaptation (D-28).
+BST must use the amendment's generation-time next-token CE path, not its ordinary dense
+prefix-suffix loss; the current `use_bst=true` launcher path is therefore blocked pending a custom
+parity-tested adapter. **`train_batches: 20500`, not 500** (D-19). All banks are chosen by the
+frozen model-blind selector.
+Before adaptation, compute the amendment's gradient-dot/cosine and 16-projection Jacobian-overlap
+baselines. Fit its nested cross-fitted linear-plus-quadratic distance models without bins.
+**Exit:** all branches acquire; structural/hidden distance manipulation checks, baseline-complete
+incremental models, every fold/seed/metric, and all nulls are reported. A clean null or
+nonmonotonic curve is an acceptable outcome.
 
 ### P10 — HMM pair bank and evaluation
-`src/hmm_geometry/pair_bank.py`, `src/hmm_geometry/evaluate.py`, `manifests/hmm_eval_pairs.jsonl`, `tests/test_hmm_pairs.py`.
-Thresholds frozen from the validation pool and applied unchanged to the test pool, **before any model state is inspected**.
-**Exit:** HMM-H1/H2/H3 metrics computed, including length-64 generalization.
+`src/hmm_geometry/pair_bank.py`, `src/hmm_geometry/evaluate.py`, `manifests/hmm_family.json`,
+regime-specific pair manifests, `tests/test_hmm_pairs.py`.
+The three-regime selector, `TE` rank/singular-value certificates, thresholds, corpora, and pairs are
+frozen **before any model state is inspected**. Regimes aggregate equally inside seed.
+**Exit:** the both-metric primary HMM aggregate, Holm-corrected secondary family, every regime cell,
+MDE/sign-flip floor/leave-one-out, and length-64 generalization are emitted.
 
 ### P11 — Figures, tables, README
 `results/figures/` (the six required figures), one results table per task, `README.md`.
 The README must distinguish paper results from ours, neuroscience inspiration from evidence, and positive findings from nulls (spec §15).
 Writeup follows `docs/STYLE_GUIDE.md`: 2,000–3,000 words, hero figure first with a caption that already discloses the caveat, failures in the introduction rather than a limitations section, one visual per ~200 words, spaced hyphens not em dashes, and a specific ask at the end.
 
-**Only after all of the above:** the §7 causal-patching stretch goal (D-34), then the §13 bottleneck-width ablation framed as geometry-not-accuracy (D-37). **Drop causal patching before dropping H3 or the HMM.**
+**Only after all of the above:** the original §7 Lure-Star causal-patching stretch goal (D-34),
+then the §13 bottleneck-width ablation framed as geometry-not-accuracy (D-37). This sequencing is
+historical and does not apply to the later, mandatory CFS-2 blocks-3/7/10 patching sweep.
 
 ---
 
@@ -391,11 +441,14 @@ Writeup follows `docs/STYLE_GUIDE.md`: 2,000–3,000 words, hero figure first wi
 
 Each risk names the **specific early signal** that should trigger the corresponding spec §10 stop condition. "Stop" means halt, write it down, and escalate — not quietly re-parameterize.
 
-### R1 — GPT is *supposed* to fail the competence gate, and the spec says that stops the project. **[BLOCKED — resolve before launch]**
-The paper puts GPT on G(5,5) at ≈18.6%, which is 1/d chance. Spec §8 tells us to debug, and spec §10 tells us to stop, if "either model remains below the base competence gate". Worse than the process contradiction is the scientific one: a model at chance has a degenerate correct-branch margin, so H2's "geometry predicts planning" and H3's "margin erosion" are being measured on a capability GPT never had, and the GPT-vs-NextLat difference-in-differences loses its meaning.
+### R1 — GPT is expected at chance; treating it as competence-matched would invalidate identification. **[RESOLVED, MONITOR]**
+The paper puts GPT on G(5,5) at ≈18.6%, which is 1/d chance. The binding 90% gate therefore applies
+to NextLat and BST, while GPT is evaluated and reported but threshold-exempt. NextLat–BST is the
+primary competence-matched contrast; NextLat–GPT is secondary and competence-confounded.
 **Early signal:** GPT `val_(5, 5)/test_accuracy` still ≈0.20 and `token_2` ≈0.20 at step 5,000.
-**Recommended resolution (needs sign-off):** apply the 90% gate to **NextLat only**, preregister GPT's chance-level accuracy as a replication of the paper's Fig. 6 rather than a failure, and preregister *before any training* how GPT's H2/H3 quantities will be interpreted at chance — most defensibly as a floor, with margin analyses reported descriptively and the DiD contrast bounded out loud. Do **not** resolve it by switching topology to G(2,10) (broadens the benchmark, spec §1 forbids) or by conditioning `A_pair` on model correctness (spec §5 forbids).
-**Stop condition if unresolved:** spec §10, "either model remains below the base competence gate".
+**Action:** expected chance performance is a replication, not a stop. Investigate only a material
+departure from the paper or a failed NextLat/BST gate. Never promote GPT to the competence-matched
+contrast or condition `A_pair` on correctness.
 
 ### R2 — `proj_factor` silently reverts to 1.0 and we train the wrong model for 20,000 steps.
 Deleting the `sweep:` block — which P3 requires — drops the only place `proj_factor: 0.5` appears (D-07). The fallback is `1.0`: dynamics hidden 768, +884,736 params, no longer the paper's configuration. Nothing warns.
@@ -412,10 +465,14 @@ Near-safe and near-critical must match on two edited endpoint tokens, serialized
 **Early signal:** fewer than 1,000/1,000 quartets pass the §5 acceptance tests, or any single acceptance criterion fails at a nonzero rate.
 **Stop condition:** spec §10, "safe and critical lures cannot be exactly matched". **Fix the generator; do not regress the mismatch away in analysis afterward** — the spec explicitly forbids that.
 
-### R5 — H3 near/far branches are not comparably difficult, so the interference contrast is confounded.
-`B_far` must be matched to `B_near` on initial loss quantiles using a **separate, non-confirmatory pilot checkpoint**, then frozen across every model and seed.
-**Early signal:** in the model-blind pilot, near/far initial-loss quantiles fail to overlap; or, at adaptation time, acquisition on the two branches' own examples differs materially.
-**Stop condition:** spec §10, "near/far branches cannot achieve comparable acquisition or initial difficulty". Report any residual imbalance and control for it item-level rather than hiding it.
+### R5 — H3 branches are not comparably difficult, so the interference contrast is confounded.
+`B_near`, `B_mid`, and `B_far` must be matched on pilot initial-loss deciles and acquisition design,
+then frozen across every model and seed.
+**Early signal:** pilot loss distributions fail their fixed caliper, realized hidden distance does
+not order structurally, or acquisition differs materially.
+**Stop condition:** retain and report a failed hidden-distance manipulation check, but do not make a
+dose-response claim; stop the affected interference contrast if difficulty/acquisition matching
+fails. Never reselect with a confirmatory checkpoint.
 
 ### R6 — A botched restore looks exactly like a fresh run.
 `core_train.py:165-168` silently initializes from scratch when the resume pointer is missing, and `core_train.py:976-979` deletes the previous recovery checkpoint after a non-atomic pointer write with no verification of the new one. Both failure modes produce a running job and a plausible loss curve.
@@ -428,26 +485,30 @@ Every s/step in §4.3 is modelled. `data.num_workers: 0` with a 35k-token step a
 **Stop condition:** spec §10, "the available hardware cannot run the exact paper-scale configuration reliably. In that case, pause for a compute decision rather than shrinking the confirmatory model." Hard stop at **600 CU** (§4.4). Reduce optional analyses before reducing scientific fidelity.
 
 ### R8 — The geometry effect exists only under one metric or one layer.
-The spec preregisters centered cosine as primary and whitened Euclidean as the robustness check, and designates the final post-norm state as primary with intermediate layers descriptive only. D-11 adds a second, equally preregistered position.
-**Early signal:** PSI is positive under centered cosine and null under whitened Euclidean; or positive at `h[63]` and null at `h[62]`, or vice versa, without a stated mechanism.
-**Stop condition:** spec §10, "a geometry effect exists only under a post-hoc distance metric or layer". Report the disagreement as the result. Do not go metric-shopping.
+The amendment makes centered cosine and held-out whitened Mahalanobis co-primary and designates the
+final post-norm state at index 62 as H1 primary; D-11 keeps index 63 mandatory secondary.
+**Early signal:** signs or interval decisions disagree across the co-primary metrics, or effects
+appear only at a secondary index/layer/state.
+**Stop condition:** classify the result as metric-dependent/secondary and withhold the central
+metric-robust claim. Report the disagreement; do not go metric-shopping.
 
 ### R9 — The result depends on one seed.
-Three confirmatory seeds is already a documented reduction from the paper's five (D-33).
+All five paper-count confirmatory seeds are included (D-33).
 **Early signal:** the across-seed spread of PSI or of `erosion_near − erosion_far` includes zero once any single seed is dropped.
-**Stop condition:** spec §10, "the result depends on one seed". Run the remaining two paper seeds if time permits; otherwise bound the claim out loud and state what magnitude three seeds could not have detected.
+**Stop condition:** spec §10, "the result depends on one seed". Report leave-one-seed-out
+sensitivity and bound the claim; do not replace or add seeds after seeing the result.
 
 ### R10 — The new `hmm_belief` datamodule breaks the trainer in a way that costs a runtime.
 `trainer.test_interval` is read unconditionally at `core_train.py:671` and is absent from `defaults.yaml`, and the spec's §12 YAML omits it (D-17). `experiment_name` is likewise required by `train.py:95`.
 **Early signal:** the first validation (step 300) raises a missing-key error — which, under `colab exec`, returns "cleanly" in ~40 s and invites the orchestrator to burn another runtime.
 **Stop condition:** transport circuit breaker. Mitigate cheaply by running P6's 50-step exit test on **T4** before touching A100.
 
-### R11 — The competence gate is measured under multinomial sampling, not greedy.
-`evaluate_stargraph` samples (D-22). The number we quote as "exact-path accuracy" is therefore not the number a reader will assume.
-**Early signal:** sampled accuracy sits a few points below greedy on the same checkpoint at the first validation.
-**Stop condition:** none — but the gate's sampling regime must be fixed **in writing before the first run**, and both numbers reported. Silently switching to greedy after seeing a gate failure is exactly the post-hoc move the spec forbids.
+### R11 — Sampled validation and the greedy competence gate can be conflated.
+`evaluate_stargraph` samples (D-22), while the binding gate is a separate hash-bound greedy evaluation fixed before outcomes.
+**Early signal:** sampled accuracy differs from greedy on the same checkpoint at the first validation.
+**Stop condition:** neither metric may substitute for the other; retain both receipts and label the decoding regime. Changing the gate after seeing a result is forbidden.
 
 ### R12 — Credential blast radius on a machine we do not control. **[BLOCKED — resolve before first upload]**
 `/content/adc.json` as a user ADC is a live refresh token for `<redacted-account>` with full `cloud-platform` scope, uploaded to a Google-managed VM with an uncontrolled lifetime (D-36).
 **Early signal:** none — this risk is silent by construction, which is the argument for fixing it up front.
-**Stop condition:** none in spec §10; this is a project-hygiene gate. Recommended: a dedicated service account scoped to `roles/storage.objectAdmin` on `nextlat-lurestar-project-flash-490419` only. If the user ADC is used anyway: `chmod 0600` as the driver's first action, uploaded per session, never persisted to Drive, never in the source snapshot, never in git, never echoed, and never inside `job.json`.
+**Stop condition:** none in spec §10; this is a project-hygiene gate. Recommended: a dedicated service account scoped to `roles/storage.objectAdmin` on `YOUR_PRIVATE_BUCKET` only. If the user ADC is used anyway: `chmod 0600` as the driver's first action, uploaded per session, never persisted to Drive, never in the source snapshot, never in git, never echoed, and never inside `job.json`.

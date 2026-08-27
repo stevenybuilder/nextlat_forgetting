@@ -87,6 +87,10 @@ def test_heterogeneous_corpus_is_refused(tok):
 def test_cache_roundtrip_and_digest_guard(tok, lines, tmp_path):
     sub = lines[:3000]
     first = fs.materialize(sub, tok, cache_dir=tmp_path, log=lambda *_: None)
+    # np.savez appends ".npz" to string/path targets without that suffix.  The cache
+    # writer must instead publish the exact .partial path atomically and leave no stray
+    # ".npz.partial.npz" artifact behind.
+    assert not list(tmp_path.glob("*.partial*"))
     second = fs.materialize(sub, tok, cache_dir=tmp_path, log=lambda *_: None)
     assert np.array_equal(first, second)
     assert len(list(tmp_path.glob("stargraph_tokens_v*.npz"))) == 1
@@ -96,6 +100,7 @@ def test_cache_roundtrip_and_digest_guard(tok, lines, tmp_path):
     third = fs.materialize(other, tok, cache_dir=tmp_path, log=lambda *_: None)
     assert not np.array_equal(first, third)
     assert len(list(tmp_path.glob("stargraph_tokens_v*.npz"))) == 2
+    assert not list(tmp_path.glob("*.partial*"))
 
 
 def test_digest_is_whitespace_insensitive_the_same_way_getitem_is(tok, lines):

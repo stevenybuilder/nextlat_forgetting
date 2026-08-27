@@ -1,0 +1,15 @@
+{
+  "schema": "nextlat_forgetting/superseded_artifact/1",
+  "artifact": "historical invalid identities formerly at manifests/hmm_family.json",
+  "superseded_payload_sha256": "7c32975438b79b73500cc638c27135d2f39ad5baddd4b6c57973427365b67e2b",
+  "superseded_payload_sha256s": [
+    "7c32975438b79b73500cc638c27135d2f39ad5baddd4b6c57973427365b67e2b",
+    "c098fef14f7709a6346c2002efd1c0e4f715915bbc258bc023e178f1525cdd1c",
+    "25062f63e49575cd26fec6fecce1a6767aa7141c870511384522c0cbc356739f"
+  ],
+  "status": "SUPERSESSION_HISTORY_ONLY_CURRENT_MANIFEST_VALID",
+  "reason": "The four-regime hand-specified family conflicts with the frozen 2026-08-24 preregistration amendment, which requires three total regimes selected from the unchanged deterministic candidate grid and sigma_min(T@E) > 0.05.",
+  "replacement_payload_sha256": "e24a883dbc547c99f543433d290b0e228e2191427af041a851a1279d77a68b27",
+  "replacement_rule": "The amendment-exact three-regime model-blind grid selection now occupies manifests/hmm_family.json. This file is history only and does not invalidate the replacement.",
+  "model_outcomes_used_to_make_this_correction": false
+}

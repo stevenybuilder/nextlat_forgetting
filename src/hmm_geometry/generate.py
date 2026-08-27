@@ -459,10 +459,11 @@ def generate_corpus(
     hmm_manifest: dict | None = None,
     store_posteriors_for: tuple[str, ...] = ("val", "lengen"),
     verbose: bool = True,
+    data_seed: int = DATA_SEED,
 ) -> dict:
     """Sample the three splits, store exact posteriors for the evaluation splits, hash everything."""
     data_dir.mkdir(parents=True, exist_ok=True)
-    seeds = np.random.SeedSequence(DATA_SEED).spawn(len(SPLITS))
+    seeds = np.random.SeedSequence(data_seed).spawn(len(SPLITS))
     entry: dict[str, dict] = {}
 
     for (name, n, length, idx), seq in zip(SPLITS, seeds):
@@ -513,8 +514,8 @@ def generate_corpus(
         "schema": "nextlat_forgetting/hmm_dataset/1",
         "hmm_sha256": hmm.sha256(),
         "hmm_manifest_sha256": (hmm_manifest or {}).get("payload_sha256"),
-        "data_seed": DATA_SEED,
-        "seed_scheme": "numpy.random.SeedSequence(DATA_SEED).spawn(3) -> train, val, lengen",
+        "data_seed": data_seed,
+        "seed_scheme": "numpy.random.SeedSequence(data_seed).spawn(3) -> train, val, lengen",
         "splits": entry,
         "pair_bank_split_rule": (
             "both evaluation splits are cut in half by sequence index. val[0:5000] and "

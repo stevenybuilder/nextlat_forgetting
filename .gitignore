@@ -1,10 +1,30 @@
 .venv/
 upstream/NextLat/.git/
+.DS_Store
+*.py[cod]
+**/__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .env
 *.pt
 *.ckpt
 data/
 output/
 __pycache__/
-.agent_state/*.log
+.agent_state/
+.agents/
+.codex/
 .secrets/
+application_default_credentials.json
+adc.json
+*.tgz
+*.tar.gz
+.colab_session
+.colab_exec.pid
+.gstack/
+
+# Generated candidate/loss banks are reproducible but too large for GitHub.
+# Keep their SHA-256 receipts and materialization code under version control.
+manifests/h3_expansion/*.jsonl
+manifests/h3_precompute/*.jsonl
