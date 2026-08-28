@@ -24,6 +24,28 @@ def test_frozen_config_is_self_consistent():
     assert config["runtime_contract"]["num_gpus"] == 1
 
 
+def test_v3_same_scene_design_is_balanced():
+    config = load_config(ROOT / "config" / "pilot_v3.json")
+    scenes = config["benchmark"]["scenes"]
+    prompts = config["benchmark"]["prompts"]
+    assert len(scenes) == 12
+    assert config["sampling"]["expected_matched_pairs"] == 120
+    side_a = [prompts[scene["contrast"][0]]["subject"] for scene in scenes]
+    side_b = [prompts[scene["contrast"][1]]["subject"] for scene in scenes]
+    for subject in set(side_a + side_b):
+        assert side_a.count(subject) == side_b.count(subject) == 4
+
+
+def test_v4_replacement_scene_preserves_balance() -> None:
+    config = load_config(ROOT / "config" / "pilot_v4.json")
+    scenes = config["benchmark"]["scenes"]
+    prompts = config["benchmark"]["prompts"]
+    assert {scene["task_index"] for scene in scenes} == {0, 1, 3, 4, 5, 7, 8, 9, 11, 12, 13, 14}
+    side_a = [prompts[scene["contrast"][0]]["subject"] for scene in scenes]
+    side_b = [prompts[scene["contrast"][1]]["subject"] for scene in scenes]
+    assert all(side_a.count(subject) == side_b.count(subject) == 4 for subject in set(side_a + side_b))
+
+
 def test_manifest_uses_only_exact_initial_state_matches(tmp_path):
     config = json.loads((ROOT / "config" / "pilot.json").read_text(encoding="utf-8"))
     suite = config["benchmark"]["suite"]

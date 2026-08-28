@@ -1,0 +1,256 @@
+{
+  "action_difference_mean_norm": 1.553988992176887,
+  "advance_to_causal_stage": true,
+  "claim_boundary": "exploratory engineering gate; v4 was redesigned after v2 target-label invalidation and v3 preflight exclusion",
+  "cross_validation_group_field": "scene_id",
+  "future_target_shape": [
+    3
+  ],
+  "layers": [
+    {
+      "activation_shape": [
+        10,
+        1024
+      ],
+      "crossvalidated_r2": 0.8389086966122872,
+      "layer": 5,
+      "mean_cosine": 0.9178506826254733,
+      "per_pair": {
+        "scene-00": {
+          "mean_cosine": 0.9926091723512023,
+          "positive": true
+        },
+        "scene-01": {
+          "mean_cosine": 0.984772553655163,
+          "positive": true
+        },
+        "scene-03": {
+          "mean_cosine": 0.9449618569155556,
+          "positive": true
+        },
+        "scene-04": {
+          "mean_cosine": 0.9989380021166147,
+          "positive": true
+        },
+        "scene-05": {
+          "mean_cosine": 0.9979706787482826,
+          "positive": true
+        },
+        "scene-07": {
+          "mean_cosine": 0.18461321769461564,
+          "positive": true
+        },
+        "scene-08": {
+          "mean_cosine": 0.9933487634623545,
+          "positive": true
+        },
+        "scene-09": {
+          "mean_cosine": 0.9697557551592808,
+          "positive": true
+        },
+        "scene-11": {
+          "mean_cosine": 0.9636795254242662,
+          "positive": true
+        },
+        "scene-12": {
+          "mean_cosine": 0.9985859297650096,
+          "positive": true
+        },
+        "scene-13": {
+          "mean_cosine": 0.9989210660906803,
+          "positive": true
+        },
+        "scene-14": {
+          "mean_cosine": 0.9860516701226529,
+          "positive": true
+        }
+      },
+      "positive_task_pairs": 12
+    },
+    {
+      "activation_shape": [
+        10,
+        1024
+      ],
+      "crossvalidated_r2": 0.848315540327309,
+      "layer": 11,
+      "mean_cosine": 0.9292800477706952,
+      "per_pair": {
+        "scene-00": {
+          "mean_cosine": 0.9610371753970656,
+          "positive": true
+        },
+        "scene-01": {
+          "mean_cosine": 0.9377314114803482,
+          "positive": true
+        },
+        "scene-03": {
+          "mean_cosine": 0.9996057467996013,
+          "positive": true
+        },
+        "scene-04": {
+          "mean_cosine": 0.9999505017194817,
+          "positive": true
+        },
+        "scene-05": {
+          "mean_cosine": 0.9998891666638434,
+          "positive": true
+        },
+        "scene-07": {
+          "mean_cosine": 0.38468176313129454,
+          "positive": true
+        },
+        "scene-08": {
+          "mean_cosine": 0.877096668619609,
+          "positive": true
+        },
+        "scene-09": {
+          "mean_cosine": 0.9973898384483124,
+          "positive": true
+        },
+        "scene-11": {
+          "mean_cosine": 0.9987384234905322,
+          "positive": true
+        },
+        "scene-12": {
+          "mean_cosine": 0.9999609528562686,
+          "positive": true
+        },
+        "scene-13": {
+          "mean_cosine": 0.999864945986707,
+          "positive": true
+        },
+        "scene-14": {
+          "mean_cosine": 0.9954139786552778,
+          "positive": true
+        }
+      },
+      "positive_task_pairs": 12
+    },
+    {
+      "activation_shape": [
+        10,
+        1024
+      ],
+      "crossvalidated_r2": 0.8502850291776438,
+      "layer": 17,
+      "mean_cosine": 0.93516071783455,
+      "per_pair": {
+        "scene-00": {
+          "mean_cosine": 0.9595501500906474,
+          "positive": true
+        },
+        "scene-01": {
+          "mean_cosine": 0.9578985007184857,
+          "positive": true
+        },
+        "scene-03": {
+          "mean_cosine": 0.9998153183270245,
+          "positive": true
+        },
+        "scene-04": {
+          "mean_cosine": 0.9999788352059484,
+          "positive": true
+        },
+        "scene-05": {
+          "mean_cosine": 0.999957829465304,
+          "positive": true
+        },
+        "scene-07": {
+          "mean_cosine": 0.49887658814546365,
+          "positive": true
+        },
+        "scene-08": {
+          "mean_cosine": 0.8507826539360561,
+          "positive": true
+        },
+        "scene-09": {
+          "mean_cosine": 0.9932231956274787,
+          "positive": true
+        },
+        "scene-11": {
+          "mean_cosine": 0.999843503882788,
+          "positive": true
+        },
+        "scene-12": {
+          "mean_cosine": 0.9999874471305814,
+          "positive": true
+        },
+        "scene-13": {
+          "mean_cosine": 0.9999285627976903,
+          "positive": true
+        },
+        "scene-14": {
+          "mean_cosine": 0.9620860286871326,
+          "positive": true
+        }
+      },
+      "positive_task_pairs": 12
+    }
+  ],
+  "manifest_sha256": "5b1a4df70974379fc9e915a1b915073f5cb0ab4f4c4e7682d1fe9b3b5738f008",
+  "n_matched_states": 120,
+  "n_task_pair_clusters": 12,
+  "primary": {
+    "activation_shape": [
+      10,
+      1024
+    ],
+    "crossvalidated_r2": 0.8502850291776438,
+    "layer": 17,
+    "mean_cosine": 0.93516071783455,
+    "per_pair": {
+      "scene-00": {
+        "mean_cosine": 0.9595501500906474,
+        "positive": true
+      },
+      "scene-01": {
+        "mean_cosine": 0.9578985007184857,
+        "positive": true
+      },
+      "scene-03": {
+        "mean_cosine": 0.9998153183270245,
+        "positive": true
+      },
+      "scene-04": {
+        "mean_cosine": 0.9999788352059484,
+        "positive": true
+      },
+      "scene-05": {
+        "mean_cosine": 0.999957829465304,
+        "positive": true
+      },
+      "scene-07": {
+        "mean_cosine": 0.49887658814546365,
+        "positive": true
+      },
+      "scene-08": {
+        "mean_cosine": 0.8507826539360561,
+        "positive": true
+      },
+      "scene-09": {
+        "mean_cosine": 0.9932231956274787,
+        "positive": true
+      },
+      "scene-11": {
+        "mean_cosine": 0.999843503882788,
+        "positive": true
+      },
+      "scene-12": {
+        "mean_cosine": 0.9999874471305814,
+        "positive": true
+      },
+      "scene-13": {
+        "mean_cosine": 0.9999285627976903,
+        "positive": true
+      },
+      "scene-14": {
+        "mean_cosine": 0.9620860286871326,
+        "positive": true
+      }
+    },
+    "positive_task_pairs": 12
+  },
+  "selected_layer": 17,
+  "study": "geometry-of-intended-futures-pi05-pilot-v4"
+}

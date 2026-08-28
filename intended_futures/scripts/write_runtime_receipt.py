@@ -17,6 +17,7 @@ def main() -> int:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--libero-cf-root", type=Path, required=True)
     parser.add_argument("--openpi-root", type=Path, required=True)
+    parser.add_argument("--stimulus-validation", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -65,6 +66,20 @@ def main() -> int:
         "simulator_renderer": config["runtime_contract"]["simulator_renderer"],
         "distributed": False,
     }
+    if args.stimulus_validation is not None:
+        validation = json.loads(args.stimulus_validation.read_text(encoding="utf-8"))
+        if (
+            not validation.get("passed")
+            or validation.get("study") != config["study"]
+            or validation.get("manifest_sha256") != manifest["manifest_sha256"]
+        ):
+            raise RuntimeError("stimulus validation does not certify the frozen study and manifest")
+        receipt["stimulus_validation"] = {
+            "file_sha256": sha256_file(args.stimulus_validation),
+            "scenes_validated": validation["scenes_validated"],
+            "states_validated": validation["states_validated"],
+            "subjects_required_in_every_scene": validation["subjects_required_in_every_scene"],
+        }
     if receipt["libero_cf_commit"] != config["upstream"]["libero_cf_commit"]:
         raise RuntimeError("LIBERO-CF commit violates the frozen configuration")
     if receipt["openpi_commit"] != config["upstream"]["openpi_reference_commit"]:

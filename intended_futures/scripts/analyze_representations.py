@@ -34,7 +34,8 @@ def main() -> int:
     config = load_config(args.config)
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     rows = manifest["rows"]
-    groups = np.asarray([row["pair_id"] for row in rows])
+    group_field = str(config["analysis"].get("cross_validation_group_field", "pair_id"))
+    groups = np.asarray([row[group_field] for row in rows])
     future = []
     actions = []
     layer_differences: dict[int, list[np.ndarray]] = {
@@ -109,6 +110,7 @@ def main() -> int:
         "manifest_sha256": manifest["manifest_sha256"],
         "n_matched_states": len(rows),
         "n_task_pair_clusters": len(np.unique(groups)),
+        "cross_validation_group_field": group_field,
         "future_target_shape": list(target.shape[1:]),
         "action_difference_mean_norm": float(
             np.mean(np.linalg.norm(action_difference.reshape(len(rows), -1), axis=1))
