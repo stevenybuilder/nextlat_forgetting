@@ -1,0 +1,116 @@
+{
+  "schema": "nextlat_forgetting/basin_case_study_freeze/1",
+  "frozen_at": "2026-08-27",
+  "status": "FROZEN_BEFORE_NEW_TRAJECTORY_EVALUATION",
+  "design": {
+    "question": "How do a known generalizing and known shortcut NextLat Path-Star run diverge, and how early is that divergence visible in held-out behavior?",
+    "retrospective_outcome_selected": true,
+    "outcomes_known_before_freeze": true,
+    "population_inference_authorized": false,
+    "formal_null_hypothesis_test": null,
+    "inferential_unit": "training run",
+    "held_out_graph_role": "conditional measurement precision for a fixed checkpoint",
+    "checkpoint_selection_rule": "include every retained non-recovery ckpt_iter_<step>_<loss>.pt object for seeds 1234 and 1235",
+    "primary_endpoint": "exact greedy five-token path accuracy on all 20,000 frozen G(5,5) test examples",
+    "secondary_endpoints": [
+      "greedy accuracy at each of the five path positions",
+      "teacher-forced accuracy and gold-token logit margin at path position 2, the first nontrivial branch decision",
+      "saved training and validation loss as a function of actual optimizer updates"
+    ],
+    "transition_reporting_rule": "report interval bounds imposed by retained checkpoint times; do not interpolate an exact transition step",
+    "multiplicity_rule": "all secondary endpoints are descriptive; do not report seed-population p-values",
+    "determinism_acceptance_rule": "two clean evaluations of the seed-1234 final checkpoint must have byte-identical scientific JSON",
+    "claim_boundary": "retrospective mechanistic case study; no solver-frequency, cross-objective, or unique-cause claim"
+  },
+  "software": {
+    "upstream_repo": "JaydenTeoh/NextLat",
+    "upstream_commit": "3770be6009cea2b3c455a9ce7f2ca88b504bb955",
+    "source_config": {
+      "path": "configs/nextlat_lurestar.yaml",
+      "sha256": "33d00b09e054c09a6f99ad2146cc2b468bd460d9f7c379d1258504525b1c2465"
+    },
+    "legacy_exact_path_evaluator": {
+      "path": "scripts/evaluate_base_competence.py",
+      "sha256": "781422bed19b2d333c1d0fdc6fce91de7af6b3dde90def51cf1eeb55fe0b9e96"
+    },
+    "runtime_image": "pytorch/pytorch:2.11.0-cuda12.8-cudnn9-devel",
+    "torch": "2.11.0+cu128",
+    "lightning": "2.6.5"
+  },
+  "runtime_controls": {
+    "gpu_model": "NVIDIA GeForce RTX 4090",
+    "gpu_count": 1,
+    "full_host_gpu_fraction": 1.0,
+    "distributed_training_or_evaluation": false,
+    "distributed_sampler": false,
+    "decoding": "explicit autoregressive argmax",
+    "precision": "bf16-mixed",
+    "deterministic_inference": true,
+    "capture": [
+      "GPU UUID and PCI bus",
+      "nvidia-smi topo -m",
+      "driver, CUDA, cuDNN, PyTorch, and Lightning versions",
+      "container image, source hashes, data hashes, and checkpoint hashes"
+    ],
+    "spend_stop_usd": 5.0,
+    "new_training_authorized": false
+  },
+  "data": {
+    "train": {
+      "object_name": "lurestar/corpus/stargraph/graph_5_5_sample_200000.txt",
+      "generation": "1787529737718369",
+      "size": 27259044,
+      "sha256": "d13199b00c41d74325931cfecb15e3cf876d5e7d999c3257aaf4962e44827d76"
+    },
+    "test": {
+      "object_name": "lurestar/corpus/stargraph/graph_5_5_test_20000.txt",
+      "generation": "1787529736483972",
+      "size": 2726200,
+      "sha256": "f52fb14ef1c39aee187fd0ae40e781e7e716045d7b8270cddf9b7760afb74be9"
+    },
+    "manifest": {
+      "path": "manifests/corpus.sha256",
+      "sha256": "d50bf5da1d8975e46befe155229987933c8147c9b51af13d6b7ea746d21ac5a8"
+    }
+  },
+  "runs": [
+    {
+      "job_id": "nextlat-s1234-base",
+      "seed": 1234,
+      "selection_role": "known generalizing exemplar",
+      "materialized_config_sha256": "f9b75cd24c8f380e8cb69fdf390a41938c0841f37ffdc917f1a465b293ae5c35",
+      "metrics_sha256": "7b10628904779356077475ff361d8af57bf19e974b0999717dd6f65b636ce8cc",
+      "checkpoints": [
+        {"step": 1000, "filename": "ckpt_iter_1000_1.7443.pt", "generation": "1787636509944272", "size": 263100035, "sha256": "eb9eb38a0cccfb32a200cfcf2636039c102778555d1e3bcff19bf501defe40fc"},
+        {"step": 3000, "filename": "ckpt_iter_3000_0.2122.pt", "generation": "1787637016046955", "size": 263100035, "sha256": "80bffc592fd4c3f8bc8d2776c59b9326d91f2c5ef01936a4b3f492272b5b51bb"},
+        {"step": 5000, "filename": "ckpt_iter_5000_0.1954.pt", "generation": "1787637467056089", "size": 263100035, "sha256": "88ce3566b0387d83e617fe10d2f69728846dfcc50777be515945c478fffd690a"},
+        {"step": 7000, "filename": "ckpt_iter_7000_0.2467.pt", "generation": "1787637922612739", "size": 263100035, "sha256": "e3834d425728037784ba4c73029eccea2836efb0618b53113f7791211aa5af47"},
+        {"step": 9000, "filename": "ckpt_iter_9000_0.2612.pt", "generation": "1787638546537602", "size": 263100035, "sha256": "4707140fc2c26f40f17437e91ffc01d787eefb5c7b16b2a30638d85c433c7ea4"},
+        {"step": 12000, "filename": "ckpt_iter_12000_0.2893.pt", "generation": "1787638992636364", "size": 263100035, "sha256": "b3c523f050ce8fa3fee61f1ef85ac960412e6b5adb1bd6c6464de9b9ba828a8b"},
+        {"step": 15000, "filename": "ckpt_iter_15000_0.3041.pt", "generation": "1787639612741244", "size": 263100035, "sha256": "0b070114ff28c19f14c836b9c9591afa586af91bbe2998c79d15805fe3411ef4"},
+        {"step": 17000, "filename": "ckpt_iter_17000_0.3228.pt", "generation": "1787640157288447", "size": 263100035, "sha256": "7d0ddcbd8beacbdee0d261385072f80afa8a0e35a57a6e1b03ceefcfc2a35fdf"},
+        {"step": 19000, "filename": "ckpt_iter_19000_0.3269.pt", "generation": "1787640614369527", "size": 263100035, "sha256": "9788d9527cf5d0417b928d93bd7000c8a1f1e0721ebb9341f3cb81690cae7575"},
+        {"step": 20000, "filename": "ckpt_iter_20000_0.3191.pt", "generation": "1787640809865328", "size": 263100035, "sha256": "73fd612cbfa41de258ca7944c7bf430788b1d6ca2d2c03829c969a7a63bf1dd0"}
+      ]
+    },
+    {
+      "job_id": "nextlat-s1235-base",
+      "seed": 1235,
+      "selection_role": "known shortcut exemplar",
+      "materialized_config_sha256": "ae2d6c36ac7b0100e8187f0259bffe903f11b11a86459e9c0e9cc00dc3d02ce2",
+      "metrics_sha256": "f04965d3841e9b578763307afdd183b0e606b881bfb96d7efaaaa0fe5e3ef586",
+      "checkpoints": [
+        {"step": 2000, "filename": "ckpt_iter_2000_1.6588.pt", "generation": "1787641449021323", "size": 263100035, "sha256": "edd685a53c6f292fa424ebe49062b9b38cada1924bebb7d2ddffdf13a474e87d"},
+        {"step": 4000, "filename": "ckpt_iter_4000_1.9561.pt", "generation": "1787641927604529", "size": 263100035, "sha256": "3dcfa142d290e41ae7d64e10427a80acc8969c6a1a10e4e7fea16336bfb5f497"},
+        {"step": 6000, "filename": "ckpt_iter_6000_2.2884.pt", "generation": "1787642424613779", "size": 263100035, "sha256": "bfd1181329600b94389a934c778429cd9f27a55efc3460ce03d95500a0e7e9b2"},
+        {"step": 8000, "filename": "ckpt_iter_8000_2.4696.pt", "generation": "1787642985376951", "size": 263100035, "sha256": "5d8e4045186c3a542c9d33761bcfd37ecada433bb9941f53a084e74ddfd4f3ec"},
+        {"step": 10000, "filename": "ckpt_iter_10000_2.0718.pt", "generation": "1787643443717080", "size": 263100035, "sha256": "89bcce49c165a6a97b2c383d05c119200b04b3774581916d5f73dd177c8d37f8"},
+        {"step": 12000, "filename": "ckpt_iter_12000_2.0293.pt", "generation": "1787643928241875", "size": 263100035, "sha256": "eb327ca41ac4acabe16f8ca171fb2c717e70783b6e4e9852b66e5dba6e879da0"},
+        {"step": 15000, "filename": "ckpt_iter_15000_2.0526.pt", "generation": "1787644390326831", "size": 263100035, "sha256": "e54060bf49bc35e7f981da39065335cecb8e5863018b98b1e35e303b815cf746"},
+        {"step": 17000, "filename": "ckpt_iter_17000_2.0751.pt", "generation": "1787645029860105", "size": 263100035, "sha256": "1e611c90e4dfcf17e922de6d21b8834cd8e1f9cf171b9d9ce51a16ae6ea5cfaa"},
+        {"step": 19000, "filename": "ckpt_iter_19000_2.1111.pt", "generation": "1787645499936200", "size": 263100035, "sha256": "e4b7f8bb68a6005957d3201206c87137ba895cf492a83608c60bb162f6563278"},
+        {"step": 20000, "filename": "ckpt_iter_20000_2.1224.pt", "generation": "1787645642734573", "size": 263100035, "sha256": "b441ebd8d7588abd29556602be357e1aefd6ae92c34692b8a33eb1d8c2b0211f"}
+      ]
+    }
+  ]
+}

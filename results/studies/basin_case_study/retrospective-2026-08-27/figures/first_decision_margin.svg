@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="650" viewBox="0 0 1120 650" role="img">
+<title>Gold-token margin at the first nontrivial path decision</title>
+<desc>The solver develops a large positive margin while the shortcut becomes increasingly confident in a wrong next node on average.</desc>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;fill:#222}
+.title{font-size:22px;font-weight:650}.axis{font-size:13px}.label{font-size:15px}
+.note{font-size:12px;fill:#555}.grid{stroke:#ddd;stroke-width:1}
+.frame{fill:#fff;stroke:#888;stroke-width:1}.line{fill:none;stroke-width:3}
+.point{stroke:#fff;stroke-width:1.5}
+</style>
+<rect width="100%" height="100%" fill="#fff"/>
+<text class="title" x="100" y="42">The shortcut becomes confidently wrong</text>
+<text class="note" x="100" y="66">Mean gold-next-node logit minus the largest non-gold logit, conditioned on the gold source</text>
+<rect class="frame" x="100" y="95" width="970" height="460"/>
+<line x1="100" y1="530.79" x2="1070" y2="530.79" stroke="#ddd" stroke-width="1"/>
+<text class="axis" text-anchor="end" x="88" y="535.79">-5</text>
+<line x1="100" y1="409.74" x2="1070" y2="409.74" stroke="#777" stroke-width="1.5"/>
+<text class="axis" text-anchor="end" x="88" y="414.74">+0</text>
+<line x1="100" y1="288.68" x2="1070" y2="288.68" stroke="#ddd" stroke-width="1"/>
+<text class="axis" text-anchor="end" x="88" y="293.68">+5</text>
+<line x1="100" y1="167.63" x2="1070" y2="167.63" stroke="#ddd" stroke-width="1"/>
+<text class="axis" text-anchor="end" x="88" y="172.63">+10</text>
+<line class="grid" x1="100.00" y1="95" x2="100.00" y2="555"/>
+<text class="axis" text-anchor="middle" x="100.00" y="583">0k</text>
+<line class="grid" x1="342.50" y1="95" x2="342.50" y2="555"/>
+<text class="axis" text-anchor="middle" x="342.50" y="583">5k</text>
+<line class="grid" x1="585.00" y1="95" x2="585.00" y2="555"/>
+<text class="axis" text-anchor="middle" x="585.00" y="583">10k</text>
+<line class="grid" x1="827.50" y1="95" x2="827.50" y2="555"/>
+<text class="axis" text-anchor="middle" x="827.50" y="583">15k</text>
+<line class="grid" x1="1070.00" y1="95" x2="1070.00" y2="555"/>
+<text class="axis" text-anchor="middle" x="1070.00" y="583">20k</text>
+<text class="label" text-anchor="middle" x="585.0" y="628">optimizer updates</text>
+<text class="label" text-anchor="middle" transform="translate(25 325.0) rotate(-90)">mean gold margin (logits)</text>
+<path class="line" stroke="#0072B2" d="M148.50,442.86 L245.50,223.10 L342.50,163.86 L439.50,134.83 L536.50,119.58 L682.00,133.27 L827.50,125.36 L924.50,93.90 L1021.50,99.28 L1070.00,126.95"/>
+<circle class="point" cx="148.50" cy="442.86" r="5" fill="#0072B2"/>
+<circle class="point" cx="245.50" cy="223.10" r="5" fill="#0072B2"/>
+<circle class="point" cx="342.50" cy="163.86" r="5" fill="#0072B2"/>
+<circle class="point" cx="439.50" cy="134.83" r="5" fill="#0072B2"/>
+<circle class="point" cx="536.50" cy="119.58" r="5" fill="#0072B2"/>
+<circle class="point" cx="682.00" cy="133.27" r="5" fill="#0072B2"/>
+<circle class="point" cx="827.50" cy="125.36" r="5" fill="#0072B2"/>
+<circle class="point" cx="924.50" cy="93.90" r="5" fill="#0072B2"/>
+<circle class="point" cx="1021.50" cy="99.28" r="5" fill="#0072B2"/>
+<circle class="point" cx="1070.00" cy="126.95" r="5" fill="#0072B2"/>
+<path class="line" stroke="#D55E00" d="M197.00,443.74 L294.00,470.63 L391.00,495.02 L488.00,503.87 L585.00,509.14 L682.00,510.32 L827.50,508.81 L924.50,509.90 L1021.50,510.83 L1070.00,512.19"/>
+<circle class="point" cx="197.00" cy="443.74" r="5" fill="#D55E00"/>
+<circle class="point" cx="294.00" cy="470.63" r="5" fill="#D55E00"/>
+<circle class="point" cx="391.00" cy="495.02" r="5" fill="#D55E00"/>
+<circle class="point" cx="488.00" cy="503.87" r="5" fill="#D55E00"/>
+<circle class="point" cx="585.00" cy="509.14" r="5" fill="#D55E00"/>
+<circle class="point" cx="682.00" cy="510.32" r="5" fill="#D55E00"/>
+<circle class="point" cx="827.50" cy="508.81" r="5" fill="#D55E00"/>
+<circle class="point" cx="924.50" cy="509.90" r="5" fill="#D55E00"/>
+<circle class="point" cx="1021.50" cy="510.83" r="5" fill="#D55E00"/>
+<circle class="point" cx="1070.00" cy="512.19" r="5" fill="#D55E00"/>
+<line x1="128" y1="587" x2="162" y2="587" stroke="#0072B2" stroke-width="4"/>
+<text class="label" x="172" y="592">seed 1234: solver</text>
+<line x1="378" y1="587" x2="412" y2="587" stroke="#D55E00" stroke-width="4"/>
+<text class="label" x="422" y="592">seed 1235: shortcut</text>
+</svg>

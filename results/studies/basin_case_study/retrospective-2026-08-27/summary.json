@@ -1,0 +1,122 @@
+{
+  "claim_boundary": {
+    "not_supported": [
+      "NextLat population success probability",
+      "a method comparison against GPT, BST, MTP, JTP, or HLP",
+      "a unique causal explanation for basin selection",
+      "a claim that seed 1235 is intrinsically defective"
+    ],
+    "supported": "For these two outcome-selected artifacts, the retained trajectories separate by step 3000 and remain in distinct behavioral regimes through step 20000."
+  },
+  "cost": {
+    "basis": "Vast provider balance decrement; not an itemized per-checkpoint bill",
+    "checkpoint_evaluation_session_usd_approx": 0.382,
+    "frozen_spend_stop_usd": 5.0,
+    "new_training_usd": 0.0
+  },
+  "design": {
+    "formal_hypothesis_test": null,
+    "heldout_examples_are_not_independent_training_runs": true,
+    "heldout_examples_per_checkpoint": 20000,
+    "inferential_unit": "training run",
+    "population_inference_authorized": false,
+    "retrospective_outcome_selected": true,
+    "run_count": 2
+  },
+  "deterministic_repeat": {
+    "byte_identical": true,
+    "seed": 1234,
+    "sha256": "d079d4b94817ffb25350db4d6bfb527fe42faf3eb3a027cd9029f83d85459b99",
+    "status": "PASS",
+    "step": 20000
+  },
+  "historical_evaluator_comparison": {
+    "absolute_accuracy_difference": 0.0006,
+    "correct_count_difference_historical_minus_new": 12,
+    "historical_accuracy": 0.18315,
+    "historical_correct": 3663,
+    "historical_total": 20000,
+    "interpretation": "The 12-example (0.06 percentage-point) difference does not alter basin classification. Its exact cause was not isolated; the two evaluator/runtime paths must not be silently merged.",
+    "new_accuracy": 0.18255,
+    "new_correct": 3651,
+    "new_total": 20000,
+    "same_checkpoint": true,
+    "source": "git:5c71e5f:docs/DECISION_D47_NEXTLAT_SEED1235_REPRODUCIBILITY_DIAGNOSTIC.md"
+  },
+  "loss_log_caveat": {
+    "step_column_status": "all_zero_logger_artifact",
+    "training_summary": "median of ordered rows in 1,000-row windows",
+    "validation_cadence_reconstructed": true
+  },
+  "provenance": {
+    "dataset_sha256": "f52fb14ef1c39aee187fd0ae40e781e7e716045d7b8270cddf9b7760afb74be9",
+    "evaluation_index": {
+      "path": "results/trajectory/evaluation_index.json",
+      "sha256": "4460d98932b83c5852e8b7de6e6586d69d4fc6986664cfd314642683d4659894"
+    },
+    "freeze": {
+      "path": "manifests/case_study/basin/artifacts.json",
+      "sha256": "40283412ef684b538473b217f4933e33492cc6fb5d0b7f128d0b2336eaabb5d1"
+    },
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "gpu_count": 1,
+    "loss_metrics": {
+      "1234": {
+        "path": "artifacts/runs/nextlat-s1234-base/metrics.csv",
+        "sha256": "7b10628904779356077475ff361d8af57bf19e974b0999717dd6f65b636ce8cc"
+      },
+      "1235": {
+        "path": "artifacts/runs/nextlat-s1235-base/metrics.csv",
+        "sha256": "f04965d3841e9b578763307afdd183b0e606b881bfb96d7efaaaa0fe5e3ef586"
+      }
+    },
+    "runtime": {
+      "cuda": "12.8",
+      "cudnn_benchmark": false,
+      "cudnn_deterministic": true,
+      "deterministic_algorithms": true,
+      "device": "cuda:0",
+      "tf32_cudnn": false,
+      "tf32_matmul": false,
+      "torch": "2.11.0+cu128"
+    },
+    "upstream_commit": "3770be6009cea2b3c455a9ce7f2ca88b504bb955"
+  },
+  "results": {
+    "seed_1234": {
+      "archived_in_training_validation": {
+        "status": "supporting_nonfrozen_evaluator_trace",
+        "step_2000_logged_exact_path_accuracy": 0.9626402258872986
+      },
+      "interval_notation": "(1000, 3000]",
+      "retained_checkpoint_transition_interval": [
+        1000,
+        3000
+      ],
+      "role": "selected generalizing trajectory",
+      "step_1000_exact_path_accuracy": 0.0,
+      "step_20000_exact_path_accuracy": 0.99955,
+      "step_20000_first_decision_gold_margin_mean": 11.680407034301759,
+      "step_3000_exact_path_accuracy": 0.99015
+    },
+    "seed_1235": {
+      "role": "selected shortcut trajectory",
+      "step_20000_exact_path_accuracy": 0.18255,
+      "step_20000_first_decision_gold_margin_mean": -4.231727400970459,
+      "step_20000_per_token_accuracy": [
+        0.99995,
+        0.18255,
+        0.1834,
+        0.18635,
+        0.936
+      ],
+      "step_4000_exact_path_accuracy": 0.17525,
+      "steps_4000_to_20000_exact_path_accuracy_range": [
+        0.17525,
+        0.1843
+      ]
+    }
+  },
+  "schema": "nextlat_forgetting/basin_case_study_summary/1",
+  "study_date": "2026-08-27"
+}

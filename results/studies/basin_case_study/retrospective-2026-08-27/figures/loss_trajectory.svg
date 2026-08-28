@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="650" viewBox="0 0 1120 650" role="img">
+<title>Training and validation loss trajectories</title>
+<desc>Training loss falls for both selected runs, but validation loss separates after the generalizing transition.</desc>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;fill:#222}
+.title{font-size:22px;font-weight:650}.axis{font-size:13px}.label{font-size:15px}
+.note{font-size:12px;fill:#555}.grid{stroke:#ddd;stroke-width:1}
+.frame{fill:#fff;stroke:#888;stroke-width:1}.line{fill:none;stroke-width:3}
+.point{stroke:#fff;stroke-width:1.5}
+</style>
+<rect width="100%" height="100%" fill="#fff"/>
+<text class="title" x="100" y="42">Training loss alone does not identify the solution</text>
+<text class="note" x="100" y="66">Training: median in ordered 1,000-row windows; validation: reconstructed 1,000-update cadence; log scale</text>
+<rect class="frame" x="100" y="95" width="970" height="460"/>
+<line class="grid" x1="100" y1="555.00" x2="1070" y2="555.00"/>
+<text class="axis" text-anchor="end" x="88" y="560.00">0.01</text>
+<line class="grid" x1="100" y1="470.65" x2="1070" y2="470.65"/>
+<text class="axis" text-anchor="end" x="88" y="475.65">0.03</text>
+<line class="grid" x1="100" y1="378.22" x2="1070" y2="378.22"/>
+<text class="axis" text-anchor="end" x="88" y="383.22">0.1</text>
+<line class="grid" x1="100" y1="293.87" x2="1070" y2="293.87"/>
+<text class="axis" text-anchor="end" x="88" y="298.87">0.3</text>
+<line class="grid" x1="100" y1="201.43" x2="1070" y2="201.43"/>
+<text class="axis" text-anchor="end" x="88" y="206.43">1</text>
+<line class="grid" x1="100" y1="117.09" x2="1070" y2="117.09"/>
+<text class="axis" text-anchor="end" x="88" y="122.09">3</text>
+<line class="grid" x1="100.00" y1="95" x2="100.00" y2="555"/>
+<text class="axis" text-anchor="middle" x="100.00" y="583">0k</text>
+<line class="grid" x1="342.50" y1="95" x2="342.50" y2="555"/>
+<text class="axis" text-anchor="middle" x="342.50" y="583">5k</text>
+<line class="grid" x1="585.00" y1="95" x2="585.00" y2="555"/>
+<text class="axis" text-anchor="middle" x="585.00" y="583">10k</text>
+<line class="grid" x1="827.50" y1="95" x2="827.50" y2="555"/>
+<text class="axis" text-anchor="middle" x="827.50" y="583">15k</text>
+<line class="grid" x1="1070.00" y1="95" x2="1070.00" y2="555"/>
+<text class="axis" text-anchor="middle" x="1070.00" y="583">20k</text>
+<text class="label" text-anchor="middle" x="585.0" y="628">optimizer updates</text>
+<text class="label" text-anchor="middle" transform="translate(25 325.0) rotate(-90)">total objective loss</text>
+<path class="line" stroke="#0072B2" d="M148.50,122.10 L197.00,191.17 L245.50,330.15 L294.00,354.29 L342.50,387.50 L391.00,423.18 L439.50,445.52 L488.00,457.01 L536.50,469.62 L585.00,482.75 L633.50,489.06 L682.00,496.22 L730.50,501.66 L779.00,505.02 L827.50,511.23 L876.00,513.10 L924.50,520.53 L973.00,522.14 L1021.50,527.98 L1070.00,529.91"/>
+<path class="line" stroke="#0072B2" stroke-dasharray="8 6" d="M148.50,158.72 L197.00,307.41 L245.50,320.46 L294.00,334.90 L342.50,326.79 L391.00,313.41 L439.50,308.90 L488.00,305.20 L536.50,304.50 L585.00,300.39 L633.50,296.32 L682.00,296.66 L730.50,297.05 L779.00,297.34 L827.50,292.82 L876.00,293.44 L924.50,288.24 L973.00,288.55 L1021.50,287.27"/>
+<path class="line" stroke="#D55E00" d="M148.50,125.52 L197.00,165.87 L245.50,175.76 L294.00,201.64 L342.50,246.59 L391.00,276.19 L439.50,292.77 L488.00,307.06 L536.50,316.88 L585.00,338.98 L633.50,355.36 L682.00,364.68 L730.50,370.04 L779.00,373.61 L827.50,378.94 L876.00,379.22 L924.50,384.39 L973.00,385.48 L1021.50,388.46 L1070.00,389.59"/>
+<path class="line" stroke="#D55E00" stroke-dasharray="8 6" d="M148.50,157.83 L197.00,162.58 L245.50,162.02 L294.00,149.92 L342.50,144.69 L391.00,137.88 L439.50,134.64 L488.00,132.03 L536.50,132.17 L585.00,145.51 L633.50,147.68 L682.00,147.10 L730.50,147.26 L779.00,146.55 L827.50,146.22 L876.00,145.96 L924.50,145.39 L973.00,144.66 L1021.50,144.07"/>
+<line x1="128" y1="587" x2="162" y2="587" stroke="#0072B2" stroke-width="4"/>
+<text class="label" x="172" y="592">seed 1234: solver</text>
+<line x1="378" y1="587" x2="412" y2="587" stroke="#D55E00" stroke-width="4"/>
+<text class="label" x="422" y="592">seed 1235: shortcut</text>
+<line x1="670" y1="587" x2="704" y2="587" stroke="#333" stroke-width="3"/>
+<text class="label" x="714" y="592">training median</text>
+<line x1="890" y1="587" x2="924" y2="587" stroke="#333" stroke-width="3" stroke-dasharray="8 6"/>
+<text class="label" x="934" y="592">validation</text>
+</svg>
