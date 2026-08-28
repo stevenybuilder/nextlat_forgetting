@@ -10,6 +10,11 @@ One selected run crosses from 0% to 99.015% exact-path accuracy between retained
 its training loss falls. This is a useful optimization case study, not an estimate of NextLat's
 population success probability.
 
+The active follow-on is now a separate, low-compute VLA study: [compositional action
+geometry](vla_geometry/README.md). It tests whether factor interference in a frozen robot policy's
+action-facing representation prospectively predicts failure on unseen object--goal combinations.
+The earlier NextLat work remains preserved below as a completed historical research stream.
+
 ## The four studies
 
 1. **Reliable planner training:** first establish and characterize a NextLat procedure that
@@ -70,6 +75,7 @@ seeds to obtain competent parent models; that creates a new conditional populati
 rewrite the original five-seed result. See the concise
 [reproducibility finding](docs/REPRODUCIBILITY_FINDING.md).
 
-No further GPU launch is implied by this repository. Freeze a new study manifest, pass its
-implementation and profile gates, and obtain compute authorization before starting the proposed
-future-sensitive representation pilot or any confirmatory matrix.
+The low-compute VIMA geometry pilot is now complete and documented in
+[`vla_geometry/PILOT_REPORT.md`](vla_geometry/PILOT_REPORT.md). No further GPU launch is implied by
+this repository: the pilot did not pass its causal-stage gate, and the deferred NextLat training
+matrices remain unauthorized.

@@ -1,0 +1,468 @@
+{
+  "actions_executed": false,
+  "cells_checked": 32,
+  "checks": [
+    {
+      "cell_id": "cell-eaff6cb4f084",
+      "direction": "north",
+      "receptacle_shape": "bowl",
+      "seed": 100223,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-eaff6cb4f084",
+      "direction": "north",
+      "receptacle_shape": "bowl",
+      "seed": 100251,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-81b2836e9852",
+      "direction": "south",
+      "receptacle_shape": "bowl",
+      "seed": 100163,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-81b2836e9852",
+      "direction": "south",
+      "receptacle_shape": "bowl",
+      "seed": 100279,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-0a47ea6620c7",
+      "direction": "west",
+      "receptacle_shape": "bowl",
+      "seed": 100091,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-0a47ea6620c7",
+      "direction": "west",
+      "receptacle_shape": "bowl",
+      "seed": 100169,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-3c5163621a7e",
+      "direction": "east",
+      "receptacle_shape": "bowl",
+      "seed": 100182,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-3c5163621a7e",
+      "direction": "east",
+      "receptacle_shape": "bowl",
+      "seed": 100327,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-a9d70913a6b6",
+      "direction": "north",
+      "receptacle_shape": "square",
+      "seed": 100032,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-a9d70913a6b6",
+      "direction": "north",
+      "receptacle_shape": "square",
+      "seed": 100392,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-b7fd07f2dfad",
+      "direction": "south",
+      "receptacle_shape": "square",
+      "seed": 100496,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-b7fd07f2dfad",
+      "direction": "south",
+      "receptacle_shape": "square",
+      "seed": 100581,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-49035ba656f8",
+      "direction": "west",
+      "receptacle_shape": "square",
+      "seed": 100173,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-49035ba656f8",
+      "direction": "west",
+      "receptacle_shape": "square",
+      "seed": 100401,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-8d855936238d",
+      "direction": "east",
+      "receptacle_shape": "square",
+      "seed": 100127,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-8d855936238d",
+      "direction": "east",
+      "receptacle_shape": "square",
+      "seed": 100904,
+      "target_shape": "letter A"
+    },
+    {
+      "cell_id": "cell-e46926737cea",
+      "direction": "north",
+      "receptacle_shape": "bowl",
+      "seed": 100164,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-e46926737cea",
+      "direction": "north",
+      "receptacle_shape": "bowl",
+      "seed": 100347,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-a3517b0a5f9e",
+      "direction": "south",
+      "receptacle_shape": "bowl",
+      "seed": 100121,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-a3517b0a5f9e",
+      "direction": "south",
+      "receptacle_shape": "bowl",
+      "seed": 100187,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-d405abafce46",
+      "direction": "west",
+      "receptacle_shape": "bowl",
+      "seed": 100102,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-d405abafce46",
+      "direction": "west",
+      "receptacle_shape": "bowl",
+      "seed": 100125,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-f8bdca3a703d",
+      "direction": "east",
+      "receptacle_shape": "bowl",
+      "seed": 100147,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-f8bdca3a703d",
+      "direction": "east",
+      "receptacle_shape": "bowl",
+      "seed": 100507,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-82c47dc49a5c",
+      "direction": "north",
+      "receptacle_shape": "square",
+      "seed": 100739,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-82c47dc49a5c",
+      "direction": "north",
+      "receptacle_shape": "square",
+      "seed": 100994,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-11e79e60d0ab",
+      "direction": "south",
+      "receptacle_shape": "square",
+      "seed": 100132,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-11e79e60d0ab",
+      "direction": "south",
+      "receptacle_shape": "square",
+      "seed": 100142,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-439736fbe1dd",
+      "direction": "west",
+      "receptacle_shape": "square",
+      "seed": 100307,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-439736fbe1dd",
+      "direction": "west",
+      "receptacle_shape": "square",
+      "seed": 100488,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-41a7878e8179",
+      "direction": "east",
+      "receptacle_shape": "square",
+      "seed": 100322,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-41a7878e8179",
+      "direction": "east",
+      "receptacle_shape": "square",
+      "seed": 100824,
+      "target_shape": "block"
+    },
+    {
+      "cell_id": "cell-b9f342732699",
+      "direction": "north",
+      "receptacle_shape": "bowl",
+      "seed": 100037,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-b9f342732699",
+      "direction": "north",
+      "receptacle_shape": "bowl",
+      "seed": 100417,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-13efe67c265e",
+      "direction": "south",
+      "receptacle_shape": "bowl",
+      "seed": 100216,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-13efe67c265e",
+      "direction": "south",
+      "receptacle_shape": "bowl",
+      "seed": 100302,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-b697b8f9f2a5",
+      "direction": "west",
+      "receptacle_shape": "bowl",
+      "seed": 100113,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-b697b8f9f2a5",
+      "direction": "west",
+      "receptacle_shape": "bowl",
+      "seed": 100320,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-53b070b16d97",
+      "direction": "east",
+      "receptacle_shape": "bowl",
+      "seed": 100130,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-53b070b16d97",
+      "direction": "east",
+      "receptacle_shape": "bowl",
+      "seed": 100503,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-637de982331f",
+      "direction": "north",
+      "receptacle_shape": "square",
+      "seed": 100120,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-637de982331f",
+      "direction": "north",
+      "receptacle_shape": "square",
+      "seed": 100217,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-9c37a3ab5803",
+      "direction": "south",
+      "receptacle_shape": "square",
+      "seed": 100360,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-9c37a3ab5803",
+      "direction": "south",
+      "receptacle_shape": "square",
+      "seed": 100410,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-77731658b21c",
+      "direction": "west",
+      "receptacle_shape": "square",
+      "seed": 100052,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-77731658b21c",
+      "direction": "west",
+      "receptacle_shape": "square",
+      "seed": 100070,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-8f87a8a79e97",
+      "direction": "east",
+      "receptacle_shape": "square",
+      "seed": 100381,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-8f87a8a79e97",
+      "direction": "east",
+      "receptacle_shape": "square",
+      "seed": 100390,
+      "target_shape": "heart"
+    },
+    {
+      "cell_id": "cell-7e2ec34761d7",
+      "direction": "north",
+      "receptacle_shape": "bowl",
+      "seed": 100018,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-7e2ec34761d7",
+      "direction": "north",
+      "receptacle_shape": "bowl",
+      "seed": 100048,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-822b7f29c5b8",
+      "direction": "south",
+      "receptacle_shape": "bowl",
+      "seed": 100027,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-822b7f29c5b8",
+      "direction": "south",
+      "receptacle_shape": "bowl",
+      "seed": 100208,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-31a94f49616e",
+      "direction": "west",
+      "receptacle_shape": "bowl",
+      "seed": 100367,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-31a94f49616e",
+      "direction": "west",
+      "receptacle_shape": "bowl",
+      "seed": 100412,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-d50a0c9af809",
+      "direction": "east",
+      "receptacle_shape": "bowl",
+      "seed": 100083,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-d50a0c9af809",
+      "direction": "east",
+      "receptacle_shape": "bowl",
+      "seed": 100101,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-d70c9f2584c3",
+      "direction": "north",
+      "receptacle_shape": "square",
+      "seed": 100306,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-d70c9f2584c3",
+      "direction": "north",
+      "receptacle_shape": "square",
+      "seed": 100538,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-1d9ce8d5e644",
+      "direction": "south",
+      "receptacle_shape": "square",
+      "seed": 100111,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-1d9ce8d5e644",
+      "direction": "south",
+      "receptacle_shape": "square",
+      "seed": 100828,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-5d818c184e06",
+      "direction": "west",
+      "receptacle_shape": "square",
+      "seed": 100049,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-5d818c184e06",
+      "direction": "west",
+      "receptacle_shape": "square",
+      "seed": 100612,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-eff49a598a7d",
+      "direction": "east",
+      "receptacle_shape": "square",
+      "seed": 100069,
+      "target_shape": "L-shaped block"
+    },
+    {
+      "cell_id": "cell-eff49a598a7d",
+      "direction": "east",
+      "receptacle_shape": "square",
+      "seed": 100290,
+      "target_shape": "L-shaped block"
+    }
+  ],
+  "config_sha256": "b6d3f37959c7075b082e5fcfc62f94bc11c8c2feec0f931cee83e25041b0f686",
+  "passed": true,
+  "policy_loaded": false,
+  "resets_checked": 64,
+  "rewards_or_outcomes_observed": false,
+  "source_tree_sha256": "802288abba0dc4d0d7228692fe6de531839bf617b20b0a55351e467530e1d616",
+  "support_checks": {
+    "grid_columns": true,
+    "grid_rows": true,
+    "null_distractors": true,
+    "receptacle_shapes_ordered": true,
+    "target_shapes_ordered": true,
+    "target_texture_count": true
+  }
+}

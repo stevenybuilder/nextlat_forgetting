@@ -29,6 +29,10 @@ data/
 output/
 wandb/
 lightning_logs/
+vla_geometry/.runtime/
+vla_geometry/raw/
+vla_geometry/results/*.npz
+vla_geometry/results/*.jsonl
 __pycache__/
 .agent_state/
 .agents/

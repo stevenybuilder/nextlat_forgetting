@@ -1,0 +1,11 @@
+{
+  "behavior_records_before_futility_stop": 134,
+  "behavior_successes": 134,
+  "inference_eligible": false,
+  "reason": "published_and_observed_behavioral_endpoint_saturation",
+  "representation_failures": 0,
+  "representation_records": 384,
+  "smoke_failures": 0,
+  "smoke_records": 4,
+  "study_id": "vima-compositional-action-geometry-pilot-v1"
+}

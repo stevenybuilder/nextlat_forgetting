@@ -1,0 +1,49 @@
+{
+  "adapter_validation": {
+    "actions_executed": false,
+    "cells_checked": 32,
+    "config_sha256": "b6d3f37959c7075b082e5fcfc62f94bc11c8c2feec0f931cee83e25041b0f686",
+    "passed": true,
+    "policy_loaded": false,
+    "rewards_or_outcomes_observed": false,
+    "source_tree_sha256": "802288abba0dc4d0d7228692fe6de531839bf617b20b0a55351e467530e1d616"
+  },
+  "checkpoint_bytes": 1093338811,
+  "checkpoint_sha256": "858b4f6a811009285bd7969dc999daa228225ad65b2e887ff1523dd7546282b5",
+  "config_sha256": "b6d3f37959c7075b082e5fcfc62f94bc11c8c2feec0f931cee83e25041b0f686",
+  "cuda_runtime": "12.8",
+  "cudnn": 90701,
+  "environment": {
+    "cublas_workspace_config": ":4096:8",
+    "cuda_visible_devices": null
+  },
+  "gpu": {
+    "capability": [
+      8,
+      9
+    ],
+    "count": 1,
+    "name": "NVIDIA GeForce RTX 4090"
+  },
+  "gym": "0.23.1",
+  "numpy": "1.26.4",
+  "packages": {
+    "gym": "0.23.1",
+    "numpy": "1.26.4",
+    "opencv-python-headless": "4.11.0.86",
+    "pybullet": "3.2.7",
+    "scikit-learn": "1.4.2",
+    "scipy": "1.11.4",
+    "torch": "2.7.1+cu128",
+    "transformers": "4.25.1"
+  },
+  "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "python": "3.11.13",
+  "source_tree_sha256": "802288abba0dc4d0d7228692fe6de531839bf617b20b0a55351e467530e1d616",
+  "torch": "2.7.1+cu128",
+  "transformers": "4.25.1",
+  "vima_commit": "8449837aa453f8ec9ba229cb956e3bbef5c796ea",
+  "vima_worktree_clean": true,
+  "vimabench_commit": "97e0af11e126fd477c9d81eeabfb6c739021c680",
+  "vimabench_worktree_clean": true
+}

@@ -1,6 +1,6 @@
 # Current status
 
-Snapshot: **2026-08-27**. This page is a lifecycle summary, not a result report or compute
+Snapshot: **2026-08-28**. This page is a lifecycle summary, not a result report or compute
 authorization.
 
 ## Where the project is now
@@ -14,6 +14,10 @@ No new four-study confirmatory matrix has been launched. The retrospective, eval
 study of two already-trained NextLat trajectories is complete. Existing configurations and result
 files belong to the legacy replication/diagnostic phase unless explicitly promoted.
 
+A separate low-compute VLA geometry pilot is also complete under [`vla_geometry/`](../vla_geometry/README.md).
+It found additive factor structure in VIMA's first action-facing token but no preregistered evidence
+that cross-factor interference predicts Task 16 success; its causal stage was not triggered.
+
 | Area | Current state | Next gate |
 | --- | --- | --- |
 | Path-Star baseline | All 20 retained checkpoints were evaluated on the frozen 20,000-graph corpus; the deterministic repeat passed | Case-study release complete |
@@ -22,7 +26,8 @@ files belong to the legacy replication/diagnostic phase unless explicitly promot
 | Controlled forgetting | Designed, with reusable balanced interventions and patching machinery | **Deferred** |
 | Exact predictive states | Mess3/RRXOR design and legacy HMM scaffolding exist | **Deferred** |
 | New objectives | MTP/JTP are public; FSP/HiLP require later parity work | Literature context only in this phase; do not implement or train yet |
-| Compute | Evaluation used one full-host RTX 4090, no training, and approximately $0.382 | No active Vast instance and no authorized follow-on run |
+| VLA compositional geometry | Frozen Task 16 pilot completed 256 representation resets and 640 behavior episodes with zero failures; prediction gate failed | Public technical report only; no automatic causal stage |
+| Compute | Path-Star evaluation cost approximately $0.382; VLA pilot episode stages cost approximately $0.076 on an existing RTX 4090 | No additional study is authorized by these results |
 
 ## Existing result boundary
 

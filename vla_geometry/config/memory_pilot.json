@@ -1,0 +1,88 @@
+{
+  "schema_version": 2,
+  "study_id": "vima-memory-compositional-action-geometry-pilot-v2",
+  "status": "frozen",
+  "frozen_at_utc": "2026-08-28T19:47:42Z",
+  "model": {
+    "name": "VIMA-92M",
+    "checkpoint_url": "https://huggingface.co/VIMA/VIMA/resolve/main/92M.ckpt",
+    "checkpoint_expected_bytes": 1093338811,
+    "checkpoint_sha256": "858b4f6a811009285bd7969dc999daa228225ad65b2e887ff1523dd7546282b5",
+    "primary_representation": "final_action_facing_token_first_decision"
+  },
+  "upstream": {
+    "vima_git": "https://github.com/vimalabs/VIMA.git",
+    "vima_commit": "8449837aa453f8ec9ba229cb956e3bbef5c796ea",
+    "vimabench_git": "https://github.com/vimalabs/VimaBench.git",
+    "vimabench_commit": "97e0af11e126fd477c9d81eeabfb6c739021c680",
+    "metric_prior_git": "https://github.com/oshapio/necessary-compositionality.git",
+    "metric_prior_commit": "6e0e593fe691bab73346b9e1b7d0d0f91af6735a"
+  },
+  "benchmark": {
+    "partition": "combinatorial_generalization",
+    "task": "manipulate_old_neighbor",
+    "official_task_index": 16,
+    "published_vima_92m_success_percent": 42.0,
+    "bonus_steps": 2,
+    "hide_arm_rgb": true
+  },
+  "factor_order": ["target_shape", "receptacle_shape", "direction"],
+  "factors": {
+    "target_shape": ["letter A", "block", "heart", "L-shaped block"],
+    "receptacle_shape": ["bowl", "square"],
+    "direction": ["north", "south", "west", "east"]
+  },
+  "seed_sampler_contract": {
+    "rows": 3,
+    "columns": 2,
+    "null_distractors": 1,
+    "target_shapes_ordered": [
+      "letter A", "letter E", "letter G", "letter M", "letter T", "letter V",
+      "block", "cross", "triangle", "flower", "heart", "ring", "pentagon",
+      "L-shaped block"
+    ],
+    "target_texture_count": 20,
+    "receptacle_shapes_ordered": ["bowl", "frame", "container", "square"]
+  },
+  "seed_selection": {
+    "representation": {"start": 100000, "scan_limit": 12000, "count_per_cell": 8},
+    "behavior": {"start": 1000000, "scan_limit": 20000, "count_per_cell": 20},
+    "smoke": {"start": 2000000, "scan_limit": 5000, "count_per_cell": 2}
+  },
+  "seeds": {"strategy": "official_task16_factor_stratified_v1"},
+  "analysis": {
+    "n_combination_folds": 5,
+    "fold_seed": 314159,
+    "bootstrap_replicates": 10000,
+    "permutation_replicates": 10000,
+    "alpha": 0.05,
+    "minimum_abs_spearman": 0.5,
+    "predicted_spearman_direction": "negative",
+    "minimum_log_loss_improvement_fraction": 0.05,
+    "logistic_ridge": 1.0,
+    "control_model": "factor_main_effects_plus_initial_confidence_plus_initial_layout",
+    "layout_controls": [
+      "target_receptacle_xy_distance", "target_x", "target_y", "neighbor_x", "neighbor_y"
+    ]
+  },
+  "runtime_contract": {
+    "num_gpus": 1,
+    "distributed": false,
+    "deterministic_actions": "per-head categorical mode",
+    "deterministic_torch_algorithms": true,
+    "cublas_workspace_config": ":4096:8",
+    "allow_tf32": false,
+    "precision": "float32",
+    "record_raw_video": false,
+    "expected_runtime": {
+      "python": "3.11.13",
+      "torch": "2.7.1+cu128",
+      "cuda_runtime": "12.8",
+      "cudnn": 90701,
+      "gpu_name": "NVIDIA GeForce RTX 4090",
+      "numpy": "1.26.4",
+      "transformers": "4.25.1",
+      "gym": "0.23.1"
+    }
+  }
+}
