@@ -1,0 +1,109 @@
+{
+  "study": "geometry-of-intended-futures-pi05-pilot-v2",
+  "status": "frozen",
+  "frozen_at_utc": "2026-08-28T22:47:39Z",
+  "manifest_sha256": "6db156eedbc0555a6355533b144110a7d14879d8f4131b3f5275144924c173ce",
+  "upstream": {
+    "libero_cf_repository": "https://github.com/yuffish/libero-cf",
+    "libero_cf_commit": "8460457bfca6e0ef2e856bc104e2c60b023ef2a7",
+    "openpi_repository": "https://github.com/Physical-Intelligence/openpi",
+    "openpi_reference_commit": "215abfb217dbac7d5f1273282331b9b1866c0479"
+  },
+  "model": {
+    "name": "pi0.5-LIBERO",
+    "config": "pi05_libero",
+    "checkpoint_uri": "gs://openpi-assets/checkpoints/pi05_libero",
+    "checkpoint_sha256": "record-before-first-pilot-outcome",
+    "framework": "openpi-pytorch-conversion",
+    "action_horizon": 10,
+    "replan_steps": 5,
+    "denoising_steps": 10
+  },
+  "benchmark": {
+    "suite": "libero_cf_spatial_focused",
+    "baseline_gate": {
+      "suite": "libero_spatial",
+      "task_indices": [0, 1],
+      "initial_state_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      "max_steps": 220,
+      "wait_steps": 10,
+      "minimum_successes": 16,
+      "invalid_episodes_allowed": 0,
+      "retry_failed_or_invalid_episodes": false
+    },
+    "pair_selection": "byte_identical_init_file_distinct_language_v1",
+    "matched_pairs": [
+      {
+        "pair_id": "cookie-vs-ramekin",
+        "task_indices": [0, 1],
+        "intended_subjects": ["cookies_1", "glazed_rim_porcelain_ramekin_1"],
+        "intended_receptacle": "plate_1"
+      },
+      {
+        "pair_id": "cookie-vs-bowl-next-plate",
+        "task_indices": [3, 11],
+        "intended_subjects": ["cookies_1", "akita_black_bowl_1"],
+        "intended_receptacle": "plate_1"
+      },
+      {
+        "pair_id": "ramekin-vs-bowl-on-cabinet",
+        "task_indices": [4, 12],
+        "intended_subjects": ["glazed_rim_porcelain_ramekin_1", "akita_black_bowl_1"],
+        "intended_receptacle": "plate_1"
+      },
+      {
+        "pair_id": "ramekin-vs-bowl-in-cabinet",
+        "task_indices": [5, 13],
+        "intended_subjects": ["glazed_rim_porcelain_ramekin_1", "akita_black_bowl_1"],
+        "intended_receptacle": "plate_1"
+      },
+      {
+        "pair_id": "bowl-next-ramekin-vs-bowl-next-plate",
+        "task_indices": [9, 14],
+        "intended_subjects": ["akita_black_bowl_2", "akita_black_bowl_1"],
+        "intended_receptacle": "plate_1"
+      }
+    ]
+  },
+  "sampling": {
+    "initial_state_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "expected_matched_pairs": 50,
+    "noise_seed_base": 91001,
+    "statistical_unit": "matched simulator initial state",
+    "inference_unit": "five task-pair clusters"
+  },
+  "representation": {
+    "site": "pi0.5 action-expert residual stream",
+    "candidate_layers": [5, 11, 17],
+    "primary_denoising_call": 0,
+    "preserve_action_token_positions": true,
+    "mean_pool_tokens": false,
+    "future_target": "difference in intended target position relative to the end effector",
+    "primary_horizon_replans": 3
+  },
+  "analysis": {
+    "cross_validation": "leave-one-task-pair-out",
+    "ridge": 0.01,
+    "subspace_rank": 3,
+    "bootstrap_repetitions": 10000,
+    "bootstrap_seed": 73129,
+    "pilot_gates": {
+      "future_delta_crossvalidated_r2_min": 0.05,
+      "positive_task_pairs_min": 4,
+      "causal_standardized_progress_min": 0.3,
+      "random_control_excess_max": 0.1
+    },
+    "claim_boundary": "engineering go/no-go only; five task-pair clusters cannot support a two-sided exact p<0.05 confirmatory claim"
+  },
+  "runtime_contract": {
+    "num_gpus": 1,
+    "distributed": false,
+    "primary_gpu": "NVIDIA GeForce RTX 4090",
+    "precision": "bfloat16",
+    "cuda_visible_devices": "0",
+    "simulator_renderer": "osmesa",
+    "renderer_scope": "CPU simulator rendering only; model inference remains on cuda:0",
+    "fixed_noise_within_pair": true,
+    "topology_replication": "only after the scientific pilot gate passes"
+  }
+}

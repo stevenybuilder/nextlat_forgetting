@@ -1,0 +1,41 @@
+{
+  "checkpoint": {
+    "bytes": 7233652471,
+    "files": [
+      {
+        "bytes": 1914,
+        "path": "assets/physical-intelligence/libero/norm_stats.json",
+        "sha256": "b3a44bb2810436fb62917decaea58bd4d9110255df527dea21e8fd40c960bd84"
+      },
+      {
+        "bytes": 149,
+        "path": "config.json",
+        "sha256": "5c2728c53f4b33ee16380140f303713fdb5df78a8d26ee1489ace374fc54327a"
+      },
+      {
+        "bytes": 7233650408,
+        "path": "model.safetensors",
+        "sha256": "99c71043ec0b05ac98ad61f52094e823515864080f29c5a728cf0740a8a6acba"
+      }
+    ],
+    "path": "/root/intended-futures/checkpoints/pi05_libero_pytorch",
+    "tree_sha256": "d90ca39fef68eeadb5f5fd051f9e0c3b4bd5e2a01c40598d2ddd9ccbdb0c3cd2"
+  },
+  "config_sha256": "f9c08cc31f48ced20c0663925fb319e2169df0445d87e4273757fa1d15742117",
+  "cuda_runtime": "12.6",
+  "cuda_visible_devices": "0",
+  "cudnn": 90501,
+  "distributed": false,
+  "gpu_count": 1,
+  "gpu_name": "NVIDIA GeForce RTX 4090",
+  "libero_cf_commit": "8460457bfca6e0ef2e856bc104e2c60b023ef2a7",
+  "manifest_file_sha256": "23fe03134a35371b31f2dad2021149a07b52a241d12061f18c2b1e5ff19aebd0",
+  "manifest_sha256": "2820d8c2bdc7d5c31777715c0be4833c63a98d79537dba9223b420ad7b1b0bde",
+  "openpi_commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+  "python": "3.11.13",
+  "simulator_renderer": "osmesa",
+  "source_tree_sha256": "4f79ad9f6e0f5a777317f26b91ffaebc8f20334c0ef305448c45ae83854f5565",
+  "study": "geometry-of-intended-futures-pi05-pilot-v1",
+  "torch": "2.7.1+cu126",
+  "written_before_pilot_outcomes": true
+}

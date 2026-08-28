@@ -1,0 +1,143 @@
+{
+  "action_difference_mean_norm": 1.1494974313686397,
+  "advance_to_causal_stage": false,
+  "claim_boundary": "engineering go/no-go only; five task-pair clusters cannot support a two-sided exact p<0.05 confirmatory claim",
+  "future_target_shape": [
+    3
+  ],
+  "layers": [
+    {
+      "activation_shape": [
+        10,
+        1024
+      ],
+      "crossvalidated_r2": -1.5980685622538933,
+      "layer": 5,
+      "mean_cosine": 0.6938472278171558,
+      "per_pair": {
+        "bowl-next-ramekin-vs-bowl-next-plate": {
+          "mean_cosine": 0.9993732596715329,
+          "positive": true
+        },
+        "cookie-vs-bowl-next-plate": {
+          "mean_cosine": 0.9984941048829097,
+          "positive": true
+        },
+        "cookie-vs-ramekin": {
+          "mean_cosine": -0.5285792998836538,
+          "positive": false
+        },
+        "ramekin-vs-bowl-in-cabinet": {
+          "mean_cosine": 0.9999588081232792,
+          "positive": true
+        },
+        "ramekin-vs-bowl-on-cabinet": {
+          "mean_cosine": 0.9999892662917114,
+          "positive": true
+        }
+      },
+      "positive_task_pairs": 4
+    },
+    {
+      "activation_shape": [
+        10,
+        1024
+      ],
+      "crossvalidated_r2": -0.7913622162205678,
+      "layer": 11,
+      "mean_cosine": 0.6943847253340795,
+      "per_pair": {
+        "bowl-next-ramekin-vs-bowl-next-plate": {
+          "mean_cosine": 0.9998856969754518,
+          "positive": true
+        },
+        "cookie-vs-bowl-next-plate": {
+          "mean_cosine": 0.9997135966202361,
+          "positive": true
+        },
+        "cookie-vs-ramekin": {
+          "mean_cosine": -0.527571185162508,
+          "positive": false
+        },
+        "ramekin-vs-bowl-in-cabinet": {
+          "mean_cosine": 0.9999117439103655,
+          "positive": true
+        },
+        "ramekin-vs-bowl-on-cabinet": {
+          "mean_cosine": 0.9999837743268518,
+          "positive": true
+        }
+      },
+      "positive_task_pairs": 4
+    },
+    {
+      "activation_shape": [
+        10,
+        1024
+      ],
+      "crossvalidated_r2": -1.2111560523287643,
+      "layer": 17,
+      "mean_cosine": 0.6936869438805718,
+      "per_pair": {
+        "bowl-next-ramekin-vs-bowl-next-plate": {
+          "mean_cosine": 0.9999456485962943,
+          "positive": true
+        },
+        "cookie-vs-bowl-next-plate": {
+          "mean_cosine": 0.9995853046657969,
+          "positive": true
+        },
+        "cookie-vs-ramekin": {
+          "mean_cosine": -0.530909818241482,
+          "positive": false
+        },
+        "ramekin-vs-bowl-in-cabinet": {
+          "mean_cosine": 0.9998475443834319,
+          "positive": true
+        },
+        "ramekin-vs-bowl-on-cabinet": {
+          "mean_cosine": 0.9999660399988173,
+          "positive": true
+        }
+      },
+      "positive_task_pairs": 4
+    }
+  ],
+  "manifest_sha256": "6db156eedbc0555a6355533b144110a7d14879d8f4131b3f5275144924c173ce",
+  "n_matched_states": 50,
+  "n_task_pair_clusters": 5,
+  "primary": {
+    "activation_shape": [
+      10,
+      1024
+    ],
+    "crossvalidated_r2": -0.7913622162205678,
+    "layer": 11,
+    "mean_cosine": 0.6943847253340795,
+    "per_pair": {
+      "bowl-next-ramekin-vs-bowl-next-plate": {
+        "mean_cosine": 0.9998856969754518,
+        "positive": true
+      },
+      "cookie-vs-bowl-next-plate": {
+        "mean_cosine": 0.9997135966202361,
+        "positive": true
+      },
+      "cookie-vs-ramekin": {
+        "mean_cosine": -0.527571185162508,
+        "positive": false
+      },
+      "ramekin-vs-bowl-in-cabinet": {
+        "mean_cosine": 0.9999117439103655,
+        "positive": true
+      },
+      "ramekin-vs-bowl-on-cabinet": {
+        "mean_cosine": 0.9999837743268518,
+        "positive": true
+      }
+    },
+    "positive_task_pairs": 4
+  },
+  "selected_layer": 11,
+  "study": "geometry-of-intended-futures-pi05-pilot-v2"
+}

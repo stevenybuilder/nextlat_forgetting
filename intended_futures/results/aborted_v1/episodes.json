@@ -1,0 +1,14 @@
+[
+  {
+    "elapsed_seconds": 236.57884488499985,
+    "episode_id": "task-00-state-00",
+    "error": "ConnectionClosedError: no close frame received or sent\nTraceback (most recent call last):\n  File \"/root/intended-futures/project/scripts/run_baseline_gate.py\", line 138, in main\n    outputs = client.infer(request)\n  File \"/root/intended-futures/external/libero-cf/packages/openpi-client/src/openpi_client/websocket_client_policy.py\", line 47, in infer\n    response = self._ws.recv()\n  File \"/root/intended-futures/external/libero-cf/.venv/lib/python3.8/site-packages/websockets/sync/connection.py\", line 211, in recv\n    raise self.protocol.close_exc from self.recv_exc\nwebsockets.exceptions.ConnectionClosedError: no close frame received or sent\n",
+    "initial_state_index": 0,
+    "policy_calls": 1,
+    "prompt": "pick up the black bowl between the plate and the ramekin and place it on the plate",
+    "steps": 0,
+    "success": false,
+    "task_index": 0,
+    "valid": false
+  }
+]

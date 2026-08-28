@@ -7,6 +7,10 @@ the public Git history at commit `5c71e5f`.
 
 ## Active design
 
+The current VLA follow-on is [Geometry of intended futures](../intended_futures/README.md), with a
+separate [frozen engineering-pilot preregistration](../intended_futures/PREREGISTRATION.md). It does
+not modify or retroactively reinterpret the completed VIMA pilot.
+
 1. [BASIN_CASE_STUDY.md](BASIN_CASE_STUDY.md) — the completed retrospective study of one
    generalizing and one shortcut NextLat trajectory.
 2. [BLOG_POST.md](BLOG_POST.md) — a concise research-facing version of the case-study result.

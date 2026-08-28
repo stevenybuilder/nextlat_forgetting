@@ -33,6 +33,10 @@ vla_geometry/.runtime/
 vla_geometry/raw/
 vla_geometry/results/*.npz
 vla_geometry/results/*.jsonl
+intended_futures/.runtime/
+intended_futures/raw/
+intended_futures/results/*.npz
+intended_futures/results/*.jsonl
 __pycache__/
 .agent_state/
 .agents/
