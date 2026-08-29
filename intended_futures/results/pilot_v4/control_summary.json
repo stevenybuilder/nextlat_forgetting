@@ -1,0 +1,31 @@
+{
+  "activation": {
+    "crossvalidated_r2": 0.8502850291776438,
+    "mean_cosine": 0.93516071783455,
+    "residual_sse_reduction_vs_exact_prompt_pair": 0.3656305684861232
+  },
+  "controls": {
+    "action_chunk": {
+      "crossvalidated_r2": 0.42037613225139536,
+      "mean_cosine": 0.8492176125051515
+    },
+    "exact_prompt_pair": {
+      "crossvalidated_r2": 0.7639940334686806,
+      "mean_cosine": 0.8632380299220243
+    },
+    "global_intercept": {
+      "crossvalidated_r2": -0.18939936694998538,
+      "mean_cosine": 0.33685458391205925
+    },
+    "ordered_subject_pair": {
+      "crossvalidated_r2": 0.6771682964535992,
+      "mean_cosine": 0.8706695622433003
+    }
+  },
+  "interpretation": "activation geometry adds scene-conditioned information beyond strong prompt-pair structure",
+  "mean_within_scene_rms": 0.019945821382983172,
+  "selected_layer": 17,
+  "status": "post-hoc controls required to interpret the preregistered gate",
+  "study": "geometry-of-intended-futures-pi05-pilot-v4",
+  "target_mean_norm": 0.3676458928146573
+}

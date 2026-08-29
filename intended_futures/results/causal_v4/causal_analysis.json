@@ -1,0 +1,148 @@
+{
+  "causal_gate_passed": false,
+  "causal_units": 36,
+  "claim_boundary": "exploratory causal pilot; layer selected on the parent representation screen",
+  "gates": {
+    "learned_standardized_effect": false,
+    "positive_scenes": false,
+    "random_control": false
+  },
+  "metrics": {
+    "full_minus_none_donor": {
+      "cluster_bootstrap_95ci_meters": [
+        -0.002180209715045399,
+        0.00746187556858962
+      ],
+      "exact_scene_sign_flip_pvalue": 0.5673828125,
+      "mean_meters": 0.002032730266695574,
+      "positive_scenes": 4,
+      "scene_means_meters": {
+        "scene-00": 0.008048599804233189,
+        "scene-01": -0.006891596734470577,
+        "scene-03": -8.214137828232992e-05,
+        "scene-04": 0.026989291854300823,
+        "scene-05": 0.006558854331296364,
+        "scene-07": -0.0014022920346797123,
+        "scene-08": -0.0011618683279078224,
+        "scene-09": -0.002157895879687973,
+        "scene-11": -0.00042624416230681766,
+        "scene-12": -0.006545080075290477,
+        "scene-13": -0.0023288425463660056,
+        "scene-14": 0.0037919783495082293
+      },
+      "standardized_scene_effect": 0.2241134814269855
+    },
+    "learned_minus_none_donor": {
+      "cluster_bootstrap_95ci_meters": [
+        -0.003218254345553099,
+        0.0069272035672921645
+      ],
+      "exact_scene_sign_flip_pvalue": 0.79638671875,
+      "mean_meters": 0.0011967374320491328,
+      "positive_scenes": 7,
+      "scene_means_meters": {
+        "scene-00": 0.0004303063049827897,
+        "scene-01": 0.0024802480114204752,
+        "scene-03": 0.0035035597791110242,
+        "scene-04": 0.02786802581996839,
+        "scene-05": -0.004830582753102904,
+        "scene-07": 0.0036852015627248567,
+        "scene-08": -0.006719663123318269,
+        "scene-09": -0.0096393033270362,
+        "scene-11": 0.00011902495077244686,
+        "scene-12": -0.005248542186585732,
+        "scene-13": 0.004291166259403623,
+        "scene-14": -0.0015785921137509058
+      },
+      "standardized_scene_effect": 0.12542052937309606
+    },
+    "learned_minus_none_recipient": {
+      "cluster_bootstrap_95ci_meters": [
+        -0.007207664843517069,
+        0.004597384212422564
+      ],
+      "exact_scene_sign_flip_pvalue": 0.80810546875,
+      "mean_meters": -0.0008108637279139448,
+      "positive_scenes": 7,
+      "scene_means_meters": {
+        "scene-00": 0.0004106952093740346,
+        "scene-01": -0.008689989154921918,
+        "scene-03": 0.00206688454190083,
+        "scene-04": -0.02934087120379029,
+        "scene-05": 7.778466119273686e-05,
+        "scene-07": 0.004440956379655876,
+        "scene-08": 0.01731352847554596,
+        "scene-09": -0.001215542349247034,
+        "scene-11": 0.005570743694921776,
+        "scene-12": 0.005049142765122509,
+        "scene-13": -0.0030128134321880475,
+        "scene-14": -0.0024008843225337695
+      },
+      "standardized_scene_effect": -0.07387363652280445
+    },
+    "learned_minus_random_donor": {
+      "cluster_bootstrap_95ci_meters": [
+        -0.004868744440965664,
+        0.0062543994431954715
+      ],
+      "exact_scene_sign_flip_pvalue": 0.900390625,
+      "mean_meters": 0.00042485950448941284,
+      "positive_scenes": 7,
+      "scene_means_meters": {
+        "scene-00": -0.011357442690356101,
+        "scene-01": 0.010008094474010151,
+        "scene-03": 0.005414102719962992,
+        "scene-04": 0.023764455108395866,
+        "scene-05": 0.0007085840935946441,
+        "scene-07": 0.004626280134798526,
+        "scene-08": 0.00012437720602217114,
+        "scene-09": -0.009937477540619891,
+        "scene-11": -0.007041671791609916,
+        "scene-12": -0.012548521120539799,
+        "scene-13": 0.0014783723553041621,
+        "scene-14": -0.00014083889508984906
+      },
+      "standardized_scene_effect": 0.041534409936301295
+    },
+    "random_minus_none_donor": {
+      "cluster_bootstrap_95ci_meters": [
+        -0.0024338476713854063,
+        0.0040812136470459665
+      ],
+      "exact_scene_sign_flip_pvalue": 0.6640625,
+      "mean_meters": 0.0007718779275597199,
+      "positive_scenes": 6,
+      "scene_means_meters": {
+        "scene-00": 0.01178774899533889,
+        "scene-01": -0.007527846462589675,
+        "scene-03": -0.001910542940851967,
+        "scene-04": 0.004103570711572524,
+        "scene-05": -0.005539166846697548,
+        "scene-07": -0.0009410785720736689,
+        "scene-08": -0.0068440403293404395,
+        "scene-09": 0.00029817421358369067,
+        "scene-11": 0.007160696742382362,
+        "scene-12": 0.0072999789339540655,
+        "scene-13": 0.0028127939040994607,
+        "scene-14": -0.0014377532186610569
+      },
+      "standardized_scene_effect": 0.12768243813622207
+    }
+  },
+  "patch_norms": {
+    "full_donor": {
+      "mean": 794.1932124385128,
+      "sd": 240.28394748795247
+    },
+    "future_subspace": {
+      "mean": 190.23255807382088,
+      "sd": 54.223620523644065
+    },
+    "random_subspace": {
+      "mean": 191.8212285571628,
+      "sd": 53.378683395250285
+    }
+  },
+  "scene_clusters": 12,
+  "study": "geometry-of-intended-futures-pi05-causal-v4"
+}

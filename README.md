@@ -10,10 +10,11 @@ One selected run crosses from 0% to 99.015% exact-path accuracy between retained
 its training loss falls. This is a useful optimization case study, not an estimate of NextLat's
 population success probability.
 
-The active follow-on is now a separate, low-compute VLA study: [compositional action
-geometry](vla_geometry/README.md). It tests whether factor interference in a frozen robot policy's
-action-facing representation prospectively predicts failure on unseen object--goal combinations.
-The earlier NextLat work remains preserved below as a completed historical research stream.
+The active follow-on became a low-compute study of [the geometry of intended futures in
+π0.5](intended_futures/README.md). It finds that an instruction-selected target is linearly
+accessible in the action expert and generalizes across scenes, but a controlled subspace patch at
+the selected site does not reliably redirect behavior. The earlier NextLat and VIMA work remains
+preserved as completed historical research streams.
 
 ## The four studies
 
@@ -38,7 +39,9 @@ new training, cost approximately $0.382, and is complete.
   controls, results, and claim boundary.
 - [Blog post](docs/BLOG_POST.md) is the concise research-facing version of the result.
 - [Future-sensitive representation pilot](docs/FUTURE_SENSITIVE_GEOMETRY_PILOT.md) specifies the
-  recommended low-compute next experiment, directly testing study 2 with no new model training.
+  design lineage that motivated the VLA experiment.
+- [π0.5 intended-futures report](intended_futures/RESULTS.md) reports the completed representation
+  and causal pilot for study 2.
 - [Research plan](docs/RESEARCH_PLAN.md) defines the hypotheses and claim boundaries.
 - [Experiment design](docs/EXPERIMENT_DESIGN.md) defines stimuli, counterfactuals, seed policy,
   power, and statistical analysis.
@@ -75,7 +78,8 @@ seeds to obtain competent parent models; that creates a new conditional populati
 rewrite the original five-seed result. See the concise
 [reproducibility finding](docs/REPRODUCIBILITY_FINDING.md).
 
-The low-compute VIMA geometry pilot is now complete and documented in
-[`vla_geometry/PILOT_REPORT.md`](vla_geometry/PILOT_REPORT.md). No further GPU launch is implied by
-this repository: the pilot did not pass its causal-stage gate, and the deferred NextLat training
-matrices remain unauthorized.
+The low-compute VIMA geometry pilot is documented in
+[`vla_geometry/PILOT_REPORT.md`](vla_geometry/PILOT_REPORT.md). Its modern successor, the π0.5
+intended-futures pilot, is also complete. The latter passed its representation gate but failed all
+frozen causal gates. No further GPU launch is implied by either result, and the deferred NextLat
+training matrices remain unauthorized.

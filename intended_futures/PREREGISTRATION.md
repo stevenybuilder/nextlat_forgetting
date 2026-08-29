@@ -1,5 +1,10 @@
 # Geometry of intended futures: π0.5 engineering pilot
 
+> Completion note: this is the frozen v2 protocol and is retained unchanged as historical
+> provenance. V2's target labels were invalidated after extraction, v3 failed stimulus preflight,
+> and the corrected balanced v4 study is governed by `config/pilot_v4.json` and
+> `config/causal_v4.json`. Outcomes are reported in `RESULTS.md`.
+
 Status: frozen before any π0.5 activation or behavioral outcome from this study. The exact stimulus
 population is recorded in `manifests/pilot_stimuli.json`.
 
