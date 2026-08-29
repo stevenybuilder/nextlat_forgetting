@@ -19,6 +19,7 @@ def main() -> int:
     parser.add_argument("--libero-plus-root", type=Path, required=True)
     parser.add_argument("--libero-cf-root", type=Path, required=True)
     parser.add_argument("--openpi-root", type=Path, required=True)
+    parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--simulator-python", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -26,7 +27,7 @@ def main() -> int:
     project_root = Path(__file__).parents[1]
     sys.path.insert(0, str(project_root / "src"))
     from intended_futures.manifest import sha256_file
-    from intended_futures.provenance import git_commit, sha256_source_tree
+    from intended_futures.provenance import checkpoint_tree, git_commit, sha256_source_tree
 
     config = json.loads(args.config.read_text(encoding="utf-8"))
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
@@ -64,6 +65,9 @@ def main() -> int:
         raise RuntimeError("OpenPI commit violates the frozen config")
     if libero_cf_commit != parent["libero_cf_commit"]:
         raise RuntimeError("LIBERO-CF commit differs from the validated parent runtime")
+    checkpoint = checkpoint_tree(args.checkpoint)
+    if checkpoint["tree_sha256"] != parent["parent_checkpoint_tree_sha256"]:
+        raise RuntimeError("checkpoint tree differs from the validated parent checkpoint")
     simulator_python = subprocess.run(
         [str(args.simulator_python), "--version"],
         check=True,
@@ -83,7 +87,7 @@ def main() -> int:
             preflight["pooled_layout_residual_rms_meters"]
         ),
         "parent_runtime_receipt_sha256": sha256_file(args.parent_runtime_receipt),
-        "parent_checkpoint_tree_sha256": parent["parent_checkpoint_tree_sha256"],
+        "checkpoint": checkpoint,
         "source_tree_sha256": sha256_source_tree(project_root),
         "libero_plus_commit": libero_plus_commit,
         "libero_cf_commit": libero_cf_commit,
