@@ -1,0 +1,108 @@
+{
+  "execution": "4 simulator-only scene shards",
+  "manifest_sha256": "50aed097a73f98b24f55c2a83c8dc28f5ae3cb9ed1aa59fde5f530d26ec4c961",
+  "minimum_pair_distance_meters": 0.21312873872220306,
+  "model_outcomes_observed": false,
+  "passed": true,
+  "scenes": [
+    {
+      "minimum_pair_distance_meters": 0.2981607654382421,
+      "official_state_count": 50,
+      "scene_id": "scene-00",
+      "states_validated": 40,
+      "task_index": 0
+    },
+    {
+      "minimum_pair_distance_meters": 0.2981607654382421,
+      "official_state_count": 50,
+      "scene_id": "scene-01",
+      "states_validated": 40,
+      "task_index": 1
+    },
+    {
+      "minimum_pair_distance_meters": 0.21312873872220306,
+      "official_state_count": 50,
+      "scene_id": "scene-03",
+      "states_validated": 40,
+      "task_index": 3
+    },
+    {
+      "minimum_pair_distance_meters": 0.5425416388465891,
+      "official_state_count": 50,
+      "scene_id": "scene-04",
+      "states_validated": 40,
+      "task_index": 4
+    },
+    {
+      "minimum_pair_distance_meters": 0.3604546223653048,
+      "official_state_count": 50,
+      "scene_id": "scene-05",
+      "states_validated": 40,
+      "task_index": 5
+    },
+    {
+      "minimum_pair_distance_meters": 0.3318528620310425,
+      "official_state_count": 50,
+      "scene_id": "scene-07",
+      "states_validated": 40,
+      "task_index": 7
+    },
+    {
+      "minimum_pair_distance_meters": 0.3024666898286264,
+      "official_state_count": 50,
+      "scene_id": "scene-08",
+      "states_validated": 40,
+      "task_index": 8
+    },
+    {
+      "minimum_pair_distance_meters": 0.29534264419077494,
+      "official_state_count": 50,
+      "scene_id": "scene-09",
+      "states_validated": 40,
+      "task_index": 9
+    },
+    {
+      "minimum_pair_distance_meters": 0.21312873872220306,
+      "official_state_count": 50,
+      "scene_id": "scene-11",
+      "states_validated": 40,
+      "task_index": 11
+    },
+    {
+      "minimum_pair_distance_meters": 0.5425416388465891,
+      "official_state_count": 50,
+      "scene_id": "scene-12",
+      "states_validated": 40,
+      "task_index": 12
+    },
+    {
+      "minimum_pair_distance_meters": 0.3604546223653048,
+      "official_state_count": 50,
+      "scene_id": "scene-13",
+      "states_validated": 40,
+      "task_index": 13
+    },
+    {
+      "minimum_pair_distance_meters": 0.36287940051751066,
+      "official_state_count": 50,
+      "scene_id": "scene-14",
+      "states_validated": 40,
+      "task_index": 14
+    }
+  ],
+  "scenes_validated": 12,
+  "shard_files": [
+    "runs/target-control-tc1-frozen-preflight-shard-0.json",
+    "runs/target-control-tc1-frozen-preflight-shard-1.json",
+    "runs/target-control-tc1-frozen-preflight-shard-2.json",
+    "runs/target-control-tc1-frozen-preflight-shard-3.json"
+  ],
+  "split_counts": {
+    "causal_test": 120,
+    "observer_fit": 120,
+    "observer_validation": 120,
+    "reserve": 120
+  },
+  "states_validated": 480,
+  "study": "pi05-selective-target-control-tc1-v1"
+}

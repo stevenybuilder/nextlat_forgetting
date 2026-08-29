@@ -1,0 +1,41 @@
+{
+  "conditions": [
+    "donor_clean",
+    "recipient_clean",
+    "minimum_norm",
+    "donor_projection",
+    "matched_random",
+    "full_replay"
+  ],
+  "cuda_runtime": "12.6",
+  "cuda_visible_devices": "0",
+  "cudnn": 90501,
+  "distributed": false,
+  "gpu_count": 1,
+  "gpu_name": "NVIDIA GeForce RTX 4090",
+  "libero_cf_commit": "8460457bfca6e0ef2e856bc104e2c60b023ef2a7",
+  "manifest_file_sha256": "27bd3a896c22a7d5e7cc5832c290c29bb2af980ac167a3de541f003d369f896e",
+  "manifest_sha256": "50aed097a73f98b24f55c2a83c8dc28f5ae3cb9ed1aa59fde5f530d26ec4c961",
+  "openpi_commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+  "parent_checkpoint_tree_sha256": "d90ca39fef68eeadb5f5fd051f9e0c3b4bd5e2a01c40598d2ddd9ccbdb0c3cd2",
+  "parent_runtime_receipt_sha256": "91cbe2b1724a1bcb8b3610325e62b5c3f4536fe7e7d6f955fe566cd1b1781a84",
+  "policy_python": "3.11.13",
+  "preflight_file_sha256": "14d4afc6751daaad726fa7440a9d5f078f3a7aa1883c7c345d388b6a5b5133e6",
+  "preflight_minimum_pair_distance_meters": 0.21312873872220306,
+  "preflight_states_validated": 480,
+  "simulator_python": "Python 3.8.20",
+  "simulator_renderer": "osmesa",
+  "site": {
+    "indexing": "zero_based",
+    "layer": 13,
+    "pathway": "paligemma",
+    "selection_rule": "pre-outcome Action Atlas goal-classification maximum, then retained because full replay redirected target behavior in M0",
+    "site_id": "paligemma_l13",
+    "token_pooling": "none"
+  },
+  "source_tree_sha256": "1176561b3651de50896aa07bffeffdce7a658067d31d7c458321a58f4ccdbb37",
+  "study": "pi05-selective-target-control-tc1-v1",
+  "tc1_config_sha256": "11155dc0c8f2741bd92678d424438091a77b7fd21c35f6249982ae20981bcede",
+  "torch": "2.7.1+cu126",
+  "written_before_model_outcomes": true
+}
