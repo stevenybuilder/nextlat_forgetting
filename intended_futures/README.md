@@ -47,6 +47,12 @@ narrow: full PaliGemma replay can redirect target behavior, but this official st
 show compact state-conditioned coordinate geometry beyond prompt identity. See the
 [full results and limitations](RESULTS.md).
 
+A simulator-bound LIBERO-Plus follow-up then isolated layout variation within the same prompt
+families. PaliGemma-13 reached held-out residual R² **0.1066**, reduced error over the prompt-family
+mean by **10.66%**, and was directionally positive in **7/9** families. Its required first-action
+positive control was negative (R² **-0.0309**), so the composite gate failed and no causal rollout
+was authorized. This is modest representational evidence, not evidence of causal use.
+
 ## Study design
 
 - **Model:** public Physical Intelligence π0.5-LIBERO PyTorch-converted checkpoint.
@@ -79,9 +85,13 @@ episodes before activations were interpreted.
 | `config/target_control_tc1.json` | Disjoint fit, validation, causal-test, and reserve banks |
 | `TARGET_CONTROL_TC2_PROTOCOL.md` | Frozen LIBERO-Plus layout-identifiable observer and causal-control protocol |
 | `config/layout_shift_tc2.json` | Exact TC2 hypotheses, gates, topology, and $2 stop rule |
+| `TARGET_CONTROL_TC2_V2_PROTOCOL.md` | Simulator-bound correction frozen after the v1 measurement abort |
+| `TARGET_CONTROL_TC2_V2_REPORT.md` | Completed v2 observer result and claim boundary |
+| `config/layout_shift_tc2_v2.json` | Exact v2 physical validity rule, population, and unchanged gates |
 | `manifests/target_control_tc1.json` | Exact 480-state TC1 population and split assignments |
 | `manifests/pilot_v4_stimuli.json` | Exact 120 matched contrasts |
 | `manifests/layout_shift_tc2_stimuli.json` | Exact 158 official LIBERO-Plus layout variants and splits |
+| `manifests/layout_shift_tc2_v2_stimuli.json` | Exact 156 simulator-bound states and two pre-model exclusions |
 | `src/intended_futures/` | Validation, geometry, intervention, and statistical primitives |
 | `scripts/` | Collection, provenance, and analysis entry points |
 | `tests/` | Leakage, topology, geometry, instrumentation, and inference-unit checks |
@@ -90,6 +100,7 @@ episodes before activations were interpreted.
 | `results/target_control_m0/` | Frozen gate result, post-hoc touch audit, receipt, and raw hashes |
 | `results/target_control_tc1/` | Preflight, runtime receipt, failed observer gate, and archive receipt |
 | `results/target_control_tc2/` | Pre-model geometry audit and, only after execution, compact TC2 evidence |
+| `results/target_control_tc2_v2/` | Exact-state preflight, runtime, failed observer gate, and backup receipt |
 | `ENGINEERING_LOG.md` | Aborted/invalidated designs and runtime deviations |
 
 Raw activations, checkpoints, simulator caches, credentials, and provider state are excluded from

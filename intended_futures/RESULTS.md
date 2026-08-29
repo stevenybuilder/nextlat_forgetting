@@ -209,6 +209,12 @@ stopped without causal rollout. The Vast rental accumulated **$4.13**, below its
 most of that charge preceded the 27.7-minute observer collection while the instance remained live
 during design and repeated simulator certification.
 
+The layout TC2 session measured all 158 candidate simulator states, collected 13 archived v1 and
+117 final v2 observer records, and stopped at the frozen v2 observer gate without causal rollout.
+The replacement 4090 used 3,701 active seconds at $0.3722/hour, approximately **$0.38** before
+minor transfer charges. Its 281.6 MB final raw archive was verified locally and the replacement
+instance was destroyed to end storage charges.
+
 The public model weights total 7.23 GB and are identified by a tracked tree hash. The final
 representation manifest, runtime source, causal config, fitted subspace, and causal runtime source
 all have tracked SHA-256 receipts. Every retained raw v4 pair and causal record has a published hash;
@@ -230,13 +236,23 @@ activation observer must beat a training-only prompt-pair predictor on held-out 
 would the already implemented minimum-norm, matched-random, and full-replay comparison test whether
 the distributed donor state can be compressed into selective target control.
 
-### Frozen layout-identifiable follow-up (no model outcomes yet)
+### Layout-identifiable follow-up
 
-TC2 implements that criterion with the official LIBERO-Plus Objects Layout target-displacement
-tasks. Its frozen population contains 158 fixed states across nine visible spatial-task families:
-81 observer-fit tasks, 38 untouched validation tasks, and 39 causal tasks that remain inaccessible
-unless the residualized observer gate passes. The pre-model geometry audit found 3.48 cm pooled
-within-prompt layout RMS and at least 11 cm of target-difference span in every family. The hypothesis,
-splits, exact-prompt residualization, action-chunk positive control, prompt-mean controller control,
-causal thresholds, $2 compute cap, and stop rules are frozen in
-`TARGET_CONTROL_TC2_PROTOCOL.md`. This paragraph reports design state only, not a result.
+TC2-v1 stopped before record 14 because its BDDL-center validity surrogate did not describe the
+official saved simulator state. A policy-free scan then measured all 158 states directly and found
+two sample-1 states where a selected bowl fell outside the workspace during settling. TC2-v2 was
+newly frozen with those two exclusions, exact simulator-state labels, and no reuse or statistical
+inspection of the 13 v1 activation records. The final population contained 79 fit, 38 untouched
+validation, and 39 sealed causal-test states across nine families.
+
+The layer-13 residual decoder achieved sample-3 R² **0.1066**, a **10.66%** SSE reduction over the
+fit-only prompt-family mean, and positive mean direction cosine in **7/9** families. Those three
+representation checks passed. The first-action-chunk positive control failed with residual R²
+**-0.0309**, below the frozen nonnegative threshold. The composite observer gate therefore failed:
+no controller or causal clearance was created, and sample 4 was never loaded.
+
+This is suggestive but weak representational evidence, not support for the full causal alternative.
+In this checkpoint and population, layer 13 modestly predicts layout-specific intended-target XY
+beyond prompt identity, but the experiment does not establish that the signal controls behavior.
+The full correction history, exact thresholds, and limitations are in
+`TARGET_CONTROL_TC2_V2_REPORT.md`.

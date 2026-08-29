@@ -78,3 +78,27 @@ available package was 595.84. The attempted packages were removed and the origin
 NVML links were restored. OSMesa passed a render-only simulator smoke test and was then frozen for
 deterministic CPU simulation rendering in every study version; all model inference remained on the
 single 4090. The behavioral baseline passed before representations were interpreted.
+
+## Layout TC2-v1 — aborted on an invalid geometry surrogate
+
+TC2-v1 published its protocol and runtime receipt before model output, then completed 13 observer
+records. Before the fourteenth policy request, the frozen 3 cm BDDL-to-simulator check failed on
+`between_the_plate_and_the_ramekin-l5-s2`. The instance was stopped immediately. The records were
+backed up but never fitted, statistically inspected, or reused.
+
+A policy-free scan of all 158 fixed states showed that BDDL region centers are not valid labels for
+saved MuJoCo states; the maximum difference was 89.2 cm. Two sample-1 states also placed a selected
+bowl outside the physical workspace after settling. This was a measurement-design failure, not a
+negative model result.
+
+## Layout TC2-v2 — completed without causal advancement
+
+V2 was frozen with exact simulator-state labels and a coordinate-only physical validity rule before
+new model output. It excluded the two fallen-object states, retained 156 official states, and
+published the revised protocol, manifest, preflight, and runtime receipt. All 117 observer records
+completed without retry or invalidity.
+
+The representation checks passed at R² 0.1066, 10.66% improvement over the prompt-family mean, and
+positive cosine in 7/9 families. The action-chunk positive control failed at R² -0.0309. The frozen
+all-or-nothing gate was honored: no controller or clearance was created and no sample-4 state was
+loaded. Raw evidence was verified locally before the replacement instance was destroyed.

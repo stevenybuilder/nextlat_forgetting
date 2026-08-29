@@ -1,0 +1,62 @@
+{
+  "advance_to_causal_test": false,
+  "checks": {
+    "minimum_action_chunk_positive_control_r2": false,
+    "minimum_layout_residual_r2": true,
+    "minimum_positive_family_cosines": true,
+    "minimum_sse_reduction_over_exact_prompt_mean": true
+  },
+  "claim_boundary": "untouched sample-3 layout validation; no sample-4 causal state was loaded",
+  "config_sha256": "7ded263325ec6209d9d19ac87d157efbd619f51e0fd034dacbe94f6b9bb89c59",
+  "families": 9,
+  "fit_leave_one_level_out_candidates": [
+    {
+      "r2": 0.027972118456337847,
+      "ridge_fraction": 1e-06,
+      "rows": 79
+    },
+    {
+      "r2": 0.027983075943829094,
+      "ridge_fraction": 0.0001,
+      "rows": 79
+    },
+    {
+      "r2": 0.029039741536543873,
+      "ridge_fraction": 0.01,
+      "rows": 79
+    },
+    {
+      "r2": 0.043139142351342086,
+      "ridge_fraction": 1.0,
+      "rows": 79
+    }
+  ],
+  "fit_units": 79,
+  "input_shape": [
+    968,
+    2048
+  ],
+  "manifest_sha256": "6c9c62623532d3b7a8db15a4bb0d48ccb6e2dc7f62f237414f9ee65839403f10",
+  "runtime_receipt_sha256": "d9779e934b99b2cc36df2735e20200c3acb76261cdf8e109d5bf70da17690366",
+  "selected_ridge_fraction": 1.0,
+  "status": "observer_gate_failed",
+  "study": "pi05-libero-plus-intended-future-geometry-tc2-v2",
+  "validation": {
+    "action_chunk_positive_control_r2": -0.030936066947336416,
+    "family_cosines": {
+      "between_the_plate_and_the_ramekin": 0.6101778550791115,
+      "from_table_center": -0.2902768396081262,
+      "next_to_the_cookie_box": 0.7341014585652631,
+      "next_to_the_plate": 0.07791428053828525,
+      "next_to_the_ramekin": 0.16428294332959079,
+      "on_the_cookie_box": -0.3343752299501017,
+      "on_the_ramekin": 0.7823856255541392,
+      "on_the_stove": 0.8528003450329442,
+      "on_the_wooden_cabinet": 0.6468781974889054
+    },
+    "layout_residual_r2": 0.10661328019924543,
+    "positive_family_cosines": 7,
+    "sse_reduction_over_exact_prompt_mean": 0.10661328019924543
+  },
+  "validation_units": 38
+}
