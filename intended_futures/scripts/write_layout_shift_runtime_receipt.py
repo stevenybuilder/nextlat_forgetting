@@ -17,6 +17,7 @@ def main() -> int:
     parser.add_argument("--preflight", type=Path, required=True)
     parser.add_argument("--parent-runtime-receipt", type=Path, required=True)
     parser.add_argument("--libero-plus-root", type=Path, required=True)
+    parser.add_argument("--libero-cf-root", type=Path, required=True)
     parser.add_argument("--openpi-root", type=Path, required=True)
     parser.add_argument("--simulator-python", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -55,11 +56,14 @@ def main() -> int:
     if config["runtime_contract"]["gpu_class"] not in gpu_name:
         raise RuntimeError(f"GPU {gpu_name!r} violates the runtime contract")
     libero_plus_commit = git_commit(args.libero_plus_root)
+    libero_cf_commit = git_commit(args.libero_cf_root)
     openpi_commit = git_commit(args.openpi_root)
     if libero_plus_commit != config["upstream"]["libero_plus_commit"]:
         raise RuntimeError("LIBERO-Plus commit violates the frozen config")
     if openpi_commit != config["upstream"]["openpi_reference_commit"]:
         raise RuntimeError("OpenPI commit violates the frozen config")
+    if libero_cf_commit != parent["libero_cf_commit"]:
+        raise RuntimeError("LIBERO-CF commit differs from the validated parent runtime")
     simulator_python = subprocess.run(
         [str(args.simulator_python), "--version"],
         check=True,
@@ -82,6 +86,7 @@ def main() -> int:
         "parent_checkpoint_tree_sha256": parent["parent_checkpoint_tree_sha256"],
         "source_tree_sha256": sha256_source_tree(project_root),
         "libero_plus_commit": libero_plus_commit,
+        "libero_cf_commit": libero_cf_commit,
         "openpi_commit": openpi_commit,
         "policy_python": platform.python_version(),
         "simulator_python": simulator_python,
