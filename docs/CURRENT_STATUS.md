@@ -24,16 +24,22 @@ displacement with leave-one-scene-out R² 0.850. A frozen 36-unit causal stage d
 behavioral redirection: the learned rank-three patch's standardized scene effect was 0.125 and all
 three causal gates failed.
 
+A subsequent 36-unit all-call manipulation check found that PaliGemma layer-13 replay nearly
+transplanted the clean donor policy's target behavior: donor first touch was 58.3%, versus 61.1%
+for clean donor, 11.1% for clean recipient, and 13.9% for matched random perturbations. It passed
+six of seven frozen checks but missed the required 0.10 absolute action-cosine margin with 0.0509.
+The gate was honored and the learned target controller was not run.
+
 | Area | Current state | Next gate |
 | --- | --- | --- |
 | Path-Star baseline | All 20 retained checkpoints were evaluated on the frozen 20,000-graph corpus; the deterministic repeat passed | Case-study release complete |
 | Reproducibility | The selected solver crosses between retained updates 1,000 and 3,000; the selected shortcut plateaus near 18% and becomes confidently wrong | No population claim; the 24-seed reliability study remains deferred |
-| Future-sensitive geometry | π0.5 representation and causal pilots completed; geometry was accessible but the tested subspace patch was not selectively causal | Publication complete; any follow-up needs a new design freeze |
+| Future-sensitive geometry | π0.5 representation, compact-patch, and full-replay stages completed; PaliGemma replay redirected target behavior but missed one frozen TC1 gate | Publication complete; any learned-controller follow-up needs a new design freeze |
 | Controlled forgetting | Designed, with reusable balanced interventions and patching machinery | **Deferred** |
 | Exact predictive states | Mess3/RRXOR design and legacy HMM scaffolding exist | **Deferred** |
 | New objectives | MTP/JTP are public; FSP/HiLP require later parity work | Literature context only in this phase; do not implement or train yet |
 | VLA compositional geometry | Frozen Task 16 pilot completed 256 representation resets and 640 behavior episodes with zero failures; prediction gate failed | Public technical report only; no automatic causal stage |
-| Compute | Path-Star evaluation cost approximately $0.382; VIMA episode stages cost approximately $0.076; the π0.5 rental cost approximately $2.17 including setup and invalid-design diagnosis | The Vast instance is stopped; no additional study is authorized |
+| Compute | Path-Star evaluation cost approximately $0.382; VIMA episode stages cost approximately $0.076; π0.5 work cost approximately $2.67 including the $0.50 target-control session | The Vast instance is stopped; no additional study is authorized |
 
 ## Existing result boundary
 
@@ -59,6 +65,6 @@ is 3,651/20,000 (18.255%); the historical evaluator's 3,663/20,000 result remain
 reported. The evaluator discrepancy was not silently pooled.
 
 The future-sensitive representation pilot has now been executed in a modern public VLA rather than
-the archived NextLat checkpoints. The result supports accessible intended-future geometry but not
-the tested causal mechanism. Nothing in this release authorizes the proposed multi-site causal
-follow-up or any new model training.
+the archived NextLat checkpoints. The result supports accessible intended-future geometry and a
+strong full-PaliGemma-replay effect, but not compact learned target control. Nothing in this release
+authorizes a revised controller study, a multi-site follow-up, or any new model training.

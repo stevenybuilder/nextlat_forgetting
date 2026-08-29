@@ -1,0 +1,42 @@
+{
+  "conditions": [
+    "donor_clean",
+    "recipient_clean",
+    "paligemma_l13_full",
+    "paligemma_l13_random",
+    "expert_l9_full",
+    "expert_l9_random"
+  ],
+  "cuda_runtime": "12.6",
+  "cuda_visible_devices": "0",
+  "distributed": false,
+  "expected_units": 36,
+  "gpu_count": 1,
+  "gpu_name": "NVIDIA GeForce RTX 4090",
+  "libero_cf_commit": "8460457bfca6e0ef2e856bc104e2c60b023ef2a7",
+  "m0_config_sha256": "c09d63d97b517e88cd65afd81def9f90a486a01538849a94c53f97a0dfe77616",
+  "manifest_file_sha256": "b49dff2ec9f78b08c7c0d2225249f65b360c3c6595d5c23372011c1259500183",
+  "manifest_sha256": "5b1a4df70974379fc9e915a1b915073f5cb0ab4f4c4e7682d1fe9b3b5738f008",
+  "openpi_commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+  "parent_checkpoint_tree_sha256": "d90ca39fef68eeadb5f5fd051f9e0c3b4bd5e2a01c40598d2ddd9ccbdb0c3cd2",
+  "parent_runtime_receipt_sha256": "98314c3d8a4ccae201d621d63a54658fa4f1bbf2e1ac42320a6c84d120383a4f",
+  "policy_python": "3.11.13",
+  "simulator_python": "Python 3.8.20",
+  "simulator_renderer": "osmesa",
+  "sites": [
+    {
+      "layer": 13,
+      "pathway": "paligemma",
+      "site_id": "paligemma_l13"
+    },
+    {
+      "layer": 9,
+      "pathway": "expert",
+      "site_id": "expert_l9"
+    }
+  ],
+  "source_tree_sha256": "3bd2a0fa6263b492fe4151deb33d7e124f64872da264afdb2cb7a7f46ccc1f0c",
+  "study": "pi05-selective-target-control-m0",
+  "torch": "2.7.1+cu126",
+  "written_before_m0_outcomes": true
+}

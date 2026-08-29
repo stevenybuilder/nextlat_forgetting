@@ -12,9 +12,11 @@ population success probability.
 
 The active follow-on became a low-compute study of [the geometry of intended futures in
 π0.5](intended_futures/README.md). It finds that an instruction-selected target is linearly
-accessible in the action expert and generalizes across scenes, but a controlled subspace patch at
-the selected site does not reliably redirect behavior. The earlier NextLat and VIMA work remains
-preserved as completed historical research streams.
+accessible in the action expert and generalizes across scenes. The original compact subspace patch
+did not redirect behavior, while later full replay at PaliGemma layer 13 nearly transplanted the
+clean donor policy's target choice. That manipulation check missed one frozen advancement threshold,
+so no learned target controller was run. The earlier NextLat and VIMA work remains preserved as
+completed historical research streams.
 
 ## The four studies
 
@@ -81,5 +83,6 @@ rewrite the original five-seed result. See the concise
 The low-compute VIMA geometry pilot is documented in
 [`vla_geometry/PILOT_REPORT.md`](vla_geometry/PILOT_REPORT.md). Its modern successor, the π0.5
 intended-futures pilot, is also complete. The latter passed its representation gate but failed all
-frozen causal gates. No further GPU launch is implied by either result, and the deferred NextLat
-training matrices remain unauthorized.
+original compact-patch gates; its full-replay follow-on produced strong descriptive target
+redirection but did not clear the all-or-nothing TC1 gate. No further GPU launch is implied by
+either result, and the deferred NextLat training matrices remain unauthorized.

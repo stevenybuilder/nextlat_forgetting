@@ -1,0 +1,9 @@
+{
+  "completed_or_preexisting": 36,
+  "config_sha256": "c09d63d97b517e88cd65afd81def9f90a486a01538849a94c53f97a0dfe77616",
+  "elapsed_seconds": 4424.269509886995,
+  "expected": 36,
+  "invalid": 0,
+  "manifest_sha256": "5b1a4df70974379fc9e915a1b915073f5cb0ab4f4c4e7682d1fe9b3b5738f008",
+  "study": "pi05-selective-target-control-m0"
+}

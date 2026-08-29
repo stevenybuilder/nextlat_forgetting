@@ -43,6 +43,19 @@ R² 0.850 and positive cosine in 12/12 scenes. The subsequent frozen causal stag
 units with zero invalid records. Its learned future-subspace patch failed all three advancement
 gates; see `RESULTS.md` for the effect estimates and claim boundary.
 
+## Target-control M0 — completed without TC1 advancement
+
+The follow-on froze 36 units and two literature-selected sites before outcome collection. An
+excluded state verified that PaliGemma layer 13 patched its single call and expert layer 9 patched
+all ten denoising calls with zero shape mismatches. The production run then completed 36/36 valid
+units in 4,424.3 seconds, with no retries or replacements.
+
+PaliGemma full replay produced donor-like target touch and progress and passed six of seven frozen
+checks. It failed the absolute 0.10 action-cosine-margin check with an observed margin of 0.0509.
+The all-or-nothing gate was honored: the minimum-norm learned controller was not fitted or run.
+Expert layer 9 moved behavior away from the donor. Raw records were copied locally and verified
+against all 36 remote SHA-256 hashes before the Vast instance was stopped.
+
 ## Renderer
 
 The Vast container exposes the RTX 4090 for CUDA compute but was created with

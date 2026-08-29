@@ -4,6 +4,10 @@ Estimate date: **2026-08-27**. The only active compute is deterministic evaluati
 already-trained NextLat checkpoints. The hard provider-spend cap is **$5**, and no new training is
 authorized.
 
+Status update, 2026-08-28: no project compute is active. The later π0.5 target-control manipulation
+check completed for about $0.50 including startup and transfer, below its separate $5 cap. The
+shared Vast instance is stopped and no learned-controller run is authorized.
+
 ## Active case study
 
 The checkpoint roster contains ten periodic checkpoints from seed 1234 and ten from seed 1235.

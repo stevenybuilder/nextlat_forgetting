@@ -1,8 +1,9 @@
 # Geometry of intended futures in a modern VLA
 
-This completed pilot asks whether a frozen action-chunking VLA represents which future an
-instruction selects from the same physical scene, and whether that representation is causally used
-to construct the next action chunk.
+This completed study asks whether a frozen action-chunking VLA represents which future an
+instruction selects from the same physical scene, whether that representation is causally used to
+construct the next action chunk, and whether a donor instruction's target can be transplanted by
+replaying internal activations.
 
 Using the public π0.5-LIBERO checkpoint and official LIBERO-CF/LIBERO stimuli, the final study
 evaluated 120 matched prompt contrasts across 12 scenes. The image, robot state, object layout,
@@ -18,16 +19,26 @@ cosine of **0.935**, positive in all 12 held-out scenes. The activation model re
 squared error by **36.6%** relative to an exact-prompt-pair mean baseline, showing that the result is
 not only a language-template lookup.
 
-The causal result was negative. Replacing the recipient policy's coefficients in the learned
+The original causal result was negative. Replacing the recipient policy's coefficients in the learned
 rank-three future subspace moved early behavior toward the donor target by only **1.20 mm** on
 average (95% scene-cluster bootstrap CI **[-3.22, 6.93] mm**; standardized scene effect **0.125**;
 7/12 scenes positive; exact sign-flip p = **0.796**). A matched random subspace produced a similar
 effect, and even full donor-activation replacement was not reliably directional at this intervention
 site and denoising call. None of the three frozen causal gates passed.
 
-The supported claim is therefore narrow but substantive: π0.5 exposes scene-conditioned geometry
-about an instruction-selected future at this action-expert site, but this experiment does not show
-that the fitted linear subspace at the first denoising call causally controls behavior. See the
+A gated follow-on corrected the intervention schedule and tested both model pathways. Replaying
+PaliGemma layer 13 on its one matching call nearly reproduced the clean donor policy: donor-object
+first touch was **58.3%**, versus **61.1%** for clean donor, **11.1%** for clean recipient, and
+**13.9%** for a norm-matched random perturbation. Donor-target progress improved by **17.7 cm**
+over clean recipient (scene-cluster 95% CI **[11.6, 24.2] cm**) and was positive in all 12 scenes.
+Action-expert layer 9 instead moved behavior away from the donor.
+
+The follow-on nevertheless failed its frozen all-or-nothing advancement rule: PaliGemma's mean
+donor-versus-recipient action-cosine margin was **0.051**, below the predeclared **0.10** minimum,
+even though it passed the other six checks. The learned minimum-norm controller was therefore not
+run. The supported claim is narrow: π0.5 exposes scene-conditioned intended-target geometry, and
+full PaliGemma activation replay produced strong descriptive target redirection, but this study
+does not establish selective control through a compact learned direction. See the
 [full results and limitations](RESULTS.md).
 
 ## Study design
@@ -38,6 +49,9 @@ that the fitted linear subspace at the first denoising call causally controls be
 - **Causal units:** three frozen states from every scene, for 36 units and four rollout conditions.
 - **Intervention:** learned future subspace, matched random subspace, full donor replacement, and
   no intervention; 15 early closed-loop steps per condition.
+- **Target-control gate:** 36 fixed units, clean donor/recipient, full replay and norm-matched random
+  controls at PaliGemma layer 13 and expert layer 9, up to 60 actions, and official first-touch
+  attribution.
 - **Runtime:** one RTX 4090, bfloat16, eager PyTorch, no distributed execution, fixed within-unit
   noise, OSMesa simulation rendering, and no retry or replacement after an outcome.
 
@@ -52,12 +66,15 @@ episodes before activations were interpreted.
 | `PREREGISTRATION.md` | Original frozen v2 hypotheses and gates |
 | `config/pilot_v4.json` | Corrected balanced representation protocol |
 | `config/causal_v4.json` | Frozen causal protocol |
+| `TARGET_CONTROL_PROTOCOL.md` | Frozen all-call replay and target-control advancement rules |
+| `config/target_control_m0.json` | Exact manipulation-check population, sites, and thresholds |
 | `manifests/pilot_v4_stimuli.json` | Exact 120 matched contrasts |
 | `src/intended_futures/` | Validation, geometry, intervention, and statistical primitives |
 | `scripts/` | Collection, provenance, and analysis entry points |
 | `tests/` | Leakage, topology, geometry, instrumentation, and inference-unit checks |
 | `results/pilot_v4/` | Compact representation evidence and raw-file hashes |
 | `results/causal_v4/` | Compact causal evidence and raw-file hashes |
+| `results/target_control_m0/` | Frozen gate result, post-hoc touch audit, receipt, and raw hashes |
 | `ENGINEERING_LOG.md` | Aborted/invalidated designs and runtime deviations |
 
 Raw activations, checkpoints, simulator caches, credentials, and provider state are excluded from

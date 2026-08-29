@@ -1,0 +1,144 @@
+{
+  "advance_to_tc1": false,
+  "claim_boundary": "engineering manipulation check; not a target-control effect",
+  "invalid_units": 0,
+  "passed_sites": [],
+  "records": 36,
+  "sites": {
+    "expert_l9": {
+      "action_margin_cluster_bootstrap_95ci": [
+        -0.27487376376022005,
+        -0.09787818039563888
+      ],
+      "checks": {
+        "exact_all_call_receipts": true,
+        "invalid_units": true,
+        "margin_over_random": false,
+        "mean_action_margin": false,
+        "positive_action_margin_scenes": false,
+        "positive_donor_progress_scenes": false,
+        "standardized_donor_progress": false
+      },
+      "donor_first_touch_rates": {
+        "full_replay": 0.1111111111111111,
+        "random_direction": 0.1388888888888889,
+        "recipient_clean": 0.1111111111111111
+      },
+      "donor_progress_cluster_bootstrap_95ci_meters": [
+        -0.054433213185831726,
+        -0.011560123554958581
+      ],
+      "gate_passed": false,
+      "mean_donor_action_similarity_margin": -0.1800602905707513,
+      "mean_donor_progress_effect_meters": -0.03409394290329994,
+      "mean_margin_advantage_over_random": -0.09587486605724636,
+      "positive_action_margin_scenes": 0,
+      "positive_donor_progress_scenes": 2,
+      "positive_margin_advantage_scenes": 0,
+      "scene_action_margins": {
+        "scene-00": -0.17656975662749239,
+        "scene-01": -0.2551536005375566,
+        "scene-03": -0.027619362414833464,
+        "scene-04": -0.028524402192129112,
+        "scene-05": -0.2511692412227508,
+        "scene-07": -0.5474338182617228,
+        "scene-08": -0.027053761490366646,
+        "scene-09": -0.17592150128597303,
+        "scene-11": -0.01949818409873109,
+        "scene-12": -0.022209249409602633,
+        "scene-13": -0.24064479645645484,
+        "scene-14": -0.38892581285140215
+      },
+      "scene_progress_effects_meters": {
+        "scene-00": -0.04840585257794846,
+        "scene-01": -0.03667609023580496,
+        "scene-03": 0.006544811909812727,
+        "scene-04": -0.010461468551593559,
+        "scene-05": -0.07242347774985751,
+        "scene-07": -0.025087852574289526,
+        "scene-08": -0.08222886850063922,
+        "scene-09": -0.04015438209376835,
+        "scene-11": -0.01355925583897676,
+        "scene-12": 0.05555250508438649,
+        "scene-13": -0.07979128412742209,
+        "scene-14": -0.062436099583498016
+      },
+      "site": {
+        "layer": 9,
+        "pathway": "expert",
+        "site_id": "expert_l9"
+      },
+      "standardized_scene_donor_progress": -0.8505347305221701,
+      "valid_units": 36
+    },
+    "paligemma_l13": {
+      "action_margin_cluster_bootstrap_95ci": [
+        0.02953944785329796,
+        0.07545906766402406
+      ],
+      "checks": {
+        "exact_all_call_receipts": true,
+        "invalid_units": true,
+        "margin_over_random": true,
+        "mean_action_margin": false,
+        "positive_action_margin_scenes": true,
+        "positive_donor_progress_scenes": true,
+        "standardized_donor_progress": true
+      },
+      "donor_first_touch_rates": {
+        "full_replay": 0.5833333333333334,
+        "random_direction": 0.1388888888888889,
+        "recipient_clean": 0.1111111111111111
+      },
+      "donor_progress_cluster_bootstrap_95ci_meters": [
+        0.11551293972306649,
+        0.24179370755611188
+      ],
+      "gate_passed": false,
+      "mean_donor_action_similarity_margin": 0.05090374035011615,
+      "mean_donor_progress_effect_meters": 0.17710439648847612,
+      "mean_margin_advantage_over_random": 0.12999414324289993,
+      "positive_action_margin_scenes": 11,
+      "positive_donor_progress_scenes": 12,
+      "positive_margin_advantage_scenes": 12,
+      "scene_action_margins": {
+        "scene-00": 0.033623054886332694,
+        "scene-01": 0.06171215314962367,
+        "scene-03": 0.0013593428857252936,
+        "scene-04": 0.03771667489507317,
+        "scene-05": 0.056478984619819116,
+        "scene-07": 0.14698753822934485,
+        "scene-08": 0.018725954230317903,
+        "scene-09": 0.05229049913178733,
+        "scene-11": -0.002421062659570502,
+        "scene-12": 0.029728300484693142,
+        "scene-13": 0.06079089476275571,
+        "scene-14": 0.11385254958549133
+      },
+      "scene_progress_effects_meters": {
+        "scene-00": 0.2897026639376245,
+        "scene-01": 0.20946643914048566,
+        "scene-03": 0.006731342697176845,
+        "scene-04": 0.10981511833878621,
+        "scene-05": 0.16031313639478398,
+        "scene-07": 0.34824780567601055,
+        "scene-08": 0.18403774820631527,
+        "scene-09": 0.1698820653866796,
+        "scene-11": 0.0019876759701885627,
+        "scene-12": 0.10985913208355948,
+        "scene-13": 0.1661290338779008,
+        "scene-14": 0.36908059615220196
+      },
+      "site": {
+        "layer": 13,
+        "pathway": "paligemma",
+        "site_id": "paligemma_l13"
+      },
+      "standardized_scene_donor_progress": 1.521121046859493,
+      "valid_units": 36
+    }
+  },
+  "status": "complete",
+  "study": "pi05-selective-target-control-m0",
+  "valid_units": 36
+}

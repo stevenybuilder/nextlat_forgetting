@@ -99,6 +99,46 @@ replacement also failed to redirect behavior reliably, so this run cannot distin
 epiphenomenal code from a causal code that requires another layer, denoising time, nonlinear
 coordinate system, or multi-site intervention.
 
+## All-call target-control follow-on
+
+A frozen manipulation check directly tested two explanations for the failed first-call assay. It
+used sequential activation replay on every matching call, following the public Action Atlas
+convention, and tested both PaliGemma layer 13 and action-expert layer 9. The population was fixed
+to states 0, 4, and 9 in all 12 v4 scenes. Every unit included clean donor, clean recipient, full
+donor replay, and a call-wise norm-matched random direction. All 36 units were valid, all replay
+receipts were exact, and no unit was retried.
+
+PaliGemma replay strongly redirected behavior. Its first action chunk was closer to clean donor
+than clean recipient in 11/12 scene means; the mean cosine margin was 0.0509 (scene-cluster 95% CI
+[0.0295, 0.0755]) and exceeded the random margin by 0.1300. Donor-target progress improved by
+17.71 cm over clean recipient (95% CI [11.55, 24.18] cm), with a standardized scene effect of
+1.521 and all 12 scenes positive.
+
+| Condition | Donor first touch | Mean donor progress |
+| --- | ---: | ---: |
+| Clean donor | 61.1% (22/36) | 26.00 cm |
+| Clean recipient | 11.1% (4/36) | 7.67 cm |
+| PaliGemma-13 full replay | **58.3% (21/36)** | **25.39 cm** |
+| PaliGemma-13 random | 13.9% (5/36) | 9.39 cm |
+
+The touch analysis was secondary and its intervals were computed after the frozen gate result. Full
+replay exceeded clean recipient by 47.2 percentage points (exploratory scene-cluster 95% CI
+[30.6, 66.7]) and random by 44.4 points [25.0, 63.9], while differing from clean donor by only
+-2.8 points [-25.0, 16.7]. The clean donor and recipient action chunks were already highly similar
+(mean cosine 0.907); full replay had cosine 0.990 to donor and 0.939 to recipient.
+
+The frozen M0 rule still failed because it required an absolute action margin of at least 0.10.
+PaliGemma passed the other six checks but achieved only 0.0509. This threshold was not relaxed
+after observing the strong behavioral result, so no learned minimum-norm controller (TC1) was run.
+Action-expert layer 9 clearly failed: its action margin was -0.180 (95% CI [-0.275, -0.098]), donor
+progress changed by -3.41 cm [-5.44, -1.16], and donor first touch remained 11.1%.
+
+This produces a useful but deliberately asymmetric conclusion. Full PaliGemma replay gives strong
+descriptive causal evidence that the instruction-selected target is routed through that pathway,
+but the preregistered study did not authorize a claim about compact or selective learned target
+control. A future confirmation must use a newly frozen, scale-aware manipulation endpoint; this
+result cannot be re-scored under a friendlier post-hoc gate.
+
 ## Invalidated and aborted studies
 
 - **v1** is an infrastructure abort. OpenPI cached the compiled sampler before instrumentation;
@@ -123,19 +163,26 @@ versions, the single RTX 4090 rental ran for approximately 6.01 hours at $0.3611
 **$2.17** of GPU rental before storage/network charges. The instance was stopped after local backup;
 it was not destroyed because it also contains earlier JEPA work.
 
+The target-control manipulation check took 4,424.3 seconds. Its incremental collection charge was
+approximately **$0.44**, and about **$0.50** including model startup, preflight, analysis, and
+verified transfer. The same single 4090 was stopped immediately afterward.
+
 The public model weights total 7.23 GB and are identified by a tracked tree hash. The final
 representation manifest, runtime source, causal config, fitted subspace, and causal runtime source
 all have tracked SHA-256 receipts. Every retained raw v4 pair and causal record has a published hash;
-the large raw arrays themselves are intentionally excluded from Git.
+the large raw arrays themselves are intentionally excluded from Git. The target-control config,
+pre-outcome runtime receipt, compact analyses, and all 36 raw-record hashes are tracked as well.
 
 ## Interpretation and next experiment
 
-The useful finding is a dissociation: **decodable future geometry is much easier to establish than
-causal control through that geometry**. That matters for representation-learning work because a
-high-quality linear probe—even one that generalizes across scenes and beats language baselines—does
-not establish that the policy uses the decoded coordinates.
+The useful finding is a three-way dissociation: **intended-target geometry is decodable in the
+action expert; a compact linear patch there does not control behavior; full PaliGemma replay can
+transplant target choice**. A high-quality linear probe—even one that generalizes across scenes and
+beats language baselines—therefore does not identify either the causal pathway or a compact control
+direction.
 
-A follow-up is justified only if it targets the failed causal identification directly: freeze a
-small layer × denoising-time intervention grid, require a positive full-donor control at each site,
-and test a held-out confirmatory scene set. Retraining π0.5 or expanding to another architecture is
-not warranted until an intervention site can first move behavior in this checkpoint.
+If a new study is authorized, the narrow next experiment is no longer a layer search. It should
+freeze PaliGemma layer 13, use an independent state split, define a scale-aware replay manipulation
+check before outcomes, and compare a cross-fitted minimum-norm target controller with full replay
+and norm-matched random directions. That would test whether the distributed donor state can be
+compressed into selective target control. The current failed gate does not authorize that run.

@@ -1,0 +1,81 @@
+{
+  "action_similarity": {
+    "clean_donor_to_recipient": 0.906578918520784,
+    "full_to_donor": 0.9897213648464932,
+    "full_to_recipient": 0.9388176244963771,
+    "random_to_donor": 0.9098992816110252,
+    "random_to_recipient": 0.9889896845038089
+  },
+  "claim_boundary": "These secondary estimates explain the frozen M0 failure and cannot override its failed 0.10 action-margin gate or authorize TC1.",
+  "condition_summary": {
+    "donor_clean": {
+      "donor_first_touch_rate": 0.6111111111111112,
+      "first_touch_counts": {
+        "donor": 22,
+        "none": 8,
+        "recipient": 6
+      },
+      "mean_donor_progress_meters": 0.260044683201132,
+      "mean_recipient_progress_meters": 0.04489748741229015
+    },
+    "paligemma_l13_full": {
+      "donor_first_touch_rate": 0.5833333333333334,
+      "first_touch_counts": {
+        "donor": 21,
+        "none": 8,
+        "recipient": 7
+      },
+      "mean_donor_progress_meters": 0.25385335720472263,
+      "mean_recipient_progress_meters": 0.08167375077373479
+    },
+    "paligemma_l13_random": {
+      "donor_first_touch_rate": 0.1388888888888889,
+      "first_touch_counts": {
+        "donor": 5,
+        "none": 15,
+        "recipient": 16
+      },
+      "mean_donor_progress_meters": 0.09385561787460037,
+      "mean_recipient_progress_meters": 0.1992788859808886
+    },
+    "recipient_clean": {
+      "donor_first_touch_rate": 0.1111111111111111,
+      "first_touch_counts": {
+        "donor": 4,
+        "none": 12,
+        "recipient": 20
+      },
+      "mean_donor_progress_meters": 0.0767489607162465,
+      "mean_recipient_progress_meters": 0.21707111566798284
+    }
+  },
+  "status": "posthoc_exploratory",
+  "study": "pi05-selective-target-control-m0",
+  "touch_contrasts": {
+    "paligemma_full_minus_donor_clean": {
+      "difference": -0.027777777777777776,
+      "exact_scene_sign_flip_p_unadjusted": 1.0,
+      "scene_cluster_bootstrap_95ci": [
+        -0.25,
+        0.16666666666666666
+      ]
+    },
+    "paligemma_full_minus_random": {
+      "difference": 0.4444444444444444,
+      "exact_scene_sign_flip_p_unadjusted": 0.00390625,
+      "scene_cluster_bootstrap_95ci": [
+        0.25,
+        0.6388888888888888
+      ]
+    },
+    "paligemma_full_minus_recipient_clean": {
+      "difference": 0.4722222222222222,
+      "exact_scene_sign_flip_p_unadjusted": 0.001953125,
+      "scene_cluster_bootstrap_95ci": [
+        0.3055555555555556,
+        0.6666666666666666
+      ]
+    }
+  },
+  "units": 36
+}
