@@ -6,9 +6,11 @@ torch = pytest.importorskip("torch")
 from torch import nn
 
 from intended_futures.openpi_hooks import (
+    AllCallsDeltaPatch,
     CaptureCalls,
     FirstCallDeltaPatch,
     ProjectedFirstCallPatch,
+    ReplayCallsPatch,
     disable_compiled_sampling,
 )
 
@@ -65,3 +67,44 @@ def test_precomputed_delta_patch_changes_first_call_only():
     assert torch.equal(second, recipient)
     assert patch.receipt.calls_seen == 2
     assert patch.receipt.calls_patched == 1
+
+
+def test_replay_calls_patch_replaces_each_matching_call():
+    layer = nn.Identity()
+    recipient = torch.zeros((1, 2, 3), dtype=torch.float32)
+    source_calls = [
+        np.ones((1, 2, 3), dtype=np.float32),
+        np.full((1, 2, 3), 2.0, dtype=np.float32),
+    ]
+    with ReplayCallsPatch(layer, source_calls) as patch:
+        first = layer(recipient)
+        second = layer(recipient)
+    assert torch.equal(first, torch.ones_like(first))
+    assert torch.equal(second, torch.full_like(second, 2.0))
+    assert patch.receipt.calls_seen == 2
+    assert patch.receipt.calls_patched == 2
+    assert patch.receipt.shape_mismatches == 0
+
+
+def test_replay_calls_patch_rejects_unmatched_call_count():
+    layer = nn.Identity()
+    source_calls = [np.ones((1, 2, 3), dtype=np.float32)]
+    with pytest.raises(RuntimeError, match="did not patch every matching call"):
+        with ReplayCallsPatch(layer, source_calls):
+            layer(torch.zeros((1, 2, 3), dtype=torch.float32))
+            layer(torch.zeros((1, 2, 3), dtype=torch.float32))
+
+
+def test_all_calls_delta_patch_applies_call_specific_deltas():
+    layer = nn.Identity()
+    recipient = torch.ones((1, 2, 3), dtype=torch.float32)
+    deltas = [
+        np.ones((1, 2, 3), dtype=np.float32),
+        np.full((1, 2, 3), -0.5, dtype=np.float32),
+    ]
+    with AllCallsDeltaPatch(layer, deltas) as patch:
+        first = layer(recipient)
+        second = layer(recipient)
+    assert torch.equal(first, torch.full_like(first, 2.0))
+    assert torch.equal(second, torch.full_like(second, 0.5))
+    assert patch.receipt.calls_patched == 2

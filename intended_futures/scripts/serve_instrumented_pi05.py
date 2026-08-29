@@ -13,6 +13,7 @@ def main() -> int:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--config-name", default="pi05_libero")
     parser.add_argument("--layers", default="5,11,17")
+    parser.add_argument("--paligemma-layers", default="")
     parser.add_argument("--denoising-calls", type=int, default=10)
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--device", default="cuda:0")
@@ -28,6 +29,9 @@ def main() -> int:
     if args.device != "cuda:0":
         raise RuntimeError("the frozen pilot requires cuda:0")
     layers = [int(value) for value in args.layers.split(",")]
+    paligemma_layers = [
+        int(value) for value in args.paligemma_layers.split(",") if value.strip()
+    ]
     base_policy = policy_config.create_trained_policy(
         training_config.get_config(args.config_name),
         args.checkpoint,
@@ -37,8 +41,14 @@ def main() -> int:
         base_policy,
         layer_indices=layers,
         expected_denoising_calls=args.denoising_calls,
+        paligemma_layer_indices=paligemma_layers,
     )
-    logging.info("Serving instrumented policy on %s with layers %s", socket.gethostname(), layers)
+    logging.info(
+        "Serving instrumented policy on %s with expert layers %s and PaliGemma layers %s",
+        socket.gethostname(),
+        layers,
+        paligemma_layers,
+    )
     server = websocket_policy_server.WebsocketPolicyServer(
         policy=policy,
         host="0.0.0.0",

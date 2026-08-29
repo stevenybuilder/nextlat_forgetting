@@ -1,0 +1,115 @@
+{
+  "study": "pi05-selective-target-control-m0",
+  "status": "frozen",
+  "frozen_date": "2026-08-28",
+  "purpose": "engineering manipulation check; no scientific target-control claim",
+  "upstream": {
+    "action_atlas_repository": "https://github.com/CWRU-AISM/action-atlas",
+    "action_atlas_commit": "b8b0db331df18fc30a3fd92c45ec721d35d3ee52",
+    "libero_cf_repository": "https://github.com/yuffish/libero-cf",
+    "libero_cf_commit": "8460457bfca6e0ef2e856bc104e2c60b023ef2a7",
+    "openpi_repository": "https://github.com/Physical-Intelligence/openpi",
+    "openpi_reference_commit": "215abfb217dbac7d5f1273282331b9b1866c0479"
+  },
+  "parent": {
+    "pilot_study": "geometry-of-intended-futures-pi05-pilot-v4",
+    "manifest": "manifests/pilot_v4_stimuli.json",
+    "manifest_sha256": "5b1a4df70974379fc9e915a1b915073f5cb0ab4f4c4e7682d1fe9b3b5738f008"
+  },
+  "population": {
+    "scene_ids": [
+      "scene-00",
+      "scene-01",
+      "scene-03",
+      "scene-04",
+      "scene-05",
+      "scene-07",
+      "scene-08",
+      "scene-09",
+      "scene-11",
+      "scene-12",
+      "scene-13",
+      "scene-14"
+    ],
+    "initial_state_indices": [0, 4, 9],
+    "expected_units": 36,
+    "inference_cluster": "scene_id"
+  },
+  "sites": [
+    {
+      "site_id": "paligemma_l13",
+      "pathway": "paligemma",
+      "layer": 13
+    },
+    {
+      "site_id": "expert_l9",
+      "pathway": "expert",
+      "layer": 9
+    }
+  ],
+  "conditions": [
+    {
+      "condition_id": "donor_clean",
+      "prompt_side": "donor",
+      "patch_kind": "none"
+    },
+    {
+      "condition_id": "recipient_clean",
+      "prompt_side": "recipient",
+      "patch_kind": "none"
+    },
+    {
+      "condition_id": "paligemma_l13_full",
+      "prompt_side": "recipient",
+      "site_id": "paligemma_l13",
+      "patch_kind": "full_donor",
+      "patch_schedule": "all_calls_replay"
+    },
+    {
+      "condition_id": "paligemma_l13_random",
+      "prompt_side": "recipient",
+      "site_id": "paligemma_l13",
+      "patch_kind": "random_direction",
+      "patch_schedule": "all_calls_delta"
+    },
+    {
+      "condition_id": "expert_l9_full",
+      "prompt_side": "recipient",
+      "site_id": "expert_l9",
+      "patch_kind": "full_donor",
+      "patch_schedule": "all_calls_replay"
+    },
+    {
+      "condition_id": "expert_l9_random",
+      "prompt_side": "recipient",
+      "site_id": "expert_l9",
+      "patch_kind": "random_direction",
+      "patch_schedule": "all_calls_delta"
+    }
+  ],
+  "rollout": {
+    "replans": 12,
+    "execute_actions_per_replan": 5,
+    "stop_on_first_candidate_touch": true,
+    "condition_order_seed": 99281,
+    "noise_seed_offset": 600000,
+    "random_direction_seed_offset": 700000,
+    "retry_failed_or_invalid_units": false
+  },
+  "gate": {
+    "minimum_positive_scene_margins": 9,
+    "minimum_donor_action_similarity_margin": 0.1,
+    "minimum_margin_over_random": 0.1,
+    "minimum_standardized_donor_progress": 0.5,
+    "minimum_positive_donor_progress_scenes": 9,
+    "maximum_invalid_units": 0
+  },
+  "runtime_contract": {
+    "num_gpus": 1,
+    "distributed": false,
+    "gpu_class": "RTX 4090",
+    "inference_dtype": "bfloat16",
+    "simulator_renderer": "osmesa",
+    "maximum_new_rental_usd": 5.0
+  }
+}
