@@ -1,0 +1,63 @@
+{
+  "checkpoint": {
+    "bytes": 7233652471,
+    "files": [
+      {
+        "bytes": 1914,
+        "path": "assets/physical-intelligence/libero/norm_stats.json",
+        "sha256": "b3a44bb2810436fb62917decaea58bd4d9110255df527dea21e8fd40c960bd84"
+      },
+      {
+        "bytes": 149,
+        "path": "config.json",
+        "sha256": "5c2728c53f4b33ee16380140f303713fdb5df78a8d26ee1489ace374fc54327a"
+      },
+      {
+        "bytes": 7233650408,
+        "path": "model.safetensors",
+        "sha256": "99c71043ec0b05ac98ad61f52094e823515864080f29c5a728cf0740a8a6acba"
+      }
+    ],
+    "path": "/root/intended-futures/checkpoints/pi05_libero_pytorch",
+    "tree_sha256": "d90ca39fef68eeadb5f5fd051f9e0c3b4bd5e2a01c40598d2ddd9ccbdb0c3cd2"
+  },
+  "conditions": [
+    "task_a_clean",
+    "task_b_clean",
+    "minimum_norm",
+    "prompt_mean_controller",
+    "matched_random",
+    "full_replay"
+  ],
+  "config_sha256": "7ded263325ec6209d9d19ac87d157efbd619f51e0fd034dacbe94f6b9bb89c59",
+  "cuda_runtime": "12.6",
+  "cuda_visible_devices": "0",
+  "cudnn": 90501,
+  "distributed": false,
+  "gpu_count": 1,
+  "gpu_name": "NVIDIA GeForce RTX 4090",
+  "libero_cf_commit": "8460457bfca6e0ef2e856bc104e2c60b023ef2a7",
+  "libero_plus_commit": "4976dc30028e805ff8094b55501d532c48fec182",
+  "manifest_file_sha256": "40424f7f56bf8d2cb72bc087563c1dd511d44175940764ee330d9c1d364c4b0c",
+  "manifest_sha256": "6c9c62623532d3b7a8db15a4bb0d48ccb6e2dc7f62f237414f9ee65839403f10",
+  "openpi_commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+  "parent_runtime_receipt_sha256": "0b08a270ae6edc6b4f3c582fefac4fbc13748a67b3547c01b35000cd67f24a98",
+  "policy_python": "3.11.13",
+  "preflight_file_sha256": "fd5c2f76fbcaf19128b17afac4119ebd204a22ab09c68b2e9098f40f520511e3",
+  "preflight_pooled_layout_residual_rms_meters": 0.03777558362620756,
+  "preflight_rows": 156,
+  "simulator_python": "Python 3.8.20",
+  "simulator_renderer": "osmesa",
+  "site": {
+    "indexing": "zero_based",
+    "layer": 13,
+    "pathway": "paligemma",
+    "selection_rule": "fixed before TC2 from Action Atlas goal-discrimination localization and the parent full-replay manipulation",
+    "site_id": "paligemma_l13",
+    "token_pooling": "none"
+  },
+  "source_tree_sha256": "894ed96ad1a1aaf1e6fc4b1c3d53dc8b53dbcc026a43763c99bbbcf459c709bc",
+  "study": "pi05-libero-plus-intended-future-geometry-tc2-v2",
+  "torch": "2.7.1+cu126",
+  "written_before_model_outcomes": true
+}
