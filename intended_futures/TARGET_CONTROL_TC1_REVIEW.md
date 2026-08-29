@@ -1,9 +1,21 @@
 # Anti-sycophancy review of the TC1 design
 
 Review date: 2026-08-29  
-Verdict: **ready to execute as a narrowly scoped confirmatory pilot; not yet a publishable positive
-claim**  
+Pre-run verdict: **ready to execute as a narrowly scoped confirmatory pilot; not yet a publishable
+positive claim**
 Confidence: **high**
+
+## Post-run audit
+
+Post-run verdict: **the stopping decision and narrow negative report are supported; compact target
+control remains untested**
+Confidence: **high**
+
+The run completed all 240 permitted observer records and failed one of three frozen observer gates.
+The activation decoder's validation R² was 0.953, but the exact prompt-pair baseline's R² was 0.995;
+activation residual error was therefore 9.80 times larger. The other two checks passed. The fitter
+returned its no-go status before constructing a controller, and the causal and reserve banks were
+not loaded.
 
 ## Strongest legitimate contribution
 
@@ -15,11 +27,11 @@ compressed into selective control?
 
 ## Claim ledger
 
-| Claim | Required evidence | Current status before TC1 |
+| Claim | Required evidence | Post-run status |
 | --- | --- | --- |
-| PaliGemma-13 carries causally sufficient target-routing information | Full replay redirects behavior beyond matched random | Supported descriptively by M0; independent confirmation required |
-| A linear observer measures scene-conditioned target displacement at this site | Untouched-state prediction beyond exact prompt-pair means | Not yet tested at PaliGemma-13; mandatory pre-causal gate |
-| A compact controller selectively changes target choice | Learned intervention beats clean recipient and norm-matched random while full replay succeeds | Not yet testable |
+| PaliGemma-13 carries causally sufficient target-routing information | Full replay redirects behavior beyond matched random | Supported descriptively by M0; not independently retested because TC1 stopped earlier |
+| A linear observer measures scene-conditioned target displacement at this site | Untouched-state prediction beyond exact prompt-pair means | Not supported for this observer and official state bank |
+| A compact controller selectively changes target choice | Learned intervention beats clean recipient and norm-matched random while full replay succeeds | Untested; no controller was fitted |
 | The result demonstrates intended futures or a world model | Temporally extended, future-specific counterfactuals and causal use | Unsupported by this design and explicitly disallowed |
 
 ## Major risks and repairs
@@ -73,3 +85,8 @@ this protocol. A publishable positive claim requires a passed observer gate, a p
 check, selective learned-control effects on the untouched causal test, and an unchanged reserve
 replication. A negative result is still reportable, but only with the controller- and
 population-specific boundary above.
+
+After execution, the result is suitable as a compact methodological case study: an apparently
+strong VLA probe failed against a stimulus-aware baseline, and the preregistered gate prevented an
+unidentified causal intervention. It is not evidence that PaliGemma lacks causal target
+information, and it is not a standalone positive representation-learning contribution.

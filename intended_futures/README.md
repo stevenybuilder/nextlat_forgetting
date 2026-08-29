@@ -33,12 +33,18 @@ first touch was **58.3%**, versus **61.1%** for clean donor, **11.1%** for clean
 over clean recipient (scene-cluster 95% CI **[11.6, 24.2] cm**) and was positive in all 12 scenes.
 Action-expert layer 9 instead moved behavior away from the donor.
 
-The follow-on nevertheless failed its frozen all-or-nothing advancement rule: PaliGemma's mean
+The manipulation check nevertheless failed its frozen all-or-nothing advancement rule: PaliGemma's mean
 donor-versus-recipient action-cosine margin was **0.051**, below the predeclared **0.10** minimum,
 even though it passed the other six checks. The learned minimum-norm controller was therefore not
-run. The supported claim is narrow: π0.5 exposes scene-conditioned intended-target geometry, and
-full PaliGemma activation replay produced strong descriptive target redirection, but this study
-does not establish selective control through a compact learned direction. See the
+run in that study.
+
+An independently frozen follow-up then collected 240 new PaliGemma-13 observer records. Its linear
+decoder achieved validation R² **0.953** and positive direction cosine in 12/12 scenes, but a
+training-only exact-prompt-pair baseline achieved **0.995**. Because the decoder had 9.80 times the
+baseline residual error, it failed the required incremental-information gate. No controller was
+fitted, and neither the causal-test nor reserve bank was opened. The supported claim is therefore
+narrow: full PaliGemma replay can redirect target behavior, but this official state bank does not
+show compact state-conditioned coordinate geometry beyond prompt identity. See the
 [full results and limitations](RESULTS.md).
 
 ## Study design
@@ -68,6 +74,10 @@ episodes before activations were interpreted.
 | `config/causal_v4.json` | Frozen causal protocol |
 | `TARGET_CONTROL_PROTOCOL.md` | Frozen all-call replay and target-control advancement rules |
 | `config/target_control_m0.json` | Exact manipulation-check population, sites, and thresholds |
+| `TARGET_CONTROL_TC1_PROTOCOL.md` | Frozen independent observer/controller confirmation |
+| `TARGET_CONTROL_TC1_REPORT.md` | Self-contained negative-result report and next-design criterion |
+| `config/target_control_tc1.json` | Disjoint fit, validation, causal-test, and reserve banks |
+| `manifests/target_control_tc1.json` | Exact 480-state TC1 population and split assignments |
 | `manifests/pilot_v4_stimuli.json` | Exact 120 matched contrasts |
 | `src/intended_futures/` | Validation, geometry, intervention, and statistical primitives |
 | `scripts/` | Collection, provenance, and analysis entry points |
@@ -75,6 +85,7 @@ episodes before activations were interpreted.
 | `results/pilot_v4/` | Compact representation evidence and raw-file hashes |
 | `results/causal_v4/` | Compact causal evidence and raw-file hashes |
 | `results/target_control_m0/` | Frozen gate result, post-hoc touch audit, receipt, and raw hashes |
+| `results/target_control_tc1/` | Preflight, runtime receipt, failed observer gate, and archive receipt |
 | `ENGINEERING_LOG.md` | Aborted/invalidated designs and runtime deviations |
 
 Raw activations, checkpoints, simulator caches, credentials, and provider state are excluded from

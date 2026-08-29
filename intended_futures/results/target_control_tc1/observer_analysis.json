@@ -1,0 +1,62 @@
+{
+  "advance_to_causal_test": false,
+  "checks": {
+    "minimum_r2": true,
+    "positive_scene_cosines": true,
+    "residual_sse_reduction_over_exact_prompt_pair": false
+  },
+  "claim_boundary": "observer validation only; no causal-test state was loaded",
+  "fit_leave_one_scene_out_candidates": [
+    {
+      "r2": 0.8382255557843317,
+      "ridge_fraction": 1e-06
+    },
+    {
+      "r2": 0.8382233856692267,
+      "ridge_fraction": 0.0001
+    },
+    {
+      "r2": 0.8379828702860227,
+      "ridge_fraction": 0.01
+    },
+    {
+      "r2": 0.7663054709537909,
+      "ridge_fraction": 1.0
+    }
+  ],
+  "fit_units": 120,
+  "input_shape": [
+    968,
+    2048
+  ],
+  "manifest_sha256": "50aed097a73f98b24f55c2a83c8dc28f5ae3cb9ed1aa59fde5f530d26ec4c961",
+  "protocol_sha256": "11155dc0c8f2741bd92678d424438091a77b7fd21c35f6249982ae20981bcede",
+  "runtime_receipt_sha256": "0b08a270ae6edc6b4f3c582fefac4fbc13748a67b3547c01b35000cd67f24a98",
+  "selected_ridge_fraction": 1e-06,
+  "status": "observer_gate_failed",
+  "study": "pi05-selective-target-control-tc1-v1",
+  "validation": {
+    "activation_mean_cosine": 0.9932166970041915,
+    "activation_r2": 0.953439434674897,
+    "exact_prompt_pair_mean_r2": 0.9952476514597667,
+    "global_mean_r2": -7.04532596527141e-05,
+    "ordered_subject_pair_mean_r2": 0.915464113613899,
+    "positive_scene_cosines": 12,
+    "residual_sse_reduction_over_exact_prompt_pair": -8.797380164969281,
+    "scene_cosines": {
+      "scene-00": 0.998240441097075,
+      "scene-01": 0.998240441097075,
+      "scene-03": 0.9932279909137879,
+      "scene-04": 0.9991298107705575,
+      "scene-05": 0.9968343294743196,
+      "scene-07": 0.987915615603414,
+      "scene-08": 0.9616526973261715,
+      "scene-09": 0.9979045880868733,
+      "scene-11": 0.9932279909137879,
+      "scene-12": 0.9991298107705575,
+      "scene-13": 0.9968343294743196,
+      "scene-14": 0.9962623185223578
+    }
+  },
+  "validation_units": 120
+}

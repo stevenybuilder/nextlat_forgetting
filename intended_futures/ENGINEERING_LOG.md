@@ -56,6 +56,19 @@ The all-or-nothing gate was honored: the minimum-norm learned controller was not
 Expert layer 9 moved behavior away from the donor. Raw records were copied locally and verified
 against all 36 remote SHA-256 hashes before the Vast instance was stopped.
 
+## Target-control TC1 — stopped at the observer gate
+
+TC1 froze four disjoint official-state banks after a simulator-only 480-state preflight and
+published the protocol and single-4090 runtime receipt before any model request. Observer
+collection completed 240/240 records in four resumable batches with no invalid or non-finite
+record. All raw records were copied locally and verified against their remote SHA-256 hashes.
+
+The layer-13 decoder reached validation R² 0.953 and positive cosine in 12/12 scenes, but the
+training-only exact-prompt-pair baseline reached R² 0.995. The required 10% residual improvement
+therefore failed. Fitting exited with the preregistered no-go status and did not create a controller
+or causal-clearance file. Causal-test and reserve state banks were not loaded. The Vast instance
+was stopped at approximately $4.13 accumulated rental, below the frozen $5 cap.
+
 ## Renderer
 
 The Vast container exposes the RTX 4090 for CUDA compute but was created with

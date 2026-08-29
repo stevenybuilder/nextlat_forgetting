@@ -1,6 +1,6 @@
 # Current status
 
-Snapshot: **2026-08-28**. This page is a lifecycle summary, not a result report or compute
+Snapshot: **2026-08-29**. This page is a lifecycle summary, not a result report or compute
 authorization.
 
 ## Where the project is now
@@ -30,16 +30,21 @@ for clean donor, 11.1% for clean recipient, and 13.9% for matched random perturb
 six of seven frozen checks but missed the required 0.10 absolute action-cosine margin with 0.0509.
 The gate was honored and the learned target controller was not run.
 
+The independently frozen follow-up used 240 new official states to test whether PaliGemma-13
+encoded state-conditioned 3D target displacement beyond prompt identity. Its decoder reached
+validation R² 0.953, but the exact prompt-pair baseline reached 0.995. The incremental-information
+gate failed, so no controller was fitted and no causal-test or reserve rollout was opened.
+
 | Area | Current state | Next gate |
 | --- | --- | --- |
 | Path-Star baseline | All 20 retained checkpoints were evaluated on the frozen 20,000-graph corpus; the deterministic repeat passed | Case-study release complete |
 | Reproducibility | The selected solver crosses between retained updates 1,000 and 3,000; the selected shortcut plateaus near 18% and becomes confidently wrong | No population claim; the 24-seed reliability study remains deferred |
-| Future-sensitive geometry | π0.5 representation, compact-patch, and full-replay stages completed; PaliGemma replay redirected target behavior but missed one frozen TC1 gate | Publication complete; any learned-controller follow-up needs a new design freeze |
+| Future-sensitive geometry | PaliGemma replay redirected target behavior, but the independent PaliGemma observer failed to beat prompt identity | Redesign stimuli for repeated prompts across varied layouts before any controller |
 | Controlled forgetting | Designed, with reusable balanced interventions and patching machinery | **Deferred** |
 | Exact predictive states | Mess3/RRXOR design and legacy HMM scaffolding exist | **Deferred** |
 | New objectives | MTP/JTP are public; FSP/HiLP require later parity work | Literature context only in this phase; do not implement or train yet |
 | VLA compositional geometry | Frozen Task 16 pilot completed 256 representation resets and 640 behavior episodes with zero failures; prediction gate failed | Public technical report only; no automatic causal stage |
-| Compute | Path-Star evaluation cost approximately $0.382; VIMA episode stages cost approximately $0.076; π0.5 work cost approximately $2.67 including the $0.50 target-control session | The Vast instance is stopped; no additional study is authorized |
+| Compute | Path-Star evaluation cost approximately $0.382; VIMA episode stages cost approximately $0.076; prior π0.5 work cost approximately $2.67; TC1 added $4.13 | The Vast instance is stopped; no additional study is authorized |
 
 ## Existing result boundary
 
@@ -65,6 +70,7 @@ is 3,651/20,000 (18.255%); the historical evaluator's 3,663/20,000 result remain
 reported. The evaluator discrepancy was not silently pooled.
 
 The future-sensitive representation pilot has now been executed in a modern public VLA rather than
-the archived NextLat checkpoints. The result supports accessible intended-future geometry and a
-strong full-PaliGemma-replay effect, but not compact learned target control. Nothing in this release
-authorizes a revised controller study, a multi-site follow-up, or any new model training.
+the archived NextLat checkpoints. The result supports accessible action-expert geometry and a
+strong full-PaliGemma-replay effect, but the independent PaliGemma observer did not add geometric
+information beyond prompt identity. Nothing in this release authorizes a revised controller study,
+a multi-site follow-up, or any new model training.

@@ -139,6 +139,42 @@ but the preregistered study did not authorize a claim about compact or selective
 control. A future confirmation must use a newly frozen, scale-aware manipulation endpoint; this
 result cannot be re-scored under a friendlier post-hoc gate.
 
+## Independent PaliGemma observer confirmation
+
+TC1 implemented that confirmation with a new study identity and official states disjoint from all
+discovery outcomes. States 10–19 in each of the 12 scenes supplied 120 observer-fit records;
+states 20–29 supplied 120 untouched observer-validation records. States 30–39 were held for a
+causal test, and states 40–49 for conditional replication. Each record retained the full unpooled
+968×2048 PaliGemma layer-13 activation-difference grid. All 240 observer records were valid,
+finite, and bound to the frozen runtime receipt.
+
+| Observer or baseline | Evaluation | R² | Mean cosine |
+| --- | --- | ---: | ---: |
+| PaliGemma-13 ridge | Leave-one-scene-out fit bank | 0.838 | — |
+| Global mean | Untouched validation bank | -0.000 | — |
+| Ordered subject-pair mean | Untouched validation bank | 0.915 | — |
+| Exact prompt-pair mean | Untouched validation bank | **0.995** | — |
+| PaliGemma-13 ridge | Untouched validation bank | 0.953 | **0.993** |
+
+The observer passed its absolute R² threshold and had positive mean direction cosine in all 12
+scenes. It failed the required incremental-information test: its residual squared error was 9.80
+times the exact-prompt-pair baseline's error, rather than at least 10% lower. Equivalently, the
+frozen residual-reduction statistic was -8.797.
+
+This is why a superficially impressive R² of 0.953 is not the claimed result. In this official
+state bank, knowing the ordered prompt pair almost completely determines the object-displacement
+target. PaliGemma layer 13 carries a strong instruction/target-correlated signal, but this linear
+observer does not demonstrate state-conditioned 3D target geometry beyond that prompt structure.
+This does not negate the earlier full-replay redirection: broad replay can transplant a distributed
+instruction-conditioned state without that state supporting the proposed compact coordinate
+decoder.
+
+The all-or-nothing gate was honored. No controller artifact or causal clearance was created; no
+causal-test or reserve state was loaded; and no behavioral rollout was run. A defensible follow-on
+would first need stimuli where the same instruction pair spans materially different object layouts,
+so prompt identity cannot predict the coordinate target. Reusing this state bank with a weaker
+baseline or post-hoc gate would not answer that question.
+
 ## Invalidated and aborted studies
 
 - **v1** is an infrastructure abort. OpenPI cached the compiled sampler before instrumentation;
@@ -167,6 +203,12 @@ The target-control manipulation check took 4,424.3 seconds. Its incremental coll
 approximately **$0.44**, and about **$0.50** including model startup, preflight, analysis, and
 verified transfer. The same single 4090 was stopped immediately afterward.
 
+The independent TC1 session validated 480 simulator states, collected 240 observer records in
+1,659.9 model-facing seconds, evaluated the frozen gate, transferred 594.4 MB of raw evidence, and
+stopped without causal rollout. The Vast rental accumulated **$4.13**, below its separate $5 cap;
+most of that charge preceded the 27.7-minute observer collection while the instance remained live
+during design and repeated simulator certification.
+
 The public model weights total 7.23 GB and are identified by a tracked tree hash. The final
 representation manifest, runtime source, causal config, fitted subspace, and causal runtime source
 all have tracked SHA-256 receipts. Every retained raw v4 pair and causal record has a published hash;
@@ -181,8 +223,9 @@ transplant target choice**. A high-quality linear probe—even one that generali
 beats language baselines—therefore does not identify either the causal pathway or a compact control
 direction.
 
-If a new study is authorized, the narrow next experiment is no longer a layer search. It should
-freeze PaliGemma layer 13, use an independent state split, define a scale-aware replay manipulation
-check before outcomes, and compare a cross-fitted minimum-norm target controller with full replay
-and norm-matched random directions. That would test whether the distributed donor state can be
-compressed into selective target control. The current failed gate does not authorize that run.
+TC1 shows why the next experiment cannot simply fit the proposed controller on more states from
+the same bank. Before another causal patch, the dataset must identify scene-conditioned geometry:
+the same instruction contrast must occur across substantially varied object layouts, and the
+activation observer must beat a training-only prompt-pair predictor on held-out layouts. Only then
+would the already implemented minimum-norm, matched-random, and full-replay comparison test whether
+the distributed donor state can be compressed into selective target control.
