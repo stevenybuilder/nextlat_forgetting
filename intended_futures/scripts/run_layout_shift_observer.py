@@ -91,8 +91,9 @@ def main() -> int:
     if os.environ.get("MUJOCO_GL") != renderer or os.environ.get("PYOPENGL_PLATFORM") != renderer:
         raise RuntimeError(f"renderer environment must be fixed to {renderer!r}")
 
-    sys.path.insert(0, str(args.libero_plus_root))
-    sys.path.append(str(args.libero_cf_root))
+    # The level/sample assets use standard LIBERO objects. Keep the already validated
+    # LIBERO-CF simulator package and read only BDDL/init assets from the pinned Plus tree.
+    sys.path.insert(0, str(args.libero_cf_root))
     import torch
     from eval.main_cf import _quat2axisangle
     from libero.libero.envs import OffScreenRenderEnv
