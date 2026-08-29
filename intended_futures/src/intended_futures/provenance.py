@@ -9,7 +9,7 @@ from typing import Any
 from .manifest import sha256_file
 
 
-_TREE_EXCLUDES = {"__pycache__", ".pytest_cache", ".runtime", "raw", "results"}
+_TREE_EXCLUDES = {"__pycache__", ".pytest_cache", ".runtime", "raw", "results", "runs"}
 
 
 def sha256_source_tree(root: str | Path) -> str:
