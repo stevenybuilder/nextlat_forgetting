@@ -1,0 +1,50 @@
+{
+  "study": "geometry-of-intended-futures-pi05-causal-v4",
+  "status": "frozen",
+  "frozen_at_utc": "2026-08-28T23:46:00Z",
+  "parent_study": "geometry-of-intended-futures-pi05-pilot-v4",
+  "parent_manifest_sha256": "5b1a4df70974379fc9e915a1b915073f5cb0ab4f4c4e7682d1fe9b3b5738f008",
+  "future_subspace_sha256": "afb9161bdeabe20e628cc07bda73c70193cea09e8843edbed59697594ce4bfec",
+  "selected_layer": 17,
+  "selection_result": {
+    "leave_one_scene_out_r2": 0.8502850291776438,
+    "positive_scenes": 12,
+    "scenes_total": 12
+  },
+  "sampling": {
+    "scene_ids": [
+      "scene-00", "scene-01", "scene-03", "scene-04", "scene-05", "scene-07",
+      "scene-08", "scene-09", "scene-11", "scene-12", "scene-13", "scene-14"
+    ],
+    "initial_state_indices": [0, 4, 9],
+    "expected_causal_units": 36,
+    "condition_order_seed": 88421,
+    "random_basis_seed": 88422,
+    "replan_noise_seed_offset": 400000
+  },
+  "rollout": {
+    "donor_side": "task_a",
+    "recipient_side": "task_b",
+    "conditions": ["none", "future_subspace", "random_subspace", "full_donor"],
+    "replans": 3,
+    "execute_actions_per_replan": 5,
+    "freeze_initial_target_positions": true,
+    "retry_failed_or_invalid_units": false
+  },
+  "endpoint": {
+    "primary": "future_subspace minus none progress toward donor target",
+    "secondary": [
+      "random_subspace minus none donor progress",
+      "full_donor minus none donor progress",
+      "recipient-target degradation",
+      "invalid-action rate"
+    ],
+    "inference_unit": "scene-level mean across three states",
+    "gates": {
+      "standardized_donor_progress_min": 0.3,
+      "positive_scenes_min": 9,
+      "random_control_excess_max": 0.1
+    }
+  },
+  "claim_boundary": "exploratory causal pilot; layer selected on the parent representation screen"
+}

@@ -1,0 +1,8 @@
+{
+  "completed_or_preexisting": 36,
+  "elapsed_seconds": 1365.541401853996,
+  "expected": 36,
+  "invalid": 0,
+  "parent_manifest_sha256": "5b1a4df70974379fc9e915a1b915073f5cb0ab4f4c4e7682d1fe9b3b5738f008",
+  "study": "geometry-of-intended-futures-pi05-causal-v4"
+}

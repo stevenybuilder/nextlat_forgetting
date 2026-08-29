@@ -5,7 +5,12 @@ from types import SimpleNamespace
 torch = pytest.importorskip("torch")
 from torch import nn
 
-from intended_futures.openpi_hooks import CaptureCalls, ProjectedFirstCallPatch, disable_compiled_sampling
+from intended_futures.openpi_hooks import (
+    CaptureCalls,
+    FirstCallDeltaPatch,
+    ProjectedFirstCallPatch,
+    disable_compiled_sampling,
+)
 
 
 def test_disable_compiled_sampling_replaces_policy_cache_and_model_reference():
@@ -45,5 +50,18 @@ def test_projected_patch_changes_first_call_only():
     assert first[0, 0, 0].item() == 1.0
     assert torch.count_nonzero(first).item() == 1
     assert torch.count_nonzero(second).item() == 0
+    assert patch.receipt.calls_seen == 2
+    assert patch.receipt.calls_patched == 1
+
+
+def test_precomputed_delta_patch_changes_first_call_only():
+    layer = nn.Identity()
+    recipient = torch.zeros((1, 2, 3), dtype=torch.float32)
+    delta = np.ones((1, 2, 3), dtype=np.float32)
+    with FirstCallDeltaPatch(layer, delta) as patch:
+        first = layer(recipient)
+        second = layer(recipient)
+    assert torch.equal(first, torch.ones_like(first))
+    assert torch.equal(second, recipient)
     assert patch.receipt.calls_seen == 2
     assert patch.receipt.calls_patched == 1

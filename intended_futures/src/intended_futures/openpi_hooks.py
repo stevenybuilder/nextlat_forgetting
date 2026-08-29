@@ -128,3 +128,40 @@ class ProjectedFirstCallPatch(AbstractContextManager["ProjectedFirstCallPatch"])
         self._handle = None
         if exc_type is None and self.receipt.calls_patched != 1:
             raise RuntimeError("the action-expert intervention did not patch exactly one denoising call")
+
+
+class FirstCallDeltaPatch(AbstractContextManager["FirstCallDeltaPatch"]):
+    """Add a precomputed token-preserving delta to exactly the first layer call."""
+
+    def __init__(self, module: Any, delta: np.ndarray):
+        self.module = module
+        self.delta = np.asarray(delta, dtype=np.float32)
+        self.receipt = PatchReceipt()
+        self._handle: Any = None
+
+    def __enter__(self) -> "FirstCallDeltaPatch":
+        import torch
+
+        def hook(_module: Any, _inputs: Any, output: Any) -> Any:
+            self.receipt.calls_seen += 1
+            if self.receipt.calls_patched:
+                return None
+            recipient = _activation_from_output(output)
+            delta = torch.as_tensor(self.delta, device=recipient.device, dtype=recipient.dtype)
+            if delta.shape != recipient.shape:
+                raise ValueError(f"delta shape {tuple(delta.shape)} != activation {tuple(recipient.shape)}")
+            replacement = recipient + delta
+            self.receipt.calls_patched = 1
+            self.receipt.original_norm = float(torch.linalg.vector_norm(recipient.float()).detach().cpu())
+            self.receipt.patch_norm = float(torch.linalg.vector_norm(delta.float()).detach().cpu())
+            return _replace_activation(output, replacement)
+
+        self._handle = self.module.register_forward_hook(hook)
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
+        if self._handle is not None:
+            self._handle.remove()
+        self._handle = None
+        if exc_type is None and self.receipt.calls_patched != 1:
+            raise RuntimeError("the action-expert intervention did not patch exactly one denoising call")

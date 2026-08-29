@@ -1,0 +1,28 @@
+{
+  "causal_config_sha256": "08996cc0f4c2e3c84ebb55c3cffcf62b72c4e41608b3172f96f217596526b3c8",
+  "causal_units": 36,
+  "conditions": [
+    "none",
+    "future_subspace",
+    "random_subspace",
+    "full_donor"
+  ],
+  "cuda_runtime": "12.6",
+  "cuda_visible_devices": "0",
+  "distributed": false,
+  "gpu_count": 1,
+  "gpu_name": "NVIDIA GeForce RTX 4090",
+  "libero_cf_commit": "8460457bfca6e0ef2e856bc104e2c60b023ef2a7",
+  "openpi_commit": "215abfb217dbac7d5f1273282331b9b1866c0479",
+  "parent_manifest_sha256": "5b1a4df70974379fc9e915a1b915073f5cb0ab4f4c4e7682d1fe9b3b5738f008",
+  "parent_runtime_receipt_sha256": "98314c3d8a4ccae201d621d63a54658fa4f1bbf2e1ac42320a6c84d120383a4f",
+  "parent_study": "geometry-of-intended-futures-pi05-pilot-v4",
+  "pilot_config_sha256": "c9cc9ea7c581f3355a4049daa5ac192dd396e33b4908bbeb24f110920f5fcaf2",
+  "python": "3.11.13",
+  "selected_layer": 17,
+  "source_tree_sha256": "7109d87bb66ad5ac200390dae4a046b650be4ea1ec80c3a006c71bf2d5f1cfd5",
+  "study": "geometry-of-intended-futures-pi05-causal-v4",
+  "subspace_sha256": "afb9161bdeabe20e628cc07bda73c70193cea09e8843edbed59697594ce4bfec",
+  "torch": "2.7.1+cu126",
+  "written_before_causal_outcomes": true
+}
