@@ -32,6 +32,8 @@ def main() -> int:
         raise RuntimeError("manifest is not bound to this config")
     rows = manifest["rows"]
     families = sorted({row["family_id"] for row in rows})
+    thresholds = config["population"]["pre_model_geometry_gate"]
+    target_field = str(thresholds.get("target_field", "bddl_target_difference_xy"))
     per_family: dict[str, dict[str, float | int]] = {}
     all_residuals: list[np.ndarray] = []
     validation_residuals: list[np.ndarray] = []
@@ -40,7 +42,7 @@ def main() -> int:
         family_rows = [row for row in rows if row["family_id"] == family]
         fit = np.asarray(
             [
-                row["bddl_target_difference_xy"]
+                row[target_field]
                 for row in family_rows
                 if row["split"] == "observer_fit"
             ],
@@ -50,12 +52,12 @@ def main() -> int:
             raise RuntimeError(f"{family} has fewer than two fit layouts")
         fit_mean = np.mean(fit, axis=0)
         target = np.asarray(
-            [row["bddl_target_difference_xy"] for row in family_rows],
+            [row[target_field] for row in family_rows],
             dtype=np.float64,
         )
         validation = np.asarray(
             [
-                row["bddl_target_difference_xy"]
+                row[target_field]
                 for row in family_rows
                 if row["split"] == "observer_validation"
             ],
@@ -79,7 +81,21 @@ def main() -> int:
         }
     all_residual_array = np.asarray(all_residuals, dtype=np.float64)
     validation_residual_array = np.asarray(validation_residuals, dtype=np.float64)
-    thresholds = config["population"]["pre_model_geometry_gate"]
+    contract = config["stimulus"]["workspace_position_contract"]
+    valid_simulator_states = True
+    if target_field == "simulator_target_difference_xy":
+        for row in rows:
+            for field in ("simulator_target_xyz_a", "simulator_target_xyz_b"):
+                target = np.asarray(row[field], dtype=np.float64)
+                valid_simulator_states &= bool(
+                    target.shape == (3,)
+                    and np.all(np.isfinite(target))
+                    and np.max(np.abs(target[:2]))
+                    <= float(contract["max_absolute_xy"])
+                    and float(contract["z_min"])
+                    <= target[2]
+                    <= float(contract["z_max"])
+                )
     checks = {
         "expected_family_count": len(families)
         == int(config["population"]["expected_families"]),
@@ -97,6 +113,7 @@ def main() -> int:
         >= int(thresholds["minimum_families_with_required_span"]),
         "unique_stimulus_ids": len({row["stimulus_id"] for row in rows}) == len(rows),
         "unique_noise_seeds": len({row["noise_seed"] for row in rows}) == len(rows),
+        "simulator_states_inside_workspace": valid_simulator_states,
     }
     payload = {
         "study": config["study"],
@@ -107,6 +124,7 @@ def main() -> int:
         "manifest_sha256": manifest["manifest_sha256"],
         "rows": len(rows),
         "families": len(families),
+        "target_field": target_field,
         "minimum_target_separation_meters": minimum_separation,
         "pooled_layout_residual_rms_meters": _rms(all_residual_array),
         "pooled_validation_residual_rms_meters": _rms(validation_residual_array),

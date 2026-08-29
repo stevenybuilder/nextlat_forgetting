@@ -189,13 +189,27 @@ def main() -> int:
             controller_target_xyz = np.asarray(
                 [target_xyz[0], target_xyz[1], 0.0], dtype=np.float64
             )
-            bddl_target_xy = np.asarray(
-                row["bddl_target_difference_xy"], dtype=np.float64
-            )
-            if float(np.linalg.norm(target_xyz[:2] - bddl_target_xy)) > float(
-                config["stimulus"]["maximum_bddl_to_simulator_xy_error_meters"]
-            ):
-                raise RuntimeError("simulator target positions disagree with BDDL preflight")
+            bddl_target_xy = np.asarray(row["bddl_target_difference_xy"], dtype=np.float64)
+            if "simulator_target_difference_xy" in row:
+                target_reference = "simulator_fixed_state"
+                reference_target_xy = np.asarray(
+                    row["simulator_target_difference_xy"], dtype=np.float64
+                )
+                tolerance = float(
+                    config["stimulus"][
+                        "maximum_manifest_to_simulator_xy_error_meters"
+                    ]
+                )
+            else:
+                target_reference = "bddl_region_center"
+                reference_target_xy = bddl_target_xy
+                tolerance = float(
+                    config["stimulus"]["maximum_bddl_to_simulator_xy_error_meters"]
+                )
+            if float(np.linalg.norm(target_xyz[:2] - reference_target_xy)) > tolerance:
+                raise RuntimeError(
+                    f"simulator target positions disagree with {target_reference} preflight"
+                )
             metadata = {
                 "study": config["study"],
                 "manifest_sha256": manifest["manifest_sha256"],
@@ -217,6 +231,7 @@ def main() -> int:
                 "layer": layer,
                 "activation_shape": list(activation_difference.shape),
                 "archive_dtype": "float16",
+                "target_reference": target_reference,
                 "pair_infer_ms": float(response["pair_infer_ms"]),
             }
             actions_a = np.asarray(response["actions_a"], dtype=np.float32)
@@ -229,6 +244,7 @@ def main() -> int:
                     "target_difference_xy": target_xyz[:2].astype(np.float64),
                     "target_difference_xyz": controller_target_xyz,
                     "bddl_target_difference_xy": bddl_target_xy,
+                    "reference_target_difference_xy": reference_target_xy,
                     "action_difference": (actions_a - actions_b).astype(np.float32),
                     "actions_a": actions_a,
                     "actions_b": actions_b,

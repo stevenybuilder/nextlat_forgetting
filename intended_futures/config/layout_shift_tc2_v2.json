@@ -1,0 +1,191 @@
+{
+  "study": "pi05-libero-plus-intended-future-geometry-tc2-v2",
+  "status": "frozen",
+  "created_date": "2026-08-29",
+  "frozen_at_utc": "2026-08-29T08:28:24Z",
+  "pre_freeze_screening": {
+    "candidate_config_file_sha256": "599a0c6d16566354ada7d065ef0cebaae0002b85460e8deb1c31fc9da738fc6f",
+    "candidate_manifest_file_sha256": "43792f10b351b6dacf6eadded1f4b6d7dbb68dba482fba9848f8eb825a7849e8",
+    "candidate_manifest_sha256": "7720a195b9042c35388142574f8747aa2f127ebad69acb0f59bdc6609557220c",
+    "candidate_preflight_file_sha256": "36fc7ac6c305d0d7c101c125842f578748a7061829b69fad3059650e71aa3966",
+    "candidate_rows": 156,
+    "candidate_families": 9,
+    "candidate_minimum_target_separation_meters": 0.10404127705324372,
+    "candidate_pooled_layout_residual_rms_meters": 0.03777558362620756,
+    "candidate_validation_residual_rms_meters": 0.041864944363023536,
+    "excluded_invalid_state_ids": [
+      "from_table_center-l3-s1",
+      "next_to_the_plate-l3-s1"
+    ],
+    "v2_model_outcomes_observed": false
+  },
+  "purpose": "test whether PaliGemma layer 13 encodes layout-specific instruction-selected target geometry after removing the exact-prompt mean",
+  "source_design": {
+    "study": "pi05-libero-plus-intended-future-geometry-tc2-v1",
+    "manifest_sha256": "64ee788999a43880b17dbe40550c80bee991ae0897f5d9de357b69fe99907683",
+    "simulator_measurements_sha256": "113d056f311807af5bfc89a4484cc37ea7e4065819594f0f7e41e206dbb5f7c0",
+    "correction_reason": "v1 used BDDL region centers as a fixed-state validity surrogate and stopped at record 14 when an official saved state differed by more than 3 cm",
+    "model_records_before_abort": 13,
+    "model_record_use": "not inspected statistically, not fitted, and not reused in v2"
+  },
+  "hypotheses": {
+    "null": "after conditioning on the exact ordered prompt pair, PaliGemma layer-13 activation differences do not predict held-out layout-specific target displacement and a decoder-derived patch does not redirect target choice beyond matched random control",
+    "alternative": "PaliGemma layer-13 activation differences contain held-out layout-specific target displacement information and that information is causally usable to redirect target choice"
+  },
+  "upstream": {
+    "libero_plus_repository": "https://github.com/sylvestf/LIBERO-plus",
+    "libero_plus_commit": "4976dc30028e805ff8094b55501d532c48fec182",
+    "libero_plus_paper": "https://arxiv.org/abs/2510.13626",
+    "openpi_repository": "https://github.com/Physical-Intelligence/openpi",
+    "openpi_reference_commit": "215abfb217dbac7d5f1273282331b9b1866c0479"
+  },
+  "model": {
+    "name": "pi0.5-LIBERO",
+    "config": "pi05_libero",
+    "checkpoint_uri": "gs://openpi-assets/checkpoints/pi05_libero",
+    "checkpoint_sha256": "reuse-parent-runtime-checkpoint-hash",
+    "action_horizon": 10,
+    "replan_steps": 5,
+    "denoising_steps": 10
+  },
+  "site": {
+    "site_id": "paligemma_l13",
+    "pathway": "paligemma",
+    "layer": 13,
+    "indexing": "zero_based",
+    "token_pooling": "none",
+    "selection_rule": "fixed before TC2 from Action Atlas goal-discrimination localization and the parent full-replay manipulation"
+  },
+  "population": {
+    "suite": "libero_spatial",
+    "source_category": "Objects Layout",
+    "source_variant": "level{1..5}_sample{1..4} target-displacement tasks",
+    "excluded_families": [
+      "pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate"
+    ],
+    "excluded_invalid_state_ids": [
+      "from_table_center-l3-s1",
+      "next_to_the_plate-l3-s1"
+    ],
+    "invalid_state_exclusion_rule": "before v2 model output, exclude any fixed state where either instruction-selected subject has absolute workspace XY above 0.5 m or Z below 0.85 m after the frozen ten-step settling sequence",
+    "split_samples": {
+      "observer_fit": [1, 2],
+      "observer_validation": [3],
+      "causal_test": [4]
+    },
+    "expected_families": 9,
+    "expected_split_units": {
+      "observer_fit": 79,
+      "observer_validation": 38,
+      "causal_test": 39
+    },
+    "expected_manifest_rows": 156,
+    "noise_seed_base": 260000,
+    "statistical_unit": "one official LIBERO-Plus BDDL task and its physically valid fixed initial state",
+    "inference_cluster": "base spatial-task family",
+    "estimand_scope": "the finite frozen set of physically valid visible LIBERO-Plus Spatial target-displacement states; layouts are nested within nine task families",
+    "pre_model_geometry_gate": {
+      "target_field": "simulator_target_difference_xy",
+      "minimum_target_separation_meters": 0.05,
+      "minimum_pooled_layout_residual_rms_meters": 0.02,
+      "minimum_validation_residual_rms_meters": 0.015,
+      "minimum_family_target_span_meters": 0.04,
+      "minimum_families_with_required_span": 7
+    }
+  },
+  "stimulus": {
+    "image_and_robot_state": "identical within each prompt pair",
+    "task_a": "verbatim official LIBERO-Spatial prompt selecting akita_black_bowl_1",
+    "task_b": "verbatim official LIBERO-Spatial prompt describing the true initial relation of akita_black_bowl_2",
+    "target": "simulator-measured task_a minus task_b initial XY in the exact settled state shown to the model",
+    "bddl_geometry_role": "provenance and candidate enumeration only; BDDL region centers are not labels or validity targets",
+    "maximum_manifest_to_simulator_xy_error_meters": 0.000001,
+    "workspace_position_contract": {
+      "max_absolute_xy": 0.5,
+      "z_min": 0.85,
+      "z_max": 2.0,
+      "minimum_subject_separation": 0.05
+    },
+    "construction_boundary": "derived matched-prompt assay over unmodified official LIBERO-Plus BDDL and init-state assets; it is not an unmodified leaderboard task"
+  },
+  "observer": {
+    "feature": "task_a minus task_b full PaliGemma layer-13 residual grid",
+    "target": "task_a minus task_b simulator-measured initial target XY",
+    "residualization": "subtract observer-fit exact-prompt-family means from both feature and target; apply the fit means unchanged to validation",
+    "fit": "zero-intercept dual ridge on residualized features and targets",
+    "ridge_fraction_grid": [0.000001, 0.0001, 0.01, 1.0],
+    "ridge_scale": "fraction of mean diagonal of the training Gram matrix",
+    "selection": "maximum leave-one-level-out R-squared on observer-fit residuals with prompt-family means re-estimated inside every fold; ties select the larger ridge fraction",
+    "baselines": [
+      "observer-fit exact-prompt-family mean",
+      "first clean action-chunk difference as a positive control"
+    ],
+    "validation_gate": {
+      "minimum_layout_residual_r2": 0.1,
+      "minimum_sse_reduction_over_exact_prompt_mean": 0.1,
+      "minimum_positive_family_cosines": 7,
+      "minimum_action_chunk_positive_control_r2": 0.0
+    },
+    "failure_action": "stop before causal rollouts and do not create a controller"
+  },
+  "controller": {
+    "primary": "minimum_norm_decoder_solution",
+    "decoder_inverse_ridge_fraction": 0.000001,
+    "maximum_norm_fraction_of_full_donor_delta": 1.0,
+    "patch_schedule": "all_matching_calls_delta",
+    "desired_change": "simulator-measured task_a minus task_b initial XY with zero Z component",
+    "no_behavioral_tuning": true
+  },
+  "conditions": [
+    {"condition_id": "task_a_clean", "prompt_side": "a", "patch_kind": "none"},
+    {"condition_id": "task_b_clean", "prompt_side": "b", "patch_kind": "none"},
+    {"condition_id": "minimum_norm", "prompt_side": "b", "patch_kind": "minimum_norm_target"},
+    {"condition_id": "prompt_mean_controller", "prompt_side": "b", "patch_kind": "minimum_norm_target"},
+    {"condition_id": "matched_random", "prompt_side": "b", "patch_kind": "random_controller"},
+    {"condition_id": "full_replay", "prompt_side": "b", "patch_kind": "full_donor"}
+  ],
+  "rollout": {
+    "replans": 12,
+    "execute_actions_per_replan": 5,
+    "stop_on_first_candidate_touch": true,
+    "freeze_initial_target_positions": true,
+    "condition_order_seed": 260500,
+    "noise_seed_offset": 800000,
+    "random_direction_seed_offset": 900000,
+    "retry_failed_or_invalid_units": false
+  },
+  "causal_decision_rule": {
+    "manipulation_check_required": {
+      "full_replay_minus_task_b_target_a_touch_minimum": 0.2,
+      "cluster_confidence_interval_lower_above_zero": true,
+      "positive_family_effects_minimum": 7,
+      "exact_patch_receipts": true
+    },
+    "compact_control_supported_only_if_all": {
+      "minimum_norm_minus_task_b_target_a_touch_minimum": 0.15,
+      "minimum_norm_minus_random_target_a_touch_minimum": 0.1,
+      "minimum_actual_minus_prompt_mean_target_a_progress_meters": 0.005,
+      "both_cluster_confidence_interval_lowers_above_zero": true,
+      "layout_progress_cluster_confidence_interval_lower_above_zero": true,
+      "positive_family_effects_minimum": 7,
+      "exact_patch_receipts": true,
+      "invalid_units_maximum": 0
+    },
+    "uncertainty": "10000-repetition base-task-family cluster bootstrap",
+    "randomization_check": "exact family-level sign-flip p-value",
+    "analysis_seed": 260501,
+    "multiplicity": "intersection-union; every frozen criterion must pass",
+    "claim_boundary": "exploratory causal pilot without an independent replication split"
+  },
+  "runtime_contract": {
+    "num_gpus": 1,
+    "distributed": false,
+    "gpu_class": "RTX 4090",
+    "inference_dtype": "bfloat16",
+    "simulator_renderer": "osmesa",
+    "maximum_new_rental_usd": 2.0,
+    "stop_instance_after_terminal_gate": true
+  },
+  "power_boundary": "nine independent task-family clusters and 38 validation layouts target only large layout-specific information and redirection effects; failure does not exclude small or family-specific effects",
+  "claim_boundary": "tests visible instruction-selected pickup-target XY geometry and its causal usability at one fixed PaliGemma layer in pi0.5-LIBERO; it does not establish temporally extended planning or a general world model"
+}

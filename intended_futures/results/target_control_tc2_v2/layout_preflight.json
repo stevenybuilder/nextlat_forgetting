@@ -1,0 +1,100 @@
+{
+  "all_checks_passed": true,
+  "checks": {
+    "expected_family_count": true,
+    "families_with_required_span": true,
+    "minimum_target_separation": true,
+    "pooled_layout_residual_rms": true,
+    "pooled_validation_residual_rms": true,
+    "simulator_states_inside_workspace": true,
+    "unique_noise_seeds": true,
+    "unique_stimulus_ids": true
+  },
+  "config_sha256": "7ded263325ec6209d9d19ac87d157efbd619f51e0fd034dacbe94f6b9bb89c59",
+  "families": 9,
+  "manifest_file_sha256": "40424f7f56bf8d2cb72bc087563c1dd511d44175940764ee330d9c1d364c4b0c",
+  "manifest_sha256": "6c9c62623532d3b7a8db15a4bb0d48ccb6e2dc7f62f237414f9ee65839403f10",
+  "minimum_target_separation_meters": 0.10404127705324372,
+  "model_outcomes_observed": false,
+  "per_family": {
+    "between_the_plate_and_the_ramekin": {
+      "all_layout_residual_rms_meters": 0.03879799848221912,
+      "fit_rows": 10,
+      "rows": 20,
+      "target_difference_span_meters": 0.15250564009675657,
+      "validation_residual_rms_meters": 0.049789977130892414,
+      "validation_rows": 5
+    },
+    "from_table_center": {
+      "all_layout_residual_rms_meters": 0.031260957667372594,
+      "fit_rows": 9,
+      "rows": 16,
+      "target_difference_span_meters": 0.12302609856666104,
+      "validation_residual_rms_meters": 0.02351132896417764,
+      "validation_rows": 4
+    },
+    "next_to_the_cookie_box": {
+      "all_layout_residual_rms_meters": 0.036596354662166763,
+      "fit_rows": 6,
+      "rows": 13,
+      "target_difference_span_meters": 0.11772059667734265,
+      "validation_residual_rms_meters": 0.04243101317276422,
+      "validation_rows": 3
+    },
+    "next_to_the_plate": {
+      "all_layout_residual_rms_meters": 0.03543724988436327,
+      "fit_rows": 9,
+      "rows": 17,
+      "target_difference_span_meters": 0.1521848991575842,
+      "validation_residual_rms_meters": 0.03167141543703766,
+      "validation_rows": 4
+    },
+    "next_to_the_ramekin": {
+      "all_layout_residual_rms_meters": 0.05339183207190264,
+      "fit_rows": 9,
+      "rows": 19,
+      "target_difference_span_meters": 0.2166528336975577,
+      "validation_residual_rms_meters": 0.05547248891390414,
+      "validation_rows": 5
+    },
+    "on_the_cookie_box": {
+      "all_layout_residual_rms_meters": 0.036484566474831365,
+      "fit_rows": 10,
+      "rows": 20,
+      "target_difference_span_meters": 0.15847946351068962,
+      "validation_residual_rms_meters": 0.04018003311260897,
+      "validation_rows": 5
+    },
+    "on_the_ramekin": {
+      "all_layout_residual_rms_meters": 0.04047829955137485,
+      "fit_rows": 9,
+      "rows": 16,
+      "target_difference_span_meters": 0.1632254221549125,
+      "validation_residual_rms_meters": 0.04754431769411993,
+      "validation_rows": 4
+    },
+    "on_the_stove": {
+      "all_layout_residual_rms_meters": 0.028696820426275613,
+      "fit_rows": 7,
+      "rows": 16,
+      "target_difference_span_meters": 0.11442921051183377,
+      "validation_residual_rms_meters": 0.024295907385020934,
+      "validation_rows": 4
+    },
+    "on_the_wooden_cabinet": {
+      "all_layout_residual_rms_meters": 0.03072166336982291,
+      "fit_rows": 10,
+      "rows": 19,
+      "target_difference_span_meters": 0.13587643358207402,
+      "validation_residual_rms_meters": 0.04393346024685496,
+      "validation_rows": 4
+    }
+  },
+  "pooled_layout_residual_rms_meters": 0.03777558362620756,
+  "pooled_validation_residual_rms_meters": 0.041864944363023536,
+  "rows": 156,
+  "status": "passed",
+  "study": "pi05-libero-plus-intended-future-geometry-tc2-v2",
+  "target_field": "simulator_target_difference_xy",
+  "written_before_model_outcomes": true
+}

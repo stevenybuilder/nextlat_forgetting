@@ -197,14 +197,29 @@ def main() -> int:
                 target_a = positions[subject_a].copy()
                 target_b = positions[subject_b].copy()
                 actual_delta = target_a - target_b
-                bddl_delta = np.asarray(
-                    row["bddl_target_difference_xy"], dtype=np.float64
-                )
-                if float(np.linalg.norm(actual_delta[:2] - bddl_delta)) > float(
-                    config["stimulus"]["maximum_bddl_to_simulator_xy_error_meters"]
-                ):
+                if "simulator_target_difference_xy" in row:
+                    target_reference = "simulator_fixed_state"
+                    reference_delta = np.asarray(
+                        row["simulator_target_difference_xy"], dtype=np.float64
+                    )
+                    tolerance = float(
+                        config["stimulus"][
+                            "maximum_manifest_to_simulator_xy_error_meters"
+                        ]
+                    )
+                else:
+                    target_reference = "bddl_region_center"
+                    reference_delta = np.asarray(
+                        row["bddl_target_difference_xy"], dtype=np.float64
+                    )
+                    tolerance = float(
+                        config["stimulus"][
+                            "maximum_bddl_to_simulator_xy_error_meters"
+                        ]
+                    )
+                if float(np.linalg.norm(actual_delta[:2] - reference_delta)) > tolerance:
                     raise RuntimeError(
-                        "simulator target positions disagree with BDDL preflight"
+                        f"simulator target positions disagree with {target_reference} preflight"
                     )
                 actual_delta[2] = 0.0
                 family_delta = np.asarray(

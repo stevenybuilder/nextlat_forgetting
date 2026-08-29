@@ -28,6 +28,31 @@ def _condition(first_touch: str | None, progress: float, *, patched: bool) -> di
     }
 
 
+def test_v2_manifest_is_bound_to_exact_simulator_states():
+    config_path = ROOT / "config" / "layout_shift_tc2_v2.json"
+    manifest_path = ROOT / "manifests" / "layout_shift_tc2_v2_stimuli.json"
+    preflight_path = ROOT / "results" / "target_control_tc2_v2" / "layout_preflight.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+    assert config["status"] == "frozen"
+    assert manifest["config_sha256"] == hashlib.sha256(config_path.read_bytes()).hexdigest()
+    assert preflight["manifest_sha256"] == manifest["manifest_sha256"]
+    assert preflight["target_field"] == "simulator_target_difference_xy"
+    assert preflight["all_checks_passed"] is True
+    assert len(manifest["rows"]) == 156
+    assert {item["stimulus_id"] for item in manifest["excluded_invalid_states"]} == {
+        "from_table_center-l3-s1",
+        "next_to_the_plate-l3-s1",
+    }
+    assert all(
+        len(row["simulator_target_difference_xy"]) == 2
+        and len(row["simulator_target_xyz_a"]) == 3
+        and len(row["simulator_target_xyz_b"]) == 3
+        for row in manifest["rows"]
+    )
+
+
 def test_residual_observer_can_pass_without_prompt_mean_leakage(tmp_path):
     config = json.loads(
         (ROOT / "config" / "layout_shift_tc2.json").read_text(encoding="utf-8")
