@@ -1,0 +1,33 @@
+{
+  "analysis": "two-sided noncentral-t approximation over twelve scene means",
+  "alpha": 0.05,
+  "claim_boundary": "planning calibration from M0 heterogeneity, not a guarantee for TC1 and not the frozen TC1 hypothesis test",
+  "degrees_of_freedom": 11,
+  "m0_full_replay_minus_recipient_scene_effects": {
+    "scene-00": 0.6666666666666666,
+    "scene-01": 0.6666666666666666,
+    "scene-03": 0.0,
+    "scene-04": 0.3333333333333333,
+    "scene-05": 0.3333333333333333,
+    "scene-07": 1.0,
+    "scene-08": 0.6666666666666666,
+    "scene-09": 0.3333333333333333,
+    "scene-11": 0.0,
+    "scene-12": 0.3333333333333333,
+    "scene-13": 0.3333333333333333,
+    "scene-14": 1.0
+  },
+  "m0_scene_mean": 0.4722222222222222,
+  "m0_scene_standard_deviation": 0.332068306631874,
+  "power_by_assumed_mean_effect": {
+    "0.15": 0.2982700593532638,
+    "0.20": 0.4775755575632004,
+    "0.25": 0.6614299480957291,
+    "0.30": 0.8126833403209591,
+    "0.35": 0.9127798075565624,
+    "0.4722": 0.9938313740257093
+  },
+  "practical_80_percent_detectable_effect": "approximately 0.30 under M0 scene heterogeneity",
+  "scenes": 12,
+  "source": "36 valid M0 units, three states nested in each scene"
+}

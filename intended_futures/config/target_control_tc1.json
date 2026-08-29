@@ -1,0 +1,189 @@
+{
+  "study": "pi05-selective-target-control-tc1-v1",
+  "status": "frozen",
+  "created_date": "2026-08-29",
+  "frozen_at_utc": "2026-08-29T05:00:37Z",
+  "pre_freeze_screening": {
+    "candidate_config_file_sha256": "90972b4a342b5cd92f81f75cce6b9b042c38c012f239993928a8a56ab90bfb43",
+    "candidate_manifest_file_sha256": "96d89fe579e3be81c653ecabd02b50c93407082b55dd74cac3656a84fc6e8634",
+    "candidate_manifest_sha256": "f1523f509915f407de246c2edc1f74aac99b43cbe090c24dd992a91ab50a3c5c",
+    "candidate_preflight_file_sha256": "5b4b9fc48a2906267e596b7d635ceac3bbffd40ea78dcccba4c757eabf11b7d6",
+    "states_validated": 480,
+    "minimum_pair_distance_meters": 0.21312873872220306,
+    "model_outcomes_observed": false
+  },
+  "purpose": "independent-state confirmation of compact target control at the manipulation-validated PaliGemma pathway",
+  "upstream": {
+    "action_atlas_repository": "https://github.com/CWRU-AISM/action-atlas",
+    "action_atlas_commit": "b8b0db331df18fc30a3fd92c45ec721d35d3ee52",
+    "libero_cf_repository": "https://github.com/yuffish/libero-cf",
+    "libero_cf_commit": "8460457bfca6e0ef2e856bc104e2c60b023ef2a7",
+    "openpi_repository": "https://github.com/Physical-Intelligence/openpi",
+    "openpi_reference_commit": "215abfb217dbac7d5f1273282331b9b1866c0479"
+  },
+  "parent": {
+    "pilot_config": "config/pilot_v4.json",
+    "pilot_study": "geometry-of-intended-futures-pi05-pilot-v4",
+    "pilot_manifest": "manifests/pilot_v4_stimuli.json",
+    "pilot_manifest_sha256": "5b1a4df70974379fc9e915a1b915073f5cb0ab4f4c4e7682d1fe9b3b5738f008",
+    "m0_study": "pi05-selective-target-control-m0",
+    "m0_config": "config/target_control_m0.json"
+  },
+  "site": {
+    "site_id": "paligemma_l13",
+    "pathway": "paligemma",
+    "layer": 13,
+    "indexing": "zero_based",
+    "token_pooling": "none",
+    "selection_rule": "pre-outcome Action Atlas goal-classification maximum, then retained because full replay redirected target behavior in M0"
+  },
+  "population": {
+    "suite": "libero_cf_spatial_focused",
+    "scene_ids": [
+      "scene-00",
+      "scene-01",
+      "scene-03",
+      "scene-04",
+      "scene-05",
+      "scene-07",
+      "scene-08",
+      "scene-09",
+      "scene-11",
+      "scene-12",
+      "scene-13",
+      "scene-14"
+    ],
+    "previously_observed_state_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "observer_fit_state_indices": [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+    "observer_validation_state_indices": [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
+    "causal_test_state_indices": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
+    "reserve_state_indices": [40, 41, 42, 43, 44, 45, 46, 47, 48, 49],
+    "expected_manifest_rows": 480,
+    "expected_observer_fit_units": 120,
+    "expected_observer_validation_units": 120,
+    "expected_causal_test_units": 120,
+    "minimum_pair_distance_meters": 0.05,
+    "inference_cluster": "scene_id",
+    "estimand_scope": "finite frozen population of 12 scene-prompt contrasts; states are nested replicates and do not expand scene-level scope"
+  },
+  "observer": {
+    "target": "donor-minus-recipient initial object position in meters",
+    "feature": "donor-minus-recipient PaliGemma layer-13 per-token residual output",
+    "activation_archive_dtype": "float16 copied from bfloat16 inference activations; fitting promotes to float64",
+    "fit": "zero-intercept dual ridge",
+    "ridge_fraction_grid": [1e-06, 0.0001, 0.01, 1.0],
+    "ridge_scale": "fraction of mean diagonal of the training Gram matrix",
+    "selection": "maximum leave-one-scene-out R-squared on observer-fit states; ties select the larger ridge fraction",
+    "final_controller_fit": "after the validation gate passes, refit the selected ridge on observer-fit plus observer-validation states; causal-test and reserve states remain untouched",
+    "validation_baselines": [
+      "global mean target displacement from observer-fit states",
+      "ordered subject-pair mean from observer-fit states",
+      "exact prompt-pair mean from observer-fit states"
+    ],
+    "validation_gate": {
+      "minimum_r2": 0.05,
+      "minimum_residual_sse_reduction_over_exact_prompt_pair": 0.1,
+      "minimum_positive_scene_cosines": 9
+    },
+    "failure_action": "stop before causal rollouts"
+  },
+  "controller": {
+    "primary": "minimum_norm_decoder_solution",
+    "decoder_inverse_ridge_fraction": 1e-06,
+    "decoder_inverse_scale": "fraction of mean diagonal of beta-transpose-beta",
+    "maximum_norm_fraction_of_full_donor_delta": 1.0,
+    "patch_schedule": "all_matching_calls_delta",
+    "desired_change": "simulator-measured donor-minus-recipient initial object position",
+    "no_behavioral_tuning": true
+  },
+  "conditions": [
+    {
+      "condition_id": "donor_clean",
+      "prompt_side": "donor",
+      "patch_kind": "none"
+    },
+    {
+      "condition_id": "recipient_clean",
+      "prompt_side": "recipient",
+      "patch_kind": "none"
+    },
+    {
+      "condition_id": "minimum_norm",
+      "prompt_side": "recipient",
+      "patch_kind": "minimum_norm_target"
+    },
+    {
+      "condition_id": "donor_projection",
+      "prompt_side": "recipient",
+      "patch_kind": "target_projection"
+    },
+    {
+      "condition_id": "matched_random",
+      "prompt_side": "recipient",
+      "patch_kind": "random_controller"
+    },
+    {
+      "condition_id": "full_replay",
+      "prompt_side": "recipient",
+      "patch_kind": "full_donor"
+    }
+  ],
+  "rollout": {
+    "replans": 12,
+    "execute_actions_per_replan": 5,
+    "stop_on_first_candidate_touch": true,
+    "freeze_initial_target_positions": true,
+    "condition_order_seed": 108221,
+    "noise_seed_offset": 800000,
+    "random_direction_seed_offset": 900000,
+    "retry_failed_or_invalid_units": false
+  },
+  "endpoints": {
+    "primary": "donor-object first touch: minimum_norm minus recipient_clean",
+    "co_primary_selectivity": "donor-object first touch: minimum_norm minus matched_random",
+    "manipulation_check": "donor-object first touch: full_replay minus recipient_clean",
+    "secondary": [
+      "recipient-object first touch",
+      "donor-target progress",
+      "recipient-target progress",
+      "first-action donor recovery fraction",
+      "patch norm divided by full donor-delta norm",
+      "invalid action or patch receipts"
+    ],
+    "uncertainty": "10000-repetition scene-cluster bootstrap confidence interval",
+    "randomization_check": "exact scene-level sign-flip p-value",
+    "analysis_seed": 108222
+  },
+  "decision_rule": {
+    "manipulation_check_required": {
+      "full_replay_minus_recipient_touch_minimum": 0.2,
+      "confidence_interval_lower_above_zero": true,
+      "positive_scene_effects_minimum": 9,
+      "exact_patch_receipts": true
+    },
+    "compact_target_control_supported_only_if_all": {
+      "minimum_norm_minus_recipient_touch_minimum": 0.15,
+      "minimum_norm_minus_random_touch_minimum": 0.1,
+      "both_confidence_interval_lowers_above_zero": true,
+      "positive_scene_effects_minimum": 9,
+      "exact_patch_receipts": true,
+      "invalid_units_maximum": 0
+    },
+    "multiplicity": "intersection-union: every listed criterion must pass; no favorable endpoint substitution",
+    "failed_manipulation_interpretation": "learned-controller outcome is assay-inconclusive",
+    "failed_controller_interpretation": "evidence against this linear decoder, norm cap, layer, checkpoint, and frozen LIBERO-CF population only",
+    "replication_rule": "run the reserve split if and only if every manipulation and compact-control criterion passes on causal_test; never use reserve states to rescue a failed or inconclusive primary test",
+    "final_positive_claim": "requires the unchanged decision rule to pass again on the reserve split"
+  },
+  "runtime_contract": {
+    "num_gpus": 1,
+    "distributed": false,
+    "gpu_class": "RTX 4090",
+    "inference_dtype": "bfloat16",
+    "simulator_renderer": "osmesa",
+    "maximum_new_rental_usd": 5.0
+  },
+  "power_boundary": "twelve scene clusters are calibrated for a large target-redirection effect; a null result cannot exclude a 15-percentage-point effect unless its scene-cluster interval does so",
+  "power_calibration": "results/target_control_m0/tc1_power_calibration.json",
+  "claim_boundary": "tests oracle-coordinate-assisted compact control of instruction-selected pickup targets, not temporally extended futures, autonomous target inference, planning, task completion, or a general world model"
+}

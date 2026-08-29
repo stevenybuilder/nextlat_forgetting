@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import logging
 from pathlib import Path
 import socket
 import sys
+
+import numpy as np
 
 
 def main() -> int:
@@ -17,6 +20,7 @@ def main() -> int:
     parser.add_argument("--denoising-calls", type=int, default=10)
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--target-controller", type=Path)
     args = parser.parse_args()
 
     project_src = Path(__file__).parents[1] / "src"
@@ -37,11 +41,25 @@ def main() -> int:
         args.checkpoint,
         pytorch_device=args.device,
     )
+    target_controller = None
+    if args.target_controller is not None:
+        with np.load(args.target_controller, allow_pickle=False) as artifact:
+            target_controller = {
+                "pathway": str(artifact["pathway"].item()),
+                "layer": int(artifact["layer"].item()),
+                "beta": np.asarray(artifact["beta"], dtype=np.float32),
+                "inverse_ridge_fraction": float(artifact["inverse_ridge_fraction"].item()),
+                "maximum_norm_fraction_of_full_donor_delta": float(
+                    artifact["maximum_norm_fraction_of_full_donor_delta"].item()
+                ),
+                "artifact_sha256": hashlib.sha256(args.target_controller.read_bytes()).hexdigest(),
+            }
     policy = InstrumentedPairedPolicy(
         base_policy,
         layer_indices=layers,
         expected_denoising_calls=args.denoising_calls,
         paligemma_layer_indices=paligemma_layers,
+        target_controller=target_controller,
     )
     logging.info(
         "Serving instrumented policy on %s with expert layers %s and PaliGemma layers %s",

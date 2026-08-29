@@ -46,6 +46,43 @@ def test_v4_replacement_scene_preserves_balance() -> None:
     assert all(side_a.count(subject) == side_b.count(subject) == 4 for subject in set(side_a + side_b))
 
 
+def test_tc1_frozen_protocol_uses_four_disjoint_untouched_state_splits() -> None:
+    protocol = json.loads(
+        (ROOT / "config" / "target_control_tc1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    population = protocol["population"]
+    split_fields = [
+        "observer_fit_state_indices",
+        "observer_validation_state_indices",
+        "causal_test_state_indices",
+        "reserve_state_indices",
+    ]
+    split_sets = [set(population[field]) for field in split_fields]
+    assert all(len(indices) == 10 for indices in split_sets)
+    assert set.union(*split_sets) == set(range(10, 50))
+    assert all(
+        left.isdisjoint(right)
+        for index, left in enumerate(split_sets)
+        for right in split_sets[index + 1 :]
+    )
+    assert set(population["previously_observed_state_indices"]).isdisjoint(
+        set.union(*split_sets)
+    )
+    assert population["expected_manifest_rows"] == 12 * 40
+    assert population["minimum_pair_distance_meters"] == 0.05
+    assert protocol["status"] == "frozen"
+    assert protocol["site"] == {
+        "site_id": "paligemma_l13",
+        "pathway": "paligemma",
+        "layer": 13,
+        "indexing": "zero_based",
+        "token_pooling": "none",
+        "selection_rule": "pre-outcome Action Atlas goal-classification maximum, then retained because full replay redirected target behavior in M0",
+    }
+
+
 def test_manifest_uses_only_exact_initial_state_matches(tmp_path):
     config = json.loads((ROOT / "config" / "pilot.json").read_text(encoding="utf-8"))
     suite = config["benchmark"]["suite"]

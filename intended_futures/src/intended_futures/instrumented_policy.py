@@ -7,6 +7,8 @@ from typing import Any
 
 import numpy as np
 
+from .geometry import construct_target_controller_delta
+
 from .openpi_hooks import (
     AllCallsDeltaPatch,
     CaptureCalls,
@@ -30,6 +32,7 @@ _CONTROL_KEYS = {
     "__patch_kind",
     "__patch_schedule",
     "__random_direction_seed",
+    "__desired_target_delta",
     "__future_basis",
     "__random_basis",
 }
@@ -45,6 +48,7 @@ class InstrumentedPairedPolicy:
         layer_indices: list[int],
         expected_denoising_calls: int,
         paligemma_layer_indices: list[int] | None = None,
+        target_controller: dict[str, Any] | None = None,
     ):
         if not getattr(base_policy, "_is_pytorch_model", False):
             raise TypeError("instrumentation requires a converted PyTorch OpenPI checkpoint")
@@ -71,6 +75,7 @@ class InstrumentedPairedPolicy:
             "paligemma": self._paligemma_layers,
         }
         self._expected_calls = int(expected_denoising_calls)
+        self._target_controller = target_controller
 
     @property
     def metadata(self) -> dict[str, Any]:
@@ -83,6 +88,7 @@ class InstrumentedPairedPolicy:
             },
             "expected_denoising_calls": self._expected_calls,
             "token_pooling": "none",
+            "target_controller_loaded": self._target_controller is not None,
         }
         return metadata
 
@@ -158,15 +164,27 @@ class InstrumentedPairedPolicy:
         obs_b["prompt"] = prompt_b
 
         started = time.monotonic()
-        result_a, activations_a, calls_a, _, _ = self._capture(obs_a, noise)
-        result_b, activations_b, calls_b, _, _ = self._capture(obs_b, noise)
+        result_a, activations_a, calls_a, all_a, pathway_calls_a = self._capture(obs_a, noise)
+        result_b, activations_b, calls_b, all_b, pathway_calls_b = self._capture(obs_b, noise)
+        paligemma_a = {
+            layer: calls[0][0]
+            for layer, calls in all_a["paligemma"].items()
+        }
+        paligemma_b = {
+            layer: calls[0][0]
+            for layer, calls in all_b["paligemma"].items()
+        }
         return {
             "actions_a": np.asarray(result_a["actions"], dtype=np.float32),
             "actions_b": np.asarray(result_b["actions"], dtype=np.float32),
             "activations_a": activations_a,
             "activations_b": activations_b,
+            "paligemma_activations_a": paligemma_a,
+            "paligemma_activations_b": paligemma_b,
             "denoising_calls_a": calls_a,
             "denoising_calls_b": calls_b,
+            "pathway_calls_a": pathway_calls_a,
+            "pathway_calls_b": pathway_calls_b,
             "noise_seed": noise_seed,
             "pair_infer_ms": (time.monotonic() - started) * 1000.0,
         }
@@ -193,6 +211,9 @@ class InstrumentedPairedPolicy:
             "random_subspace",
             "full_donor",
             "random_direction",
+            "minimum_norm_target",
+            "target_projection",
+            "random_controller",
         }:
             raise ValueError(f"unsupported patch kind: {patch_kind}")
         if patch_schedule not in {"first_call", "all_calls_replay", "all_calls_delta"}:
@@ -234,7 +255,39 @@ class InstrumentedPairedPolicy:
         recipient = recipient_sequence[0][0]
         difference = (donor - recipient).reshape(-1).astype(np.float64)
         future_delta: np.ndarray | None = None
-        if patch_kind == "future_subspace":
+        controller_delta: np.ndarray | None = None
+        if patch_kind in {"minimum_norm_target", "target_projection", "random_controller"}:
+            if self._target_controller is None:
+                raise RuntimeError("target-controller intervention requested without a loaded controller")
+            controller = self._target_controller
+            if (
+                str(controller["pathway"]) != selected_pathway
+                or int(controller["layer"]) != selected_layer
+            ):
+                raise ValueError("loaded target controller does not match the selected site")
+            beta = np.asarray(controller["beta"], dtype=np.float64)
+            if beta.ndim != 2 or beta.shape != (len(difference), 3):
+                raise ValueError("target-controller beta does not match the activation grid")
+            desired = np.asarray(obs["__desired_target_delta"], dtype=np.float64)
+            if desired.shape != (3,) or not np.all(np.isfinite(desired)):
+                raise ValueError("desired target delta must be a finite three-vector")
+            controller_delta = construct_target_controller_delta(
+                beta,
+                difference,
+                desired,
+                kind=patch_kind,
+                inverse_ridge_fraction=float(controller["inverse_ridge_fraction"]),
+                maximum_norm_fraction=float(
+                    controller["maximum_norm_fraction_of_full_donor_delta"]
+                ),
+                random_seed=(
+                    int(obs["__random_direction_seed"])
+                    if patch_kind == "random_controller"
+                    else None
+                ),
+            ).reshape(-1)
+            delta = controller_delta
+        elif patch_kind == "future_subspace":
             future_basis = np.asarray(obs["__future_basis"], dtype=np.float64)
             if future_basis.ndim != 2 or future_basis.shape[0] != len(difference):
                 raise ValueError("future basis does not match the selected activation grid")
@@ -283,6 +336,13 @@ class InstrumentedPairedPolicy:
                     (donor_call - recipient_call).astype(np.float32)
                     for donor_call, recipient_call in zip(donor_sequence, recipient_sequence)
                 ]
+            elif patch_kind in {"minimum_norm_target", "target_projection", "random_controller"}:
+                if controller_delta is None:
+                    raise RuntimeError("all-call target intervention lacks a controller delta")
+                first_grid_delta = controller_delta.reshape(recipient.shape)[None, ...].astype(
+                    np.float32
+                )
+                call_deltas = [first_grid_delta.copy() for _ in recipient_sequence]
             else:
                 if future_delta is None:
                     raise RuntimeError("all-call learned patch requires a fitted future delta")
@@ -312,6 +372,11 @@ class InstrumentedPairedPolicy:
             "selected_pathway": selected_pathway,
             "selected_layer": selected_layer,
             "patch_schedule": patch_schedule,
+            "controller_artifact_sha256": (
+                self._target_controller.get("artifact_sha256")
+                if self._target_controller is not None
+                else None
+            ),
         }
         return {
             "actions": np.asarray(result["actions"], dtype=np.float32),
@@ -324,6 +389,11 @@ class InstrumentedPairedPolicy:
                 **patch_receipt,
                 "future_projection_norm": (
                     float(np.linalg.norm(future_delta)) if future_delta is not None else None
+                ),
+                "controller_delta_norm": (
+                    float(np.linalg.norm(controller_delta))
+                    if controller_delta is not None
+                    else None
                 ),
                 "full_difference_norm": float(np.linalg.norm(difference)),
             },
