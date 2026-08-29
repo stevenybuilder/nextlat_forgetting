@@ -229,3 +229,14 @@ the same instruction contrast must occur across substantially varied object layo
 activation observer must beat a training-only prompt-pair predictor on held-out layouts. Only then
 would the already implemented minimum-norm, matched-random, and full-replay comparison test whether
 the distributed donor state can be compressed into selective target control.
+
+### Frozen layout-identifiable follow-up (no model outcomes yet)
+
+TC2 implements that criterion with the official LIBERO-Plus Objects Layout target-displacement
+tasks. Its frozen population contains 158 fixed states across nine visible spatial-task families:
+81 observer-fit tasks, 38 untouched validation tasks, and 39 causal tasks that remain inaccessible
+unless the residualized observer gate passes. The pre-model geometry audit found 3.48 cm pooled
+within-prompt layout RMS and at least 11 cm of target-difference span in every family. The hypothesis,
+splits, exact-prompt residualization, action-chunk positive control, prompt-mean controller control,
+causal thresholds, $2 compute cap, and stop rules are frozen in
+`TARGET_CONTROL_TC2_PROTOCOL.md`. This paragraph reports design state only, not a result.

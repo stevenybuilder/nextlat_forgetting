@@ -77,8 +77,11 @@ episodes before activations were interpreted.
 | `TARGET_CONTROL_TC1_PROTOCOL.md` | Frozen independent observer/controller confirmation |
 | `TARGET_CONTROL_TC1_REPORT.md` | Self-contained negative-result report and next-design criterion |
 | `config/target_control_tc1.json` | Disjoint fit, validation, causal-test, and reserve banks |
+| `TARGET_CONTROL_TC2_PROTOCOL.md` | Frozen LIBERO-Plus layout-identifiable observer and causal-control protocol |
+| `config/layout_shift_tc2.json` | Exact TC2 hypotheses, gates, topology, and $2 stop rule |
 | `manifests/target_control_tc1.json` | Exact 480-state TC1 population and split assignments |
 | `manifests/pilot_v4_stimuli.json` | Exact 120 matched contrasts |
+| `manifests/layout_shift_tc2_stimuli.json` | Exact 158 official LIBERO-Plus layout variants and splits |
 | `src/intended_futures/` | Validation, geometry, intervention, and statistical primitives |
 | `scripts/` | Collection, provenance, and analysis entry points |
 | `tests/` | Leakage, topology, geometry, instrumentation, and inference-unit checks |
@@ -86,6 +89,7 @@ episodes before activations were interpreted.
 | `results/causal_v4/` | Compact causal evidence and raw-file hashes |
 | `results/target_control_m0/` | Frozen gate result, post-hoc touch audit, receipt, and raw hashes |
 | `results/target_control_tc1/` | Preflight, runtime receipt, failed observer gate, and archive receipt |
+| `results/target_control_tc2/` | Pre-model geometry audit and, only after execution, compact TC2 evidence |
 | `ENGINEERING_LOG.md` | Aborted/invalidated designs and runtime deviations |
 
 Raw activations, checkpoints, simulator caches, credentials, and provider state are excluded from
